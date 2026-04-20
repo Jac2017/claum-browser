@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab — Glass Browser</title>
+  <style>
+    /* ================================================================
+       GLASS BROWSER — NEW TAB PAGE STYLES
+       Dark glass morphism theme with translucent layered surfaces.
+       Now supports multiple category sections like Google News.
+       ================================================================ */
+
+    /* --- Reset & Base --- */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+      background: #000;
+      color: rgba(255,255,255,0.92);
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* --- Background Image --- */
+    #bg {
+      position: fixed; inset: 0;
+      background: url('https://images.unsplash.com/photo-1472396961693-142e6e269027?w=1920&q=80') center/cover no-repeat;
+      z-index: 0;
+      transition: opacity 1.2s ease;
+    }
+    #bg::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.6) 100%);
+    }
+
+    /* --- Main Layout --- */
+    .container {
+      position: relative; z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* --- Clock & Greeting --- */
+    .hero {
+      text-align: center;
+      padding: 48px 0 32px;
+    }
+    .clock {
+      font-size: 72px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+    .greeting {
+      font-size: 22px;
+      font-weight: 300;
+      color: rgba(255,255,255,0.7);
+      margin-top: 8px;
+    }
+
+    /* --- Search Bar --- */
+    .search-wrap {
+      max-width: 620px;
+      margin: 0 auto 28px;
+    }
+    .search-bar {
+      width: 100%;
+      padding: 14px 20px 14px 48px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(28,28,30,0.72);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      color: rgba(255,255,255,0.92);
+      font-size: 15px;
+      outline: none;
+      transition: all 0.25s ease;
+    }
+    .search-bar::placeholder { color: rgba(255,255,255,0.35); }
+    .search-bar:focus {
+      border-color: rgba(10,132,255,0.5);
+      box-shadow: 0 0 0 3px rgba(10,132,255,0.15);
+      background: rgba(28,28,30,0.85);
+    }
+    .search-icon {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      color: rgba(255,255,255,0.35); pointer-events: none;
+    }
+
+    /* --- Bookmarks Bar with Pagination --- */
+    .bookmarks-section { margin-bottom: 28px; }
+    .bookmarks-nav {
+      display: flex; align-items: center; gap: 8px; justify-content: center;
+    }
+    .bookmarks-nav .nav-arrow {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(38,38,40,0.5);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease; flex-shrink: 0;
+    }
+    .bookmarks-nav .nav-arrow:hover:not(:disabled) {
+      background: rgba(58,58,60,0.7); color: rgba(255,255,255,0.9);
+    }
+    .bookmarks-nav .nav-arrow:disabled { opacity: 0.25; cursor: default; }
+    .bookmarks-row {
+      display: flex; gap: 12px; flex-wrap: nowrap;
+      justify-content: center; overflow: hidden;
+    }
+    .bookmark-page-indicator {
+      text-align: center; font-size: 11px;
+      color: rgba(255,255,255,0.25); margin-top: 8px;
+    }
+    .bookmark {
+      /* Rounded rectangle icon tile — favicon centered, name below */
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      width: 72px; height: 72px;
+      padding: 10px 6px 6px;
+      border-radius: 16px;
+      background: rgba(38,38,40,0.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.7); font-size: 10px;
+      text-decoration: none; transition: all 0.2s ease;
+      cursor: pointer; overflow: hidden;
+      text-align: center; line-height: 1.2;
+    }
+    .bookmark:hover {
+      background: rgba(58,58,60,0.7);
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+      color: rgba(255,255,255,0.95);
+    }
+    /* Large, centered favicon */
+    .bookmark img {
+      width: 28px; height: 28px; border-radius: 6px;
+      flex-shrink: 0;
+    }
+    /* Site name label — one line, ellipsis overflow */
+    .bookmark .bm-label {
+      max-width: 100%; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+      font-size: 10px;
+    }
+
+    /* ================================================================
+       CATEGORY-BASED FEED SECTIONS
+       Each category (Top Stories, Business, Tech, etc.) gets its own
+       section with a header and a horizontally scrolling row of cards.
+       ================================================================ */
+
+    /* The container for ALL feed sections */
+    #feedSections {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* Each category section */
+    .feed-section {
+      /* no extra styling needed — just spacing via gap above */
+    }
+
+    /* Section header row: category name + optional "See more" */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding: 0 4px;
+    }
+    .section-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.3px;
+    }
+
+    /* Horizontal scrolling row of cards */
+    .feed-row {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 8px;  /* space for scrollbar */
+    }
+    /* Sleek thin scrollbar */
+    .feed-row::-webkit-scrollbar { height: 4px; }
+    .feed-row::-webkit-scrollbar-track { background: transparent; }
+    .feed-row::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1); border-radius: 4px;
+    }
+    .feed-row::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* --- Glass Card (shared style for all feed items) --- */
+    .glass-card {
+      background: rgba(28,28,30,0.55);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: all 0.25s ease;
+      /* Fixed card width inside the scroll row */
+      min-width: 260px;
+      max-width: 260px;
+      scroll-snap-align: start;
+      flex-shrink: 0;
+    }
+    .glass-card:hover {
+      background: rgba(38,38,40,0.65);
+      border-color: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    /* --- Card thumbnail (image or gradient placeholder) --- */
+    .feed-item {
+      text-decoration: none; color: inherit;
+    }
+    .feed-item .thumb {
+      width: 100%; height: 148px;
+      object-fit: cover; display: block;
+    }
+    .feed-item .thumb-placeholder {
+      width: 100%; height: 148px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500;
+      color: rgba(255,255,255,0.25); letter-spacing: 0.5px;
+    }
+
+    /* --- Card info area --- */
+    .feed-item .info { padding: 12px 14px; }
+    .feed-item .title {
+      font-size: 13.5px; font-weight: 500; line-height: 1.4;
+      color: rgba(255,255,255,0.88); margin-bottom: 8px;
+      display: -webkit-box; -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .feed-item .source-row {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11.5px; color: rgba(255,255,255,0.4);
+    }
+    .feed-item .source-row img {
+      width: 14px; height: 14px; border-radius: 3px; opacity: 0.7;
+    }
+
+    /* --- YouTube play button overlay --- */
+    .thumb-wrap {
+      position: relative;
+    }
+    .yt-play-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px; height: 44px;
+      background: rgba(255,0,0,0.85);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .yt-play-overlay svg {
+      width: 18px; height: 18px;
+      fill: white;
+      margin-left: 2px; /* optical centering */
+    }
+
+    /* ================================================================
+       SHOPPING CARDS — styled differently from news cards
+       Shows product image, name, price, and optional deal badge.
+       ================================================================ */
+
+    .shopping-card {
+      background: rgba(28,28,30,0.55);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: all 0.25s ease;
+      min-width: 180px;
+      max-width: 180px;
+      scroll-snap-align: start;
+      flex-shrink: 0;
+      text-decoration: none;
+      color: inherit;
+    }
+    .shopping-card:hover {
+      background: rgba(38,38,40,0.65);
+      border-color: rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .shopping-card .product-img {
+      width: 100%; height: 160px;
+      object-fit: contain;
+      display: block;
+      background: rgba(255,255,255,0.04);
+      padding: 10px;
+    }
+    .shopping-card .product-info {
+      padding: 10px 12px 12px;
+    }
+    .shopping-card .product-name {
+      font-size: 12.5px; font-weight: 500; line-height: 1.35;
+      color: rgba(255,255,255,0.85);
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .shopping-card .product-price {
+      font-size: 14px; font-weight: 600;
+      color: rgba(72,199,142,0.95);
+    }
+    .shopping-card .product-source {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      margin-top: 3px;
+    }
+    /* Deal badge overlay on product image */
+    .deal-badge {
+      position: absolute; top: 8px; left: 8px;
+      background: rgba(255,69,58,0.85);
+      color: white; font-size: 10px; font-weight: 600;
+      padding: 3px 7px; border-radius: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    /* --- Loading spinner shown while feeds load --- */
+    .feed-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+      color: rgba(255,255,255,0.3);
+      font-size: 14px;
+    }
+
+    /* --- Top-right toolbar (Apps grid + Account) --- */
+    #topToolbar {
+      position: fixed; top: 16px; right: 20px; z-index: 100;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    /* --- Claude Toolbar Button --- */
+    /* Round button with the Claude sparkle icon, sits left of the apps grid.
+       Uses a subtle glow effect on hover to match Claude's brand warmth. */
+    .claude-toolbar-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: transparent;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .claude-toolbar-btn:hover {
+      background: rgba(217, 119, 87, 0.15);  /* Subtle Claude orange glow */
+    }
+    .claude-toolbar-btn:active {
+      background: rgba(217, 119, 87, 0.25);
+      transform: scale(0.95);
+    }
+
+    /* --- Google Apps Grid Button --- */
+    .apps-grid-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: transparent;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease;
+      color: rgba(255,255,255,0.6);
+    }
+    .apps-grid-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.95);
+    }
+    .apps-grid-btn.active {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+
+    /* --- Apps Dropdown Panel --- */
+    .apps-dropdown {
+      display: none;
+      position: absolute; top: 48px; right: 0;
+      width: 340px;
+      background: rgba(28,28,30,0.88);
+      backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 16px 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+    .apps-dropdown.visible { display: block; }
+    .apps-dropdown-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 2px;
+    }
+    .app-tile {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      padding: 10px 4px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: rgba(255,255,255,0.8);
+      font-size: 10px; text-align: center;
+      transition: background 0.15s ease;
+      line-height: 1.2;
+    }
+    .app-tile:hover {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+    }
+    .app-tile img {
+      width: 32px; height: 32px; border-radius: 50%;
+    }
+    .app-tile .app-label {
+      max-width: 64px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* --- Google Account Indicator --- */
+    #accountIndicator {
+    }
+    .account-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(10,132,255,0.7);
+      color: #fff; font-size: 16px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s ease;
+      border: 2px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .account-avatar:hover {
+      background: rgba(10,132,255,0.9);
+      border-color: rgba(255,255,255,0.3);
+      transform: scale(1.08);
+    }
+    .account-signin {
+      display: inline-block; padding: 6px 14px;
+      border-radius: 18px; font-size: 12px; font-weight: 500;
+      background: rgba(38,38,40,0.65);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(10,132,255,0.9);
+      text-decoration: none; transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .account-signin:hover {
+      background: rgba(58,58,60,0.7);
+      border-color: rgba(10,132,255,0.4);
+      color: #fff;
+    }
+
+    /* --- Footer --- */
+    .footer {
+      text-align: center;
+      padding: 40px 0 20px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.2);
+    }
+
+    /* --- Utility --- */
+    .relative { position: relative; }
+
+    /* ================================================================
+       AD UNITS — Google AdSense multiplex ads between feed sections
+       ================================================================ */
+
+    /* Container for an ad iframe — sits between feed sections.
+       HIDDEN BY DEFAULT — only shown when the ad frame confirms
+       a real ad loaded. This prevents blank gaps when AdSense
+       isn't serving (e.g. account not fully set up yet). */
+    .ad-unit {
+      margin: 12px 0 20px;
+      padding: 0 var(--feed-pad, 32px);
+      width: 100%;
+      display: none;   /* Hidden until ad confirms load */
+    }
+    .ad-unit.ad-loaded {
+      display: block;  /* Shown when ad frame reports success */
+    }
+
+    /* The iframe itself — blends with the dark glass design */
+    .ad-unit iframe {
+      width: 100%;
+      height: 280px;
+      border: none;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      overflow: hidden;
+    }
+
+    /* In-feed ad card — sits inside a horizontal scroll row.
+       Also hidden by default until ad loads. */
+    .ad-card-unit {
+      flex-shrink: 0;
+      width: 260px;
+      height: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: none;   /* Hidden until ad confirms load */
+    }
+    .ad-card-unit.ad-loaded {
+      display: block;
+    }
+    .ad-card-unit iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* Small "Ad" label for transparency — also hidden by default */
+    .ad-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 0 var(--feed-pad, 32px);
+      margin-bottom: 4px;
+      display: none;   /* Hidden until ad confirms load */
+    }
+    .ad-label.ad-loaded {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="bg"></div>
+
+  <div class="container">
+
+    <!-- Clock & Greeting -->
+    <div class="hero">
+      <div class="clock" id="clock">--:--</div>
+      <div class="greeting" id="greeting">Good evening</div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-wrap relative">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input class="search-bar" type="text" placeholder="Search Google or type a URL" id="searchInput" autocomplete="off">
+    </div>
+
+    <!-- Bookmarks Bar -->
+    <div class="bookmarks-section">
+      <div class="bookmarks-nav">
+        <button class="nav-arrow" id="bookmarkPrev" disabled title="Previous page">&#x2039;</button>
+        <div class="bookmarks-row" id="bookmarks"></div>
+        <button class="nav-arrow" id="bookmarkNext" title="Next page">&#x203A;</button>
+      </div>
+      <div class="bookmark-page-indicator" id="bookmarkPageIndicator"></div>
+    </div>
+
+    <!-- ============================================================
+         CATEGORY FEED SECTIONS
+         Each section (Top Stories, Business, Tech, etc.) is generated
+         by newtab.js and injected into this container.
+         ============================================================ -->
+    <div id="feedSections">
+      <div class="feed-loading">Loading your news feed...</div>
+    </div>
+
+    <div class="footer">Glass Browser &mdash; Browse Beautifully</div>
+  </div>
+
+  <script src="newtab.js"></script>
+</body>
+</html>

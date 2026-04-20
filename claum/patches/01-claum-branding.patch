@@ -1,0 +1,49 @@
+# ============================================================================
+# 01-claum-branding.patch
+# ----------------------------------------------------------------------------
+# Renames every user-visible "Chromium" → "Claum" string. Doesn't touch the
+# C++ namespace `chromium` or any internal symbols.
+#
+# Strings live in:
+#   chrome/app/chromium_strings.grd  (English source of truth)
+#   chrome/app/resources/locale_settings_*.grd  (per-locale overrides)
+#   chrome/browser/ui/views/frame/...   (window title formatters)
+#   build/util/LASTCHANGE.committime  (about-page build stamp — left alone)
+# ============================================================================
+
+diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
+--- a/chrome/app/chromium_strings.grd
++++ b/chrome/app/chromium_strings.grd
+@@ -0,0 +0,0 @@
+-  <message name="IDS_PRODUCT_NAME" desc="Product name (Chromium)">
+-    Chromium
+-  </message>
++  <message name="IDS_PRODUCT_NAME" desc="Product name (Claum)">
++    Claum
++  </message>
+-  <message name="IDS_SHORT_PRODUCT_NAME" desc="Short product name">
+-    Chromium
+-  </message>
++  <message name="IDS_SHORT_PRODUCT_NAME" desc="Short product name">
++    Claum
++  </message>
+-  <message name="IDS_PRODUCT_DESCRIPTION" desc="Product description">
+-    Chromium is a free, open-source web browser.
+-  </message>
++  <message name="IDS_PRODUCT_DESCRIPTION" desc="Product description">
++    Claum is a privacy-focused browser with a glass UI and Claude built in.
++  </message>
+-  <message name="IDS_ABOUT_VERSION_COMPANY_NAME" desc="Company name on About page">
+-    The Chromium Authors
+-  </message>
++  <message name="IDS_ABOUT_VERSION_COMPANY_NAME" desc="Company name on About page">
++    The Claum Authors
++  </message>
+diff --git a/chrome/browser/ui/views/frame/browser_window_property_manager_win.cc b/chrome/browser/ui/views/frame/browser_window_property_manager_win.cc
+--- a/chrome/browser/ui/views/frame/browser_window_property_manager_win.cc
++++ b/chrome/browser/ui/views/frame/browser_window_property_manager_win.cc
+@@ -0,0 +0,0 @@
+   // Set the AppUserModelID so Windows groups our taskbar windows correctly
+   // and pins/jumplists work.
+-  ui::win::SetAppIdForWindow(L"Chromium", hwnd);
++  ui::win::SetAppIdForWindow(L"Claum", hwnd);

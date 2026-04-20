@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glass Browser Sidebar</title>
+  <style>
+    /* ================================================================
+       GLASS BROWSER — SIDE PANEL STYLES
+       Vertical tabs + Claude AI panel in one sidebar
+       ================================================================ */
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      background: rgba(15,15,17,0.97);
+      color: rgba(255,255,255,0.92);
+      font-size: 13px;
+      overflow-x: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Top Navigation (switch between Tabs and Claude) --- */
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(20,20,22,0.95);
+      flex-shrink: 0;
+    }
+    .nav-tab {
+      flex: 1;
+      padding: 10px 0;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .nav-tab:hover { color: rgba(255,255,255,0.6); }
+    .nav-tab.active {
+      color: rgba(10,132,255,0.95);
+      border-bottom-color: rgba(10,132,255,0.8);
+    }
+
+    /* --- Panels --- */
+    .panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .panel.active { display: flex; }
+
+    /* ================================================================
+       VERTICAL TABS PANEL
+       ================================================================ */
+
+    .tab-search-wrap {
+      padding: 10px 12px;
+      flex-shrink: 0;
+    }
+    .tab-search {
+      width: 100%;
+      padding: 8px 12px 8px 32px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(28,28,30,0.7);
+      color: rgba(255,255,255,0.9);
+      font-size: 12px;
+      outline: none;
+    }
+    .tab-search::placeholder { color: rgba(255,255,255,0.3); }
+    .tab-search:focus {
+      border-color: rgba(10,132,255,0.4);
+      background: rgba(28,28,30,0.9);
+    }
+    .tab-search-wrap { position: relative; }
+    .tab-search-wrap svg {
+      position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
+      color: rgba(255,255,255,0.3);
+    }
+
+    .tab-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px 8px;
+    }
+    .tab-list::-webkit-scrollbar { width: 4px; }
+    .tab-list::-webkit-scrollbar-track { background: transparent; }
+    .tab-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+    .group-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 8px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .group-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .group-header .count { margin-left: auto; font-weight: 400; color: rgba(255,255,255,0.2); }
+    .group-header .chevron { transition: transform 0.2s; color: rgba(255,255,255,0.2); }
+    .group-header.collapsed .chevron { transform: rotate(-90deg); }
+
+    .tab-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .tab-item:hover { background: rgba(255,255,255,0.05); }
+    .tab-item.active-tab {
+      background: rgba(10,132,255,0.12);
+      border: 1px solid rgba(10,132,255,0.2);
+    }
+    .tab-item .favicon { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; }
+    .tab-item .tab-title {
+      flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 12.5px; color: rgba(255,255,255,0.78);
+    }
+    .tab-item.active-tab .tab-title { color: rgba(255,255,255,0.95); }
+    .tab-item .close-btn {
+      display: none; width: 16px; height: 16px; border-radius: 4px; border: none;
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4);
+      font-size: 11px; cursor: pointer; line-height: 16px; text-align: center; flex-shrink: 0;
+    }
+    .tab-item:hover .close-btn { display: block; }
+    .tab-item .close-btn:hover { background: rgba(255,69,58,0.3); color: #ff453a; }
+    .tab-item .pin-icon { color: rgba(255,255,255,0.25); font-size: 10px; flex-shrink: 0; }
+    .group-tabs.hidden { display: none; }
+
+    .new-tab-btn {
+      margin: 8px 12px 12px; padding: 8px 0; border-radius: 8px;
+      border: 1px dashed rgba(255,255,255,0.1); background: transparent;
+      color: rgba(255,255,255,0.35); font-size: 12px; cursor: pointer;
+      text-align: center; transition: all 0.2s; flex-shrink: 0;
+    }
+    .new-tab-btn:hover {
+      border-color: rgba(10,132,255,0.4); color: rgba(10,132,255,0.8);
+      background: rgba(10,132,255,0.05);
+    }
+
+    /* ================================================================
+       CLAUDE AI PANEL — embeds claude.ai directly
+       ================================================================ */
+
+    /* --- Claude toolbar (sits above the iframe) --- */
+    .claude-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(20,20,22,0.95);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;             /* Don't let the toolbar shrink */
+    }
+    .claude-toolbar-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+    }
+    /* Pop-out button — opens Claude in a full tab for voice mode */
+    .claude-popout {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .claude-popout:hover {
+      background: rgba(10,132,255,0.15);
+      border-color: rgba(10,132,255,0.3);
+      color: rgba(10,132,255,0.9);
+    }
+    .claude-popout svg {
+      flex-shrink: 0;
+    }
+
+    /* The iframe fills the entire Claude panel */
+    .claude-frame {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #1a1a1a;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top navigation: switch between Tabs and Claude -->
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-panel="tabs-panel">Tabs</div>
+    <div class="nav-tab" data-panel="claude-panel">Claude</div>
+  </div>
+
+  <!-- ============================================================
+       VERTICAL TABS PANEL
+       ============================================================ -->
+  <div class="panel active" id="tabs-panel">
+    <div class="tab-search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input class="tab-search" type="text" placeholder="Search tabs..." id="tabSearch">
+    </div>
+    <div class="tab-list" id="tabList"></div>
+    <button class="new-tab-btn" id="newTabBtn">+ New Tab</button>
+  </div>
+
+  <!-- ============================================================
+       CLAUDE AI PANEL — embeds claude.ai in the sidebar.
+       Chrome blocks cross-extension iframing, so we can't embed
+       the Claude extension (fcoeoabgfenejglbffodgkkbkcdhcgfn)
+       directly. Instead we load claude.ai with header stripping
+       via rules.json. "Open in Tab" button is available for
+       voice mode or to use the native Claude extension.
+       ============================================================ -->
+  <div class="panel" id="claude-panel">
+    <!-- Top bar with pop-out button -->
+    <div class="claude-toolbar">
+      <span class="claude-toolbar-label">Claude AI</span>
+      <button class="claude-popout" id="claudePopout" title="Open Claude in full tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        Open in Tab
+      </button>
+    </div>
+    <!-- The iframe loads the Claude Chrome extension's side panel.
+         "allow" grants all permissions Claude might need for voice. -->
+    <iframe
+      id="claudeFrame"
+      class="claude-frame"
+      src="about:blank"
+      allow="microphone *; camera *; clipboard-write *; autoplay *; display-capture *"
+    ></iframe>
+  </div>
+
+  <!-- All JS in external file (Manifest V3 requirement) -->
+  <script src="sidepanel.js"></script>
+</body>
+</html>

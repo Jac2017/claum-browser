@@ -1,0 +1,24 @@
+# Build output — created inside the ungoogled-chromium checkout, never here
+build/
+out/
+*.app/
+*.dmg
+*.exe
+*.msi
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor cruft
+.vscode/
+.idea/
+*.swp
+
+# Generated from sources (do not commit)
+claum/extensions/*/_generated_*
+claum/resources/**/_bundle_*
+
+# Node / npm if you use them for extension dev
+node_modules/
+*.log

@@ -1,0 +1,39 @@
+// Claum Windows resource file.
+//
+// This gets compiled into the .exe by the build script and controls what
+// Windows shows in Explorer's "Properties" tab, the taskbar, and the
+// Programs & Features list.
+//
+// The build script copies this over `chrome/app/chrome_exe.rc` (or merges
+// key fields into it) during the branding step.
+
+#include <winresrc.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION     1,0,0,0
+ PRODUCTVERSION  1,0,0,0
+ FILEFLAGSMASK   0x3fL
+ FILEFLAGS       0x0L
+ FILEOS          VOS_NT_WINDOWS32
+ FILETYPE        VFT_APP
+ FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "The Claum Authors"
+            VALUE "FileDescription",  "Claum Browser"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "claum"
+            VALUE "LegalCopyright",   "Copyright 2026 The Claum Authors."
+            VALUE "OriginalFilename", "claum.exe"
+            VALUE "ProductName",      "Claum"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

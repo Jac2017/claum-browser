@@ -1,0 +1,52 @@
+# ============================================================================
+# 07-claum-default-search.patch
+# ----------------------------------------------------------------------------
+# Set Claum's default search engine. Upstream ungoogled-chromium ships with a
+# neutered default (blank search), which is unfriendly. We pick Bing because:
+#   - It's what Glass Browser shipped with.
+#   - It doesn't require a Google API key.
+#   - Users can change it at chrome://settings/search → "Manage search engines".
+#
+# Override at build time with:
+#   ./claum/scripts/build-mac.sh --default-search duckduckgo
+# or at runtime with the `--claum-default-search=X` flag.
+# ============================================================================
+
+diff --git a/components/search_engines/prepopulated_engines.json b/components/search_engines/prepopulated_engines.json
+--- a/components/search_engines/prepopulated_engines.json
++++ b/components/search_engines/prepopulated_engines.json
+@@ -0,0 +0,0 @@
+ {
+   "elements": {
+-    "bing": { "id": 3, "sort_order": 2, ... },
++    "bing": {
++      "id": 3,
++      "sort_order": 1,
++      "default_for_claum": true,
++      ...
++    },
+     "google": { "id": 1, "sort_order": 3, ... },
+     "duckduckgo": { "id": 92, "sort_order": 4, ... }
+   }
+ }
+
+diff --git a/components/search_engines/template_url_prepopulate_data.cc b/components/search_engines/template_url_prepopulate_data.cc
+--- a/components/search_engines/template_url_prepopulate_data.cc
++++ b/components/search_engines/template_url_prepopulate_data.cc
+@@ -0,0 +0,0 @@
+ std::unique_ptr<TemplateURLData> GetDefaultSearchEngine(...) {
++  // -------- Claum default-search override --------------------------------
++  // Respect --claum-default-search=<name> (first), otherwise fall back to
++  // whatever the JSON marked default_for_claum=true (Bing).
++  const std::string override_name =
++      base::CommandLine::ForCurrentProcess()
++          ->GetSwitchValueASCII("claum-default-search");
++  if (!override_name.empty()) {
++    if (auto engine = FindEngineByShortName(override_name)) return engine;
++  }
++  if (auto claum_default = FindEngineTaggedDefaultForClaum()) {
++    return claum_default;
++  }
++  // ----------------------------------------------------------------------
+   // Fall back to upstream logic.
+ }

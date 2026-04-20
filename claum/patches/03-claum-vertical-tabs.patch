@@ -1,0 +1,54 @@
+# ============================================================================
+# 03-claum-vertical-tabs.patch
+# ----------------------------------------------------------------------------
+# Vertical tab sidebar for Claum.
+#
+# This patch is carried forward from the Glass Browser branch
+# (claude/desktop-browser-glass-ui-CLgkX in Jac2017/ungoogled-chromium) and
+# kept in this repo as a reference. The actual interactive sidebar lives
+# in the claum-newtab component extension (sidepanel/), so this C++ patch
+# only:
+#
+#   1. Adds a `--claum-vertical-tabs` command-line flag (default: enabled).
+#   2. When enabled, hides the horizontal tab strip and reserves 240px on the
+#      left for the sidebar to render into.
+#   3. Wires the toolbar's "new tab" button to focus the sidebar's input.
+#
+# All the heavy lifting — drag-reorder, pin, group, search, context menu —
+# is done in JavaScript inside the side panel.
+# ============================================================================
+
+diff --git a/chrome/common/chrome_switches.cc b/chrome/common/chrome_switches.cc
+--- a/chrome/common/chrome_switches.cc
++++ b/chrome/common/chrome_switches.cc
+@@ -0,0 +0,0 @@
+ namespace switches {
++// Toggle the vertical tab sidebar. Defaults to ON.
++const char kClaumVerticalTabs[] = "claum-vertical-tabs";
++const char kClaumDisableVerticalTabs[] = "claum-no-vertical-tabs";
+ }  // namespace switches
+
+diff --git a/chrome/browser/ui/views/frame/browser_view_layout.cc b/chrome/browser/ui/views/frame/browser_view_layout.cc
+--- a/chrome/browser/ui/views/frame/browser_view_layout.cc
++++ b/chrome/browser/ui/views/frame/browser_view_layout.cc
+@@ -0,0 +0,0 @@
+ void BrowserViewLayout::Layout(views::View* host) {
++  // -------- Claum: reserve 240px on the left for the vertical tab strip --
++  // The strip is rendered by the claum-newtab component extension's side
++  // panel, but we need to reserve the space here so the contents area
++  // sizes correctly.
++  const bool vertical_tabs_enabled =
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          switches::kClaumDisableVerticalTabs);
++
++  if (vertical_tabs_enabled) {
++    constexpr int kClaumSidebarWidthDip = 240;
++    contents_container_->SetX(contents_container_->x() + kClaumSidebarWidthDip);
++    contents_container_->SetSize(gfx::Size(
++        contents_container_->width() - kClaumSidebarWidthDip,
++        contents_container_->height()));
++    // Hide the upstream horizontal tab strip.
++    if (tab_strip_region_view_) tab_strip_region_view_->SetVisible(false);
++  }
++  // ----------------------------------------------------------------------
+ }

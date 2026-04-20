@@ -1,0 +1,89 @@
+# ============================================================================
+# 05-claum-first-run-import.patch
+# ----------------------------------------------------------------------------
+# On first run, automatically open the import wizard at chrome://settings/importData
+# with Chrome pre-selected as the source. The user can change the source or
+# cancel; if they confirm, Chromium's existing ImporterHost handles the heavy
+# lifting (bookmarks, history, cookies, passwords, autofill, search engines,
+# home page).
+#
+# Extension import is a separate problem (Chrome doesn't expose its installed
+# extension list through the normal importer interface). That's handled in
+# 06-claum-extension-import.patch.
+# ============================================================================
+
+diff --git a/chrome/browser/first_run/first_run.cc b/chrome/browser/first_run/first_run.cc
+--- a/chrome/browser/first_run/first_run.cc
++++ b/chrome/browser/first_run/first_run.cc
+@@ -0,0 +0,0 @@
+ #include "chrome/browser/first_run/first_run.h"
++
++// --- Claum first-run import overrides --------------------------------------
++#include "base/command_line.h"
++#include "chrome/browser/importer/external_process_importer_host.h"
++#include "chrome/browser/importer/importer_list.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/browser.h"
++#include "chrome/browser/ui/browser_navigator.h"
++#include "chrome/browser/ui/browser_navigator_params.h"
++#include "chrome/common/url_constants.h"
++#include "components/user_prefs/user_prefs.h"
++// ---------------------------------------------------------------------------
+
+ namespace first_run {
+
+ void DoPostImportTasks(Profile* profile, bool /*post_import_dialog*/) {
+   // ... upstream code ...
++
++  // -------- Claum: open the import wizard on first launch --------------
++  // We don't auto-import without confirmation — that would surprise users.
++  // Instead we surface chrome://settings/importData with Chrome preselected,
++  // showing exactly what will be copied.
++  if (!base::CommandLine::ForCurrentProcess()
++           ->HasSwitch("claum-skip-first-run-import")) {
++    // Find the active browser (created moments ago by FirstRunBrowserProcess).
++    Browser* browser = chrome::FindBrowserWithProfile(profile);
++    if (browser) {
++      NavigateParams params(browser,
++          GURL("chrome://settings/importData?source=chrome"),
++          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
++      params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
++      Navigate(&params);
++    }
++  }
++  // ---------------------------------------------------------------------
+ }
+
+ }  // namespace first_run
+diff --git a/chrome/browser/resources/settings/people_page/import_data_dialog.html b/chrome/browser/resources/settings/people_page/import_data_dialog.html
+--- a/chrome/browser/resources/settings/people_page/import_data_dialog.html
++++ b/chrome/browser/resources/settings/people_page/import_data_dialog.html
+@@ -0,0 +0,0 @@
+   <!-- Existing import-source dropdown -->
+   <select id="browserSelect">
+     <!-- options populated by importer_list.cc -->
+   </select>
++
++  <!-- Claum: also offer to import installed extensions. -->
++  <label class="claum-extension-row">
++    <input type="checkbox" id="importExtensions" checked>
++    <span>Installed extensions</span>
++    <small>Re-installs all extensions you have in the source browser.
++           Extensions that aren't on the Chrome Web Store are skipped.</small>
++  </label>
+diff --git a/chrome/browser/importer/importer_list.cc b/chrome/browser/importer/importer_list.cc
+--- a/chrome/browser/importer/importer_list.cc
++++ b/chrome/browser/importer/importer_list.cc
+@@ -0,0 +0,0 @@
+ void ImporterList::DetectSourceProfilesWorker(...) {
+   // -------- Detect Chrome --------------------------------------------------
+   DetectChromeProfiles(locale, &profiles);
+
++  // -------- Claum: detect Edge & Brave alongside Chrome ------------------
++  // Upstream Chromium already detects Firefox + Safari + IE/Edge on
++  // their respective platforms. We add Brave (Chrome-shaped on disk so
++  // the Chrome detector almost works) and Arc (also Chromium-based).
++  DetectChromiumDerivativeProfiles("Brave", &profiles);
++  DetectChromiumDerivativeProfiles("Arc",   &profiles);
++  // ----------------------------------------------------------------------
+ }

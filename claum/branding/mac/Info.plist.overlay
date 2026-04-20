@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Claum macOS Info.plist overlay.
+
+  This file is MERGED into Chromium's generated Info.plist by the build script
+  (claum/scripts/apply-branding.sh). Only keys we want to change need to live
+  here — everything else is inherited from the upstream Chromium plist.
+
+  WHY each key matters:
+    CFBundleName           — short app name in the menu bar
+    CFBundleDisplayName    — full name shown under the icon in Finder
+    CFBundleIdentifier     — must be unique; used by macOS for permissions,
+                             Launch Services, and code-signing
+    CFBundleURLTypes       — registers Claum to handle http(s):// links so it
+                             can be set as the system default browser
+    NSHumanReadableCopyright — shown in About panel
+    LSMinimumSystemVersion — ungoogled-chromium currently requires macOS 11+
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Claum</string>
+
+  <key>CFBundleDisplayName</key>
+  <string>Claum</string>
+
+  <key>CFBundleIdentifier</key>
+  <string>com.claum.Claum</string>
+
+  <key>CFBundleExecutable</key>
+  <string>Claum</string>
+
+  <key>CFBundleIconFile</key>
+  <string>app.icns</string>
+
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright 2026 The Claum Authors. All rights reserved.</string>
+
+  <key>LSMinimumSystemVersion</key>
+  <string>11.0</string>
+
+  <!-- Register Claum as a possible default browser. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>Web site URL</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>http</string>
+        <string>https</string>
+      </array>
+    </dict>
+  </array>
+
+  <!-- Tell macOS we can open these document types (HTML, PDF, etc.). -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>HTML document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.html</string>
+        <string>public.xhtml</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

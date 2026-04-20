@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ad</title>
+  <style>
+    /* ================================================================
+       AD FRAME — sandboxed page for Google AdSense
+
+       This page runs inside a sandboxed iframe with a relaxed CSP,
+       allowing the external AdSense script to load. The parent
+       newtab.html can't load external scripts directly because
+       Manifest V3 enforces a strict CSP on extension pages.
+
+       HOW IT WORKS:
+       1. newtab.html embeds this page via <iframe>
+       2. URL hash params tell us which ad format/slot to show
+       3. This page loads the AdSense script and renders the ad
+       4. The transparent background lets it blend with the parent
+       ================================================================ */
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      /* Transparent background so it blends with the dark new tab page */
+      background: transparent;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    /* Container for the ad unit */
+    .ad-container {
+      width: 100%;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Placeholder shown while ad loads (or if no ad fills) */
+    .ad-placeholder {
+      width: 100%;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.15);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Make the AdSense unit fill the container */
+    .adsbygoogle {
+      display: block;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="ad-container" id="adContainer">
+    <!-- Placeholder that disappears when a real ad loads -->
+    <div class="ad-placeholder" id="adPlaceholder">Sponsored</div>
+  </div>
+
+  <!-- ============================================================
+       GOOGLE ADSENSE SCRIPT
+
+       Publisher ID: ca-pub-5280081052346805
+
+       This script is loaded here (not in newtab.html) because
+       Manifest V3 blocks external scripts on extension pages.
+       Sandboxed pages have a relaxed CSP that allows this.
+       ============================================================ -->
+  <script async
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5280081052346805"
+    crossorigin="anonymous">
+  </script>
+
+  <script>
+    // --- Read ad configuration from the URL hash ---
+    // The parent page passes config like:
+    //   ad-frame.html#slot=1234567890&format=autorelaxed
+    //
+    // Parameters:
+    //   slot   = AdSense ad unit slot ID (from your AdSense dashboard)
+    //   format = Ad format: "autorelaxed" (multiplex), "auto" (responsive),
+    //            "fluid" (in-feed), "rectangle" etc.
+    //   width  = Optional fixed width
+    //   height = Optional fixed height
+
+    function getHashParams() {
+      var params = {};
+      var hash = window.location.hash.substring(1); // remove the #
+      if (!hash) return params;
+      hash.split('&').forEach(function(pair) {
+        var parts = pair.split('=');
+        if (parts.length === 2) {
+          params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+        }
+      });
+      return params;
+    }
+
+    var config = getHashParams();
+    var slot = config.slot || '';       // Ad slot ID — REQUIRED for ads to show
+    var format = config.format || 'autorelaxed';  // Default to multiplex
+
+    // --- Create the ad unit dynamically ---
+    if (slot) {
+      // We have a slot ID — create a real AdSense ad unit
+      var container = document.getElementById('adContainer');
+      var placeholder = document.getElementById('adPlaceholder');
+
+      // Remove the placeholder
+      if (placeholder) placeholder.remove();
+
+      // Create the AdSense <ins> element
+      var ins = document.createElement('ins');
+      ins.className = 'adsbygoogle';
+      ins.setAttribute('data-ad-client', 'ca-pub-5280081052346805');
+      ins.setAttribute('data-ad-slot', slot);
+      ins.setAttribute('data-ad-format', format);
+
+      // For multiplex ads, set the layout key if provided
+      if (config.layout) {
+        ins.setAttribute('data-matched-content-ui-type', config.layout);
+      }
+      if (config.rows) {
+        ins.setAttribute('data-matched-content-rows-num', config.rows);
+      }
+      if (config.columns) {
+        ins.setAttribute('data-matched-content-columns-num', config.columns);
+      }
+
+      // Set dimensions
+      if (config.width && config.height) {
+        ins.style.width = config.width + 'px';
+        ins.style.height = config.height + 'px';
+      } else {
+        ins.style.display = 'block';
+      }
+
+      container.appendChild(ins);
+
+      // Tell AdSense to fill the ad slot
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.log('AdSense push error:', e);
+      }
+
+      // --- PROACTIVELY NOTIFY PARENT WHEN AD RENDERS ---
+      // After a short delay, check if AdSense actually rendered
+      // content inside the <ins> element. If it did, tell the
+      // parent so it can un-hide the ad container.
+      // We check repeatedly because AdSense can take a few seconds.
+      var checkCount = 0;
+      var checkInterval = setInterval(function() {
+        checkCount++;
+        // AdSense adds child elements and sets data-ad-status
+        // when it successfully fills a slot
+        var status = ins.getAttribute('data-ad-status');
+        var hasContent = ins.children.length > 0;
+
+        if (status === 'filled' || hasContent) {
+          // Ad loaded! Tell the parent page to show the container.
+          parent.postMessage({
+            type: 'ad-loaded',
+            slot: slot,
+            success: true
+          }, '*');
+          clearInterval(checkInterval);
+        } else if (status === 'unfilled' || checkCount >= 20) {
+          // No fill after ~10 seconds — tell parent to stay hidden.
+          parent.postMessage({
+            type: 'ad-loaded',
+            slot: slot,
+            success: false
+          }, '*');
+          clearInterval(checkInterval);
+        }
+      }, 500);  // Check every 500ms
+
+    } else {
+      // No slot ID yet — tell parent to stay hidden
+      parent.postMessage({
+        type: 'ad-loaded',
+        slot: '',
+        success: false
+      }, '*');
+    }
+
+    // --- Respond to pings from parent ---
+    window.addEventListener('message', function(event) {
+      if (event.data === 'ping') {
+        event.source.postMessage({
+          type: 'ad-status',
+          loaded: !!slot,
+          slot: slot
+        }, '*');
+      }
+    });
+  </script>
+</body>
+</html>

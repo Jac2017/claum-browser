@@ -1,0 +1,72 @@
+# ============================================================================
+# Claum — macOS build on GitHub Actions
+# ----------------------------------------------------------------------------
+# Triggered manually (Actions tab → "Build Claum (macOS)" → Run workflow).
+# Produces an arm64 (Apple Silicon) .dmg as a downloadable artifact.
+#
+# Timing: ~3–5 hours on GitHub's macOS runners. The free tier has a 6 hour
+# cap, so we use the largest macos-* runner available (macos-14 is M1).
+# ============================================================================
+
+name: Build Claum (macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Target architecture"
+        default: "arm64"
+        type: choice
+        options: [arm64, x86_64]
+      default_search:
+        description: "Default search engine"
+        default: "bing"
+        type: choice
+        options: [bing, duckduckgo, google, startpage]
+
+jobs:
+  build:
+    # macos-14 = Apple Silicon. Upgrade to macos-15 when available for your plan.
+    runs-on: macos-14
+    timeout-minutes: 330   # 5 hr 30 min — just under GitHub's 6 hr cap
+    steps:
+      - name: Check out Claum repo
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install ninja python3 rsync
+
+      - name: Cache Chromium source
+        id: cache-chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/claum-build/build/downloads
+          key: chromium-src-${{ hashFiles('CHROMIUM_VERSION') }}
+          restore-keys: |
+            chromium-src-
+
+      - name: Run Claum build
+        env:
+          CLAUM_BUILD_ROOT: ${{ github.workspace }}/claum-build
+        run: |
+          chmod +x claum/scripts/build-mac.sh
+          ./claum/scripts/build-mac.sh \
+            --arch           "${{ inputs.arch }}" \
+            --default-search "${{ inputs.default_search }}"
+
+      - name: Package .app as .dmg
+        run: |
+          cd $CLAUM_BUILD_ROOT/build/src/out/Claum
+          hdiutil create -volname "Claum" \
+                         -srcfolder "Claum.app" \
+                         -ov -format UDZO \
+                         "Claum-${{ inputs.arch }}.dmg"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claum-macOS-${{ inputs.arch }}
+          path: ${{ env.CLAUM_BUILD_ROOT }}/build/src/out/Claum/Claum-${{ inputs.arch }}.dmg
+          retention-days: 14

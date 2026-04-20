@@ -1,0 +1,55 @@
+# ============================================================================
+# 02-claum-glass-ui.patch
+# ----------------------------------------------------------------------------
+# Frosted-glass aesthetic for the toolbar, tab strip, omnibox, and dialogs.
+#
+# This patch is intentionally LIGHT — most of the visual work lives in CSS
+# files under chrome/browser/resources/claum_styles/, which we copy into the
+# tree via claum/scripts/install-resources.sh and then reference from the
+# generated WebUI bundles.
+#
+# The C++ side does only three things:
+#   1. Enables backdrop-filter compositing for browser-frame surfaces.
+#   2. Disables the legacy "frame is opaque" optimization that would
+#      stamp out the blur (see views/frame/browser_view.cc).
+#   3. Hides the title bar on macOS so the glass extends to the window edge.
+# ============================================================================
+
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -0,0 +0,0 @@
+ bool BrowserView::ShouldDrawFrameBackground() const {
+-  return true;
++  // Claum: returning false lets the OS-level blur show through the toolbar
++  // and tab-strip surfaces. We still draw a faint tint via CSS for contrast.
++  return false;
+ }
+
+diff --git a/chrome/browser/ui/cocoa/window/native_widget_mac_frameless_nswindow.mm b/chrome/browser/ui/cocoa/window/native_widget_mac_frameless_nswindow.mm
+--- a/chrome/browser/ui/cocoa/window/native_widget_mac_frameless_nswindow.mm
++++ b/chrome/browser/ui/cocoa/window/native_widget_mac_frameless_nswindow.mm
+@@ -0,0 +0,0 @@
+   // Existing window setup ...
++
++  // -------- Claum: extend content under the title bar -------------------
++  // This makes the glass blur extend all the way to the top of the window
++  // instead of stopping at the traffic-light strip.
++  [window setTitlebarAppearsTransparent:YES];
++  [window setTitleVisibility:NSWindowTitleHidden];
++  [window setStyleMask:([window styleMask] | NSWindowStyleMaskFullSizeContentView)];
++  // ----------------------------------------------------------------------
+diff --git a/chrome/browser/resources/new_tab_page/app.css b/chrome/browser/resources/new_tab_page/app.css
+--- a/chrome/browser/resources/new_tab_page/app.css
++++ b/chrome/browser/resources/new_tab_page/app.css
+@@ -0,0 +0,0 @@
+ :root {
++  /* Claum glass palette — keep in sync with the claude-for-chrome side panel. */
++  --claum-orange: #D97757;
++  --claum-glass-bg: rgba(255, 255, 255, 0.10);
++  --claum-glass-border: rgba(255, 255, 255, 0.14);
++  --claum-radius: 18px;
+ }
++
++/* The Claum NTP component extension provides its own newtab page; this
++   stylesheet only kicks in if the user disables the component override. */

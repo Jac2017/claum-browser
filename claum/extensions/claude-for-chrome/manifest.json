@@ -1,0 +1,90 @@
+{
+  "manifest_version": 3,
+  "name": "Claude",
+  "short_name": "Claude",
+  "version": "1.0.0",
+  "version_name": "1.0.0 (claum)",
+  "description": "Chat with Claude about the page you're reading. Adds a side panel with per-tab context and a toolbar button.",
+
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "sidePanel",
+    "storage",
+    "scripting",
+    "contextMenus",
+    "clipboardWrite"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "optional_permissions": [
+    "bookmarks",
+    "history"
+  ],
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+
+  "action": {
+    "default_title": "Ask Claude about this page",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default":  "Ctrl+Shift+L",
+        "mac":      "Command+Shift+L",
+        "windows":  "Ctrl+Shift+L"
+      },
+      "description": "Open Claude side panel"
+    },
+    "summarize-page": {
+      "suggested_key": {
+        "default":  "Ctrl+Shift+S",
+        "mac":      "Command+Shift+S",
+        "windows":  "Ctrl+Shift+S"
+      },
+      "description": "Summarize the current page"
+    }
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.anthropic.com https://claude.ai"
+  }
+}

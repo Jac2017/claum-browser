@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "X-Frame-Options", "operation": "remove" },
+        { "header": "Content-Security-Policy", "operation": "remove" },
+        { "header": "Permissions-Policy", "operation": "set",
+          "value": "microphone=*, camera=*, clipboard-write=*, autoplay=*, display-capture=*" },
+        { "header": "Cross-Origin-Opener-Policy", "operation": "remove" },
+        { "header": "Cross-Origin-Embedder-Policy", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||claude.ai",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "Permissions-Policy", "operation": "set",
+          "value": "microphone=*, camera=*, clipboard-write=*, autoplay=*, display-capture=*" },
+        { "header": "Cross-Origin-Opener-Policy", "operation": "remove" },
+        { "header": "Cross-Origin-Embedder-Policy", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||claude.ai",
+      "resourceTypes": ["xmlhttprequest", "script", "stylesheet", "image", "other"]
+    }
+  }
+]

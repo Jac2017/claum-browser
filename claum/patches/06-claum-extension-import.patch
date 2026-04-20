@@ -1,0 +1,167 @@
+# ============================================================================
+# 06-claum-extension-import.patch
+# ----------------------------------------------------------------------------
+# Chromium's built-in importer pulls bookmarks / history / cookies / passwords
+# / autofill / search engines, but NOT installed extensions. This patch adds
+# an ExtensionsImporter that:
+#
+#   1. Reads the source browser's Preferences file (JSON).
+#   2. Extracts the extensions.settings map — each key is an extension ID.
+#   3. Filters to extensions that are `from_webstore: true` and `state: 1`
+#      (enabled).
+#   4. Queues each one for re-installation via the Chrome Web Store update URL
+#      (https://clients2.google.com/service/update2/crx).
+#
+# Self-hosted / developer-mode extensions are intentionally skipped — we can't
+# safely re-fetch them, and copying the CRX bits from disk risks bundling
+# user-specific data (cookies, storage) that should not migrate verbatim.
+#
+# Profile path conventions:
+#   macOS    ~/Library/Application Support/Google/Chrome/<Profile>/Preferences
+#   Windows  %LOCALAPPDATA%\Google\Chrome\User Data\<Profile>\Preferences
+#   Linux    ~/.config/google-chrome/<Profile>/Preferences
+# ============================================================================
+
+diff --git a/chrome/utility/importer/chrome_extensions_importer.h b/chrome/utility/importer/chrome_extensions_importer.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/utility/importer/chrome_extensions_importer.h
+@@ -0,0 +0,0 @@
++// Copyright 2026 The Claum Authors.
++// Extension-list importer for Chrome-family source browsers.
++//
++// Usage flow:
++//   * ImporterHost on the browser side constructs a ChromeExtensionsImporter
++//     in the utility process (sandboxed — we can't use the network from here).
++//   * StartImport parses Preferences synchronously and emits an
++//     ImportedExtensionsBag back to the browser side.
++//   * The browser side then queues each ID for web-store install on the
++//     user's profile (see chrome/browser/importer/extensions_import_bridge.cc).
++#ifndef CHROME_UTILITY_IMPORTER_CHROME_EXTENSIONS_IMPORTER_H_
++#define CHROME_UTILITY_IMPORTER_CHROME_EXTENSIONS_IMPORTER_H_
++
++#include <string>
++#include <vector>
++
++#include "base/files/file_path.h"
++#include "chrome/common/importer/imported_extension.h"
++
++namespace importer {
++
++class ChromeExtensionsImporter {
++ public:
++  // Parse `source_profile_dir/Preferences` and return the list of extensions
++  // we're willing to re-install. Returns an empty vector on any failure.
++  static std::vector<ImportedExtension> LoadFromProfile(
++      const base::FilePath& source_profile_dir);
++};
++
++}  // namespace importer
++#endif  // CHROME_UTILITY_IMPORTER_CHROME_EXTENSIONS_IMPORTER_H_
+diff --git a/chrome/utility/importer/chrome_extensions_importer.cc b/chrome/utility/importer/chrome_extensions_importer.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/utility/importer/chrome_extensions_importer.cc
+@@ -0,0 +0,0 @@
++// Copyright 2026 The Claum Authors.
++#include "chrome/utility/importer/chrome_extensions_importer.h"
++
++#include "base/files/file_util.h"
++#include "base/json/json_reader.h"
++#include "base/values.h"
++
++namespace importer {
++
++// static
++std::vector<ImportedExtension>
++ChromeExtensionsImporter::LoadFromProfile(
++    const base::FilePath& profile_dir) {
++  std::vector<ImportedExtension> out;
++
++  const base::FilePath prefs_path = profile_dir.AppendASCII("Preferences");
++  std::string json;
++  if (!base::ReadFileToString(prefs_path, &json)) return out;
++
++  std::optional<base::Value> parsed = base::JSONReader::Read(json);
++  if (!parsed || !parsed->is_dict()) return out;
++
++  // Path: extensions.settings.<extension_id>
++  const base::Value::Dict* settings =
++      parsed->GetDict().FindDictByDottedPath("extensions.settings");
++  if (!settings) return out;
++
++  for (const auto [ext_id, v] : *settings) {
++    if (!v.is_dict()) continue;
++    const base::Value::Dict& ext = v.GetDict();
++
++    // Only re-install enabled web-store extensions. "state": 1 = enabled.
++    const std::optional<bool> from_webstore = ext.FindBool("from_webstore");
++    const std::optional<int>  state         = ext.FindInt("state");
++    if (from_webstore != true) continue;
++    if (state != 1)             continue;
++
++    ImportedExtension entry;
++    entry.id   = ext_id;
++    // manifest.name is nested under "manifest.name"
++    if (const std::string* name =
++            ext.FindStringByDottedPath("manifest.name")) {
++      entry.name = *name;
++    }
++    if (const std::string* ver =
++            ext.FindStringByDottedPath("manifest.version")) {
++      entry.version = *ver;
++    }
++    out.push_back(std::move(entry));
++  }
++  return out;
++}
++
++}  // namespace importer
+diff --git a/chrome/common/importer/imported_extension.h b/chrome/common/importer/imported_extension.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/common/importer/imported_extension.h
+@@ -0,0 +0,0 @@
++// Copyright 2026 The Claum Authors.
++#ifndef CHROME_COMMON_IMPORTER_IMPORTED_EXTENSION_H_
++#define CHROME_COMMON_IMPORTER_IMPORTED_EXTENSION_H_
++#include <string>
++namespace importer {
++// Lightweight record of one extension we'd like to re-install.
++struct ImportedExtension {
++  std::string id;        // 32-char extension ID
++  std::string name;      // manifest.name (display only)
++  std::string version;   // last-known version (display only)
++};
++}  // namespace importer
++#endif  // CHROME_COMMON_IMPORTER_IMPORTED_EXTENSION_H_
+diff --git a/chrome/browser/importer/extensions_import_bridge.cc b/chrome/browser/importer/extensions_import_bridge.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/importer/extensions_import_bridge.cc
+@@ -0,0 +0,0 @@
++// Copyright 2026 The Claum Authors.
++// Browser-side glue that takes the list of extension IDs produced by the
++// utility process and queues each one for install via the ExtensionUpdater.
++#include "chrome/browser/importer/extensions_import_bridge.h"
++
++#include "chrome/browser/extensions/extension_service.h"
++#include "chrome/browser/extensions/webstore_install_with_prompt.h"
++#include "chrome/browser/profiles/profile.h"
++
++namespace claum {
++
++void QueueImportedExtensionInstalls(
++    Profile* profile,
++    const std::vector<importer::ImportedExtension>& to_install) {
++  for (const auto& ext : to_install) {
++    // WebstoreInstallWithPrompt shows a dialog per extension; users can
++    // bulk-accept in the import wizard (checkbox wired up in patch 05).
++    auto installer =
++        std::make_unique<extensions::WebstoreInstallWithPrompt>(
++            ext.id, profile, base::DoNothing());
++    installer->BeginInstall();
++  }
++}
++
++}  // namespace claum

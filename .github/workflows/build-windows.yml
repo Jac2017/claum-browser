@@ -1,0 +1,75 @@
+# ============================================================================
+# Claum — Windows build on GitHub Actions
+# ----------------------------------------------------------------------------
+# Triggered manually (Actions tab → "Build Claum (Windows)" → Run workflow).
+# Produces a x64 .zip of the portable build.
+# ============================================================================
+
+name: Build Claum (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Target architecture"
+        default: "x64"
+        type: choice
+        options: [x64, arm64]
+      default_search:
+        description: "Default search engine"
+        default: "bing"
+        type: choice
+        options: [bing, duckduckgo, google, startpage]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 330
+    steps:
+      - name: Check out Claum repo
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install depot_tools
+        shell: powershell
+        run: |
+          Invoke-WebRequest -UseBasicParsing `
+            https://storage.googleapis.com/chrome-infra/depot_tools.zip `
+            -OutFile depot_tools.zip
+          Expand-Archive depot_tools.zip -DestinationPath C:\depot_tools
+          "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Cache Chromium source
+        id: cache-chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/claum-build/build/downloads
+          key: chromium-src-win-${{ hashFiles('CHROMIUM_VERSION') }}
+          restore-keys: |
+            chromium-src-win-
+
+      - name: Run Claum build
+        shell: powershell
+        run: |
+          .\claum\scripts\build-windows.ps1 `
+            -Arch          "${{ inputs.arch }}" `
+            -DefaultSearch "${{ inputs.default_search }}" `
+            -BuildRoot     "${{ github.workspace }}\claum-build"
+
+      - name: Package build output
+        shell: powershell
+        run: |
+          Compress-Archive `
+            -Path "${{ github.workspace }}\claum-build\build\src\out\Claum\*" `
+            -DestinationPath "Claum-${{ inputs.arch }}.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claum-Windows-${{ inputs.arch }}
+          path: Claum-${{ inputs.arch }}.zip
+          retention-days: 14

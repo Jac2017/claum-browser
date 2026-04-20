@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Glass Browser Settings</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a1c;
+      color: rgba(255,255,255,0.9);
+      padding: 32px;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 24px; font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: rgba(255,255,255,0.4);
+      font-size: 13px; margin-bottom: 32px;
+    }
+
+    /* --- Section cards --- */
+    .section {
+      background: rgba(38,38,40,0.6);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .section h2 {
+      font-size: 15px; font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .section p {
+      font-size: 13px; color: rgba(255,255,255,0.5);
+      margin-bottom: 14px; line-height: 1.5;
+    }
+
+    /* --- Permission rows --- */
+    .perm-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .perm-row:first-of-type { border-top: none; }
+    .perm-label { font-size: 13px; }
+    .perm-status {
+      font-size: 12px; padding: 4px 10px;
+      border-radius: 12px; font-weight: 500;
+    }
+    .perm-status.granted {
+      background: rgba(48,209,88,0.15); color: #30d158;
+    }
+    .perm-status.denied {
+      background: rgba(255,69,58,0.15); color: #ff453a;
+    }
+    .perm-status.prompt {
+      background: rgba(255,159,10,0.15); color: #ff9f0a;
+    }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-block; padding: 8px 18px;
+      border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-primary {
+      background: rgba(10,132,255,0.8); color: #fff;
+    }
+    .btn-primary:hover { background: rgba(10,132,255,1); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 8px; }
+
+    /* --- Name input --- */
+    .name-input {
+      padding: 8px 12px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(28,28,30,0.8);
+      color: #fff; font-size: 14px;
+      width: 200px; outline: none;
+    }
+    .name-input:focus {
+      border-color: rgba(10,132,255,0.5);
+    }
+    .saved-msg {
+      color: #30d158; font-size: 12px;
+      margin-left: 10px; opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .saved-msg.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <h1>Glass Browser Settings</h1>
+  <p class="subtitle">Manage permissions, personalization, and features</p>
+
+  <!-- Personalization -->
+  <div class="section">
+    <h2>Personalization</h2>
+    <p>Set the name used in your greeting on each new tab.</p>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <input type="text" class="name-input" id="nameInput" placeholder="Your name">
+      <button class="btn btn-primary" id="saveName">Save</button>
+      <span class="saved-msg" id="savedMsg">Saved!</span>
+    </div>
+  </div>
+
+  <!-- Permissions -->
+  <div class="section">
+    <h2>Permissions</h2>
+    <p>These permissions are needed for full functionality. Grant them
+       here so features like Claude voice mode work correctly.</p>
+
+    <div class="perm-row">
+      <span class="perm-label">Microphone (for Claude voice)</span>
+      <span class="perm-status" id="micStatus">Checking...</span>
+    </div>
+    <div class="perm-row">
+      <span class="perm-label">Location (for local news)</span>
+      <span class="perm-status" id="locStatus">Checking...</span>
+    </div>
+
+    <div class="btn-row" style="margin-top: 14px;">
+      <button class="btn btn-primary" id="grantMic">Grant Microphone</button>
+      <button class="btn btn-secondary" id="grantLoc">Grant Location</button>
+    </div>
+  </div>
+
+  <!-- Claude Voice -->
+  <div class="section">
+    <h2>Claude Voice Mode</h2>
+    <p>Voice mode works best when Claude runs in its own tab rather than
+       the sidebar iframe. Use the button below to open Claude in a
+       full tab with unrestricted microphone access.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="openClaude">Open Claude in Full Tab</button>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="section">
+    <h2>About</h2>
+    <p>Glass Browser v1.0 — Browse Beautifully.<br>
+       A personalized new tab experience with glass morphism design,
+       vertical tabs, and Claude AI integration.</p>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

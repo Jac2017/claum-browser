@@ -1,0 +1,16 @@
+# Claum branding constants.
+# Chromium's build system reads this file (via `chrome/app/theme/<brand>/BRANDING`)
+# to populate product names in menus, About pages, crash reports, etc.
+#
+# Format: KEY=VALUE (no spaces around =). Do not add quotes.
+
+COMPANY_FULLNAME=Claum
+COMPANY_SHORTNAME=Claum
+PRODUCT_FULLNAME=Claum
+PRODUCT_SHORTNAME=Claum
+PRODUCT_INSTALLER_FULLNAME=Claum Installer
+PRODUCT_INSTALLER_SHORTNAME=Claum Installer
+COPYRIGHT=Copyright 2026 The Claum Authors. All rights reserved.
+MAC_BUNDLE_ID=com.claum.Claum
+MAC_CREATOR_CODE=CLAM
+MAC_TEAM_ID=

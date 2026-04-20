@@ -1,0 +1,60 @@
+<!--
+  Claude for Chrome — side panel.
+  Opens on toolbar click (Cmd/Ctrl+Shift+L). Renders a chat thread about the
+  active tab. Styling is the Claum glass aesthetic: frosted background, soft
+  orange accents, rounded corners, no hard edges.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Claude</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="glass-top">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <!-- Stylized Claude "C" -->
+        <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 3.2a5.8 5.8 0 0 1 5.2 3.3l-2.9 1.3a2.6 2.6 0 0 0-4.9 1.2 2.6 2.6 0 0 0 4.9 1.2l2.9 1.3A5.8 5.8 0 0 1 12 17.8 5.8 5.8 0 0 1 12 6.2Z"
+              fill="currentColor"/>
+      </svg>
+      <span>Claude</span>
+    </div>
+    <div class="tab-context" id="tab-context">
+      <span class="label">This tab</span>
+      <span class="title" id="tab-title">Loading…</span>
+    </div>
+  </header>
+
+  <main class="thread" id="thread" aria-live="polite">
+    <div class="welcome">
+      <h1>Ask Claude about this page</h1>
+      <p>Try <kbd>Summarize</kbd>, <kbd>Explain the hard parts</kbd>,
+         or paste in a question.</p>
+      <div class="chips">
+        <button data-prompt="Summarize this page in 5 bullets.">Summarize</button>
+        <button data-prompt="What are the 3 most important points on this page?">Key points</button>
+        <button data-prompt="Explain this page like I'm new to the topic.">Explain</button>
+        <button data-prompt="What action items does this page imply for me?">Action items</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="composer glass-bottom">
+    <textarea id="composer-input"
+              placeholder="Ask Claude…"
+              rows="2"></textarea>
+    <button id="composer-send" aria-label="Send">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path d="M3 11.5 21 3l-6.5 18-2.8-7.7L3 11.5Z"
+              fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </footer>
+
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>

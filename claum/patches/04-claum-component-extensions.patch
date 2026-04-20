@@ -1,0 +1,85 @@
+# ============================================================================
+# 04-claum-component-extensions.patch
+# ----------------------------------------------------------------------------
+# Registers the two Claum-bundled extensions as COMPONENT extensions.
+#
+# A component extension is built into the browser binary: it can't be
+# uninstalled, runs with elevated permissions, and upgrades only when the
+# browser does. See:
+#   https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/browser/extensions/component_loader.cc
+#
+# The copy-into-tree step happens in claum/scripts/install-component-exts.sh,
+# which drops the extension folders into
+#   chrome/browser/resources/claum_extensions/{claum_newtab,claude_for_chrome}
+# BEFORE this patch is applied.
+# ============================================================================
+
+diff --git a/chrome/browser/extensions/component_loader.cc b/chrome/browser/extensions/component_loader.cc
+--- a/chrome/browser/extensions/component_loader.cc
++++ b/chrome/browser/extensions/component_loader.cc
+@@ -0,0 +0,0 @@
+ #include "chrome/browser/extensions/component_loader.h"
+
++// --- Claum component extensions --------------------------------------------
++// These two extensions ship inside the browser and auto-enable at startup.
++// They're copied into chrome/browser/resources/claum_extensions/ by
++// claum/scripts/install-component-exts.sh before the build.
++#include "base/files/file_path.h"
++#include "base/path_service.h"
++#include "chrome/common/chrome_paths.h"
++// ---------------------------------------------------------------------------
++
+ namespace extensions {
+
+ void ComponentLoader::AddDefaultComponentExtensions(bool skip_session_components) {
+   // ... upstream code ...
+
+   // Existing upstream component extensions stay.
++
++  // -------- Claum: register our two bundled extensions -----------------
++  // The paths are relative to the resources directory that Chromium packs
++  // at build time. ComponentLoader::Add reads the manifest.json from disk.
++  base::FilePath resources_dir;
++  if (base::PathService::Get(chrome::DIR_RESOURCES, &resources_dir)) {
++    // 1. claum-newtab: glass NTP, sidebar, settings surface.
++    Add(IDR_CLAUM_NEWTAB_MANIFEST,
++        resources_dir.AppendASCII("claum_extensions/claum_newtab"));
++
++    // 2. claude-for-chrome: AI side panel + per-tab context.
++    Add(IDR_CLAUDE_FOR_CHROME_MANIFEST,
++        resources_dir.AppendASCII("claum_extensions/claude_for_chrome"));
++  }
++  // ---------------------------------------------------------------------
+ }
+
+ }  // namespace extensions
+diff --git a/chrome/browser/resources/claum_extensions/claum_extensions_resources.grdp b/chrome/browser/resources/claum_extensions/claum_extensions_resources.grdp
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/resources/claum_extensions/claum_extensions_resources.grdp
+@@ -0,0 +0,0 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++  Claum component-extension manifest registration.
++  Each <include> teaches the resource compiler where to find the manifest
++  so it can mint an IDR_* constant the ComponentLoader can reference.
++-->
++<grit-part>
++  <include name="IDR_CLAUM_NEWTAB_MANIFEST"
++           file="claum_newtab/manifest.json"
++           type="BINDATA" />
++  <include name="IDR_CLAUDE_FOR_CHROME_MANIFEST"
++           file="claude_for_chrome/manifest.json"
++           type="BINDATA" />
++</grit-part>
+diff --git a/chrome/chrome_resources.grd b/chrome/chrome_resources.grd
+--- a/chrome/chrome_resources.grd
++++ b/chrome/chrome_resources.grd
+@@ -0,0 +0,0 @@
+   <release seq="1">
+     <includes>
+       <!-- existing includes ... -->
++      <!-- Claum bundled component extensions -->
++      <part file="browser/resources/claum_extensions/claum_extensions_resources.grdp" />
+     </includes>
+   </release>
