@@ -177,6 +177,56 @@ else
   log_ok "[3/6] Skipping download (--skip-download)"
 fi
 
+# -------- [3.5/6] Download Chromium build toolchains -----------------------
+# Chromium normally downloads its own clang + Rust toolchains via `gclient
+# sync` (which runs DEPS hooks at checkout time). We're skipping gclient
+# entirely (we use the ungoogled-chromium tarball flow), so those hooks
+# never run — which means the toolchain VERSION files don't exist and
+# `gn gen` later fails with "Could not read //third_party/rust-toolchain/VERSION".
+#
+# Solution: invoke the standalone toolchain-download scripts that ship in
+# Chromium source. They fetch prebuilt binaries from Google's CIPD bucket
+# into the right directories and populate the VERSION files gn expects.
+#
+# Re-runs are safe: each script is a no-op if the right version is already
+# installed, so the cache step in build-mac.yml works correctly.
+log_step "[3.5/6] Downloading Chromium build toolchains (clang + Rust)"
+SRC="$CLAUM_BUILD_ROOT/build/src"
+
+if [ -f "$SRC/tools/clang/scripts/update.py" ]; then
+  log_ok "Downloading clang toolchain (~150 MB)"
+  python3 "$SRC/tools/clang/scripts/update.py"
+else
+  log_warn "clang update script not found — assuming system clang"
+fi
+
+if [ -f "$SRC/tools/rust/update_rust.py" ]; then
+  log_ok "Downloading Rust toolchain (~200 MB)"
+  python3 "$SRC/tools/rust/update_rust.py"
+else
+  log_warn "Rust update script not found"
+fi
+
+# Some Chromium versions also need these. Each is a no-op if not present.
+for extra_script in \
+    "tools/perf/update_wpr.py" \
+    "build/util/lastchange.py" \
+    "build/mac_toolchain.py"; do
+  if [ -f "$SRC/$extra_script" ]; then
+    log_ok "Running $extra_script"
+    # build/util/lastchange.py needs an output file argument; the others
+    # take no args. We only invoke ones that are well-behaved without args.
+    case "$extra_script" in
+      build/util/lastchange.py)
+        # Generates LASTCHANGE file used by version stamping.
+        python3 "$SRC/$extra_script" -o "$SRC/build/util/LASTCHANGE" || \
+          log_warn "lastchange.py failed (non-fatal)"
+        ;;
+      *) : ;;
+    esac
+  fi
+done
+
 # -------- [4/6] Copy Claum resources into the tree -------------------------
 log_step "[4/6] Staging Claum resources"
 install_claum_resources
