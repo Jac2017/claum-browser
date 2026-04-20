@@ -95,21 +95,62 @@ install_claum_resources() {
 }
 
 # Apply every patch under claum/patches/ in lexical order.
+# Strategy:
+#   1. Try `git apply --check` to see if the patch applies cleanly.
+#   2. If it fails, print the reason (don't swallow it) and try `patch` with
+#      fuzz=3 as a more lenient fallback (handles small line-number drift).
+#   3. If THAT fails too, leave a .rej file behind so we can inspect, log a
+#      clear warning, and continue. The build will still succeed but won't
+#      include that particular Claum customization.
 apply_claum_patches() {
   local SRC="$CLAUM_BUILD_ROOT/build/src"
   pushd "$SRC" >/dev/null
   log_step "Applying Claum patches"
+
+  local TOTAL=0 OK=0 FAILED=0
+  local FAILED_LIST=""
+
   for p in "$CLAUM_REPO_DIR"/claum/patches/*.patch; do
     [ -e "$p" ] || continue
-    echo "     $(basename "$p")"
-    if ! git apply --check "$p" 2>/dev/null; then
-      log_warn "    skipping (already applied or conflicts)"
+    TOTAL=$((TOTAL+1))
+    local name
+    name="$(basename "$p")"
+    echo ""
+    echo "     -- $name --"
+
+    # First attempt: strict git apply.
+    if git apply --check "$p" 2>/dev/null; then
+      git apply "$p"
+      OK=$((OK+1))
+      log_ok "    applied cleanly"
       continue
     fi
-    git apply "$p"
+
+    # Show the real failure reason (not redirected to /dev/null this time).
+    log_warn "    git apply --check failed, here's why:"
+    git apply --check "$p" 2>&1 | sed 's/^/        /' | head -20
+
+    # Second attempt: classic `patch` with fuzz tolerance.
+    log_warn "    retrying with patch -p1 --fuzz=3"
+    if patch -p1 --no-backup-if-mismatch --fuzz=3 -i "$p" 2>&1 | sed 's/^/        /'; then
+      OK=$((OK+1))
+      log_ok "    applied with fuzz"
+    else
+      FAILED=$((FAILED+1))
+      FAILED_LIST="$FAILED_LIST $name"
+      log_err "    REJECTED — Claum customization missing from final build"
+    fi
   done
+
   popd >/dev/null
-  log_ok "Patches applied"
+
+  echo ""
+  if [ "$FAILED" -eq 0 ]; then
+    log_ok "All $TOTAL Claum patches applied"
+  else
+    log_warn "Patches summary: $OK/$TOTAL applied, $FAILED rejected ($FAILED_LIST)"
+    log_warn "Build will continue but rejected patches will need manual fixing."
+  fi
 }
 
 # Verify prerequisites are installed. Returns 0 on success, 1 otherwise.

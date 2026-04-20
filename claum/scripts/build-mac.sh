@@ -82,6 +82,23 @@ for t in ninja python3 node git rsync; do
 done
 log_ok "ninja / python3 / node / git / rsync"
 
+# gn (Generate Ninja) is Chromium's meta-build tool. It's not on Homebrew —
+# it ships inside Google's depot_tools toolkit. Install that if missing and
+# add it to PATH for the rest of this script.
+if ! command -v gn >/dev/null 2>&1; then
+  DEPOT_TOOLS_DIR="${DEPOT_TOOLS_DIR:-$HOME/depot_tools}"
+  if [ ! -d "$DEPOT_TOOLS_DIR/.git" ]; then
+    log_warn "gn not found. Cloning depot_tools to $DEPOT_TOOLS_DIR"
+    git clone --depth=1 \
+      https://chromium.googlesource.com/chromium/tools/depot_tools.git \
+      "$DEPOT_TOOLS_DIR"
+  fi
+  export PATH="$DEPOT_TOOLS_DIR:$PATH"
+  # depot_tools self-updates on first run; suppress its telemetry prompt.
+  export DEPOT_TOOLS_UPDATE=0
+fi
+log_ok "gn: $(command -v gn)"
+
 # Disk space check.
 # Chromium release build (no debug symbols, no PGO) needs ~50-60 GB during
 # build. We check the volume that holds CLAUM_BUILD_ROOT (which on GitHub
