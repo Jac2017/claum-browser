@@ -92,9 +92,20 @@ if ! command -v gn >/dev/null 2>&1; then
     git clone --depth=1 \
       https://chromium.googlesource.com/chromium/tools/depot_tools.git \
       "$DEPOT_TOOLS_DIR"
+
+    # Bootstrap depot_tools. Fresh clones don't have `python3_bin_reldir.txt`
+    # or the CIPD-managed gn/ninja/etc. binaries — running gclient once
+    # triggers the bootstrap and downloads them. We just call --version
+    # because we don't actually want to do a checkout.
+    log_warn "Bootstrapping depot_tools (downloads ~200 MB of tooling)..."
+    (
+      export PATH="$DEPOT_TOOLS_DIR:$PATH"
+      # gclient self-bootstraps on first invocation.
+      "$DEPOT_TOOLS_DIR/gclient" --version || true
+    )
   fi
+  # Add to PATH and disable auto-updates for subsequent invocations.
   export PATH="$DEPOT_TOOLS_DIR:$PATH"
-  # depot_tools self-updates on first run; suppress its telemetry prompt.
   export DEPOT_TOOLS_UPDATE=0
 fi
 log_ok "gn: $(command -v gn)"
