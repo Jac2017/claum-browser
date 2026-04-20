@@ -262,6 +262,32 @@ GN_ARGS="
 "
 
 mkdir -p "$OUT_DIR"
+
+# ---------------------------------------------------------------------------
+# DIAGNOSTIC: dump the lines around where gn gen has been failing.
+#
+# WHY: Last build failed with:
+#   ERROR at //chrome/browser/safe_browsing/BUILD.gn:114:5: Undefined identifier.
+#       sources += [
+# That error means gn hit a `sources += [...]` before `sources` was defined.
+# Since this file lives in Chromium's own tree (not our patches), we need to
+# SEE what's actually on the runner's disk — maybe ungoogled's prune_binaries
+# or a patch stripped a `sources = [...]` block that the `+=` depends on.
+#
+# Sending `|| true` ensures this diagnostic never causes the build to abort
+# if the file or path is slightly different in a future Chromium version.
+# ---------------------------------------------------------------------------
+SB_FILE="$CLAUM_BUILD_ROOT/build/src/chrome/browser/safe_browsing/BUILD.gn"
+if [ -f "$SB_FILE" ]; then
+  log_step "Diagnostic: lines 80-160 of chrome/browser/safe_browsing/BUILD.gn"
+  # `cat -n` prepends line numbers so the output lines line up with gn's error.
+  # `sed` then slices out just the window we care about.
+  cat -n "$SB_FILE" | sed -n '80,160p' || true
+  echo "---- end BUILD.gn diagnostic ----"
+else
+  log_warn "Could not find $SB_FILE — skipping diagnostic."
+fi
+
 gn gen "$OUT_DIR" --args="$GN_ARGS"
 
 # Build the main browser target.
