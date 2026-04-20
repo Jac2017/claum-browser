@@ -82,14 +82,28 @@ for t in ninja python3 node git rsync; do
 done
 log_ok "ninja / python3 / node / git / rsync"
 
-# Disk space check (~100 GB needed for a full build).
-FREE_GB=$(df -g "$HOME" | tail -1 | awk '{print $4}')
-if [ "$FREE_GB" -lt 80 ]; then
-  log_warn "Only ${FREE_GB} GB free in \$HOME — Chromium needs ~100 GB."
-  read -r -p "     Continue anyway? [y/N] " REPLY
-  [[ "$REPLY" =~ ^[Yy]$ ]] || exit 1
+# Disk space check.
+# Chromium release build (no debug symbols, no PGO) needs ~50-60 GB during
+# build. We check the volume that holds CLAUM_BUILD_ROOT (which on GitHub
+# Actions is a different mount than $HOME — this is why the previous version
+# was wrong).
+CHECK_PATH="${CLAUM_BUILD_ROOT:-$HOME}"
+mkdir -p "$CHECK_PATH"   # ensure it exists so df can stat it
+FREE_GB=$(df -g "$CHECK_PATH" | tail -1 | awk '{print $4}')
+MIN_GB=50
+
+# In CI environments (GitHub Actions, etc.) we can't prompt interactively,
+# so we just warn and continue. Locally we still ask before proceeding.
+if [ "$FREE_GB" -lt "$MIN_GB" ]; then
+  log_warn "Only ${FREE_GB} GB free at ${CHECK_PATH} — Chromium typically needs ~${MIN_GB}+ GB."
+  if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
+    log_warn "Running in CI — continuing anyway. Build may fail with 'No space left on device'."
+  else
+    read -r -p "     Continue anyway? [y/N] " REPLY
+    [[ "$REPLY" =~ ^[Yy]$ ]] || exit 1
+  fi
 else
-  log_ok "Disk: ${FREE_GB} GB free"
+  log_ok "Disk: ${FREE_GB} GB free at ${CHECK_PATH}"
 fi
 
 # -------- [2/6] Clone ungoogled-chromium -----------------------------------

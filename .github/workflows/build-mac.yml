@@ -33,6 +33,50 @@ jobs:
       - name: Check out Claum repo
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------------
+      # GitHub's macOS runners come preloaded with multiple Xcode versions,
+      # tons of iOS simulators, the Android SDK, etc. We only need ONE
+      # Xcode and the Apple Silicon simulators are irrelevant to us.
+      # Clearing this out frees ~30-50 GB, which Chromium's build needs.
+      # ------------------------------------------------------------------
+      - name: Free up disk space on runner
+        run: |
+          echo "Disk space BEFORE cleanup:"
+          df -h /
+          df -h $HOME
+
+          # Remove all Xcode versions except the active one (current default
+          # on macos-14 is Xcode_15.4 or similar — we keep it)
+          ACTIVE_XCODE=$(xcode-select -p | sed 's|/Contents/Developer||')
+          echo "Keeping active Xcode: $ACTIVE_XCODE"
+          ls /Applications | grep -E '^Xcode_' | while read dir; do
+            FULL="/Applications/$dir"
+            if [ "$FULL" != "$ACTIVE_XCODE" ]; then
+              echo "Removing $FULL"
+              sudo rm -rf "$FULL"
+            fi
+          done
+
+          # Remove iOS / tvOS / watchOS simulator runtimes we don't need
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches || true
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Devices || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* || true
+
+          # Android SDK / NDK / emulator (~14 GB) — we're building macOS, no Android.
+          sudo rm -rf $ANDROID_HOME || true
+          sudo rm -rf $ANDROID_NDK_HOME || true
+          sudo rm -rf /Users/runner/Library/Android || true
+          sudo rm -rf /usr/local/lib/android || true
+
+          # Misc preinstalled clutter
+          sudo rm -rf /usr/local/share/chromium || true
+          sudo rm -rf ~/.dotnet || true
+
+          echo ""
+          echo "Disk space AFTER cleanup:"
+          df -h /
+          df -h $HOME
+
       - name: Install build dependencies
         run: |
           brew update
