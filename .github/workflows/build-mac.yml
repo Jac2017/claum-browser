@@ -34,35 +34,92 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # Chromium 146 requires macOS SDK 15+, which ships with Xcode 16+.
-      # The runner's default is typically Xcode 15.x (ships SDK 14.x), so we
-      # must actively switch to an Xcode 16+ BEFORE the cleanup step below
-      # (otherwise cleanup deletes the Xcode we need).
+      # Chromium 146 requires macOS SDK 15+. We don't care about Xcode VERSION
+      # numbers — we only care that the Xcode we pick has SDK 15 inside it.
+      # (Apple's version naming is messy: Xcode 16 ships SDK 15, Xcode 26
+      # ships SDK 26, etc., and GitHub's runner image changes over time.)
+      #
+      # Strategy: enumerate every /Applications/Xcode*.app, peek inside its
+      # SDKs/ folder, pick whichever Xcode actually contains a MacOSX SDK
+      # with version >= 15. Then persist the choice to $GITHUB_ENV so it's
+      # in scope for ALL later steps (otherwise xcode-select -s alone is
+      # fragile — env vars take precedence over the global symlink).
       # ------------------------------------------------------------------
-      - name: Select Xcode 16+ (for macOS SDK 15)
+      - name: Select Xcode with macOS SDK 15+
         run: |
-          echo "Xcodes installed on the runner:"
-          ls /Applications | grep -E '^Xcode' || true
+          echo "==> Xcodes installed on this runner:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
 
-          # Find the newest preinstalled Xcode 16 or higher.
-          # `sort -V` sorts version-like strings; `tail -1` gets the newest.
-          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app /Applications/Xcode_17*.app 2>/dev/null | sort -V | tail -1)
+          echo ""
+          echo "==> Checking which Xcode has SDK 15+ ..."
+          BEST_XCODE=""
+          BEST_SDK_VER=""
 
-          if [ -z "$XCODE_PATH" ]; then
-            echo "ERROR: No Xcode 16+ found on this runner."
-            echo "Chromium 146 needs macOS SDK 15+, which requires Xcode 16+."
-            echo "Either the runner image changed, or we need to upgrade to macos-15."
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            SDK_DIR="$app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
+            [ -d "$SDK_DIR" ] || continue
+
+            # Look for any MacOSX<NN>.sdk where NN >= 15.
+            # `ls` returns names like MacOSX15.sdk, MacOSX15.4.sdk, MacOSX26.sdk, etc.
+            for sdk in "$SDK_DIR"/MacOSX*.sdk; do
+              [ -d "$sdk" ] || continue
+              base=$(basename "$sdk")
+              # Strip the prefix and suffix to extract a version number.
+              # e.g. "MacOSX15.4.sdk" -> "15.4"
+              ver=$(echo "$base" | sed -E 's/MacOSX([0-9.]+)\.sdk/\1/')
+              [ -z "$ver" ] && continue
+              # MacOSX.sdk (no version) is a symlink to whatever's default; skip.
+              [ "$base" = "MacOSX.sdk" ] && continue
+
+              # Major-version check: split on the first dot.
+              major="${ver%%.*}"
+              if [ "$major" -ge 15 ] 2>/dev/null; then
+                echo "  $app contains $base (version $ver)"
+                # Keep track of the highest SDK version seen.
+                # `sort -V` understands semantic versions (15.0 < 15.4 < 26.0).
+                if [ -z "$BEST_SDK_VER" ] \
+                   || [ "$(printf '%s\n%s\n' "$BEST_SDK_VER" "$ver" | sort -V | tail -1)" = "$ver" ]; then
+                  BEST_SDK_VER="$ver"
+                  BEST_XCODE="$app"
+                fi
+              fi
+            done
+          done
+
+          if [ -z "$BEST_XCODE" ]; then
+            echo ""
+            echo "ERROR: No Xcode with macOS SDK 15+ found on this runner."
+            echo "Chromium 146 requires SDK 15+. Either:"
+            echo "  - upgrade the runner to macos-15 in build-mac.yml, OR"
+            echo "  - add a step that downloads SDK 15 from xcodes.dev."
+            echo ""
+            echo "SDKs found per Xcode:"
+            for app in /Applications/Xcode*.app; do
+              echo "  $app:"
+              ls "$app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs" 2>/dev/null || echo "    (no SDK dir)"
+            done
             exit 1
           fi
 
-          echo "Switching active Xcode to: $XCODE_PATH"
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          echo ""
+          echo "==> Selected: $BEST_XCODE  (best SDK: $BEST_SDK_VER)"
+          sudo xcode-select -s "$BEST_XCODE/Contents/Developer"
 
-          echo "Now active:"
+          # Persist the choice for ALL subsequent steps. DEVELOPER_DIR takes
+          # precedence over xcode-select's global symlink — so even if the
+          # symlink later gets disturbed (e.g. by deleting the directory it
+          # points to), tools like xcrun/xcodebuild will still find the right
+          # Xcode via this env var.
+          echo "DEVELOPER_DIR=$BEST_XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          echo "SDKROOT=$BEST_XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" >> "$GITHUB_ENV"
+
+          echo ""
+          echo "==> Verification:"
           xcode-select -p
           xcodebuild -version
-          echo "SDKs available:"
-          ls "$XCODE_PATH/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
+          echo "SDKs in selected Xcode:"
+          ls "$BEST_XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
 
       # ------------------------------------------------------------------
       # GitHub's macOS runners come preloaded with multiple Xcode versions,
@@ -80,15 +137,28 @@ jobs:
           df -h /
           df -h $HOME
 
-          # Remove all Xcode versions except the active one (which is now
-          # Xcode 16+, selected in the previous step).
-          ACTIVE_XCODE=$(xcode-select -p | sed 's|/Contents/Developer||')
-          echo "Keeping active Xcode: $ACTIVE_XCODE"
-          ls /Applications | grep -E '^Xcode_' | while read dir; do
-            FULL="/Applications/$dir"
-            if [ "$FULL" != "$ACTIVE_XCODE" ]; then
-              echo "Removing $FULL"
-              sudo rm -rf "$FULL"
+          # Determine the active Xcode and its CANONICAL path (resolves any
+          # symlinks). DEVELOPER_DIR was set by the previous step, but fall
+          # back to xcode-select if it's not set for some reason.
+          ACTIVE_RAW="${DEVELOPER_DIR:-$(xcode-select -p)}"
+          ACTIVE_XCODE="${ACTIVE_RAW%/Contents/Developer}"
+          # `realpath` resolves symlinks and trailing slashes — so paths like
+          # /Applications/Xcode.app and /Applications/Xcode_16.2.app resolve
+          # to the same canonical path if one is a symlink to the other.
+          ACTIVE_CANON=$(realpath "$ACTIVE_XCODE" 2>/dev/null || echo "$ACTIVE_XCODE")
+          echo "Active Xcode (raw):      $ACTIVE_XCODE"
+          echo "Active Xcode (canonical): $ACTIVE_CANON"
+
+          # Walk every /Applications/Xcode*.app and delete only those whose
+          # canonical path differs from the active one.
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            APP_CANON=$(realpath "$app" 2>/dev/null || echo "$app")
+            if [ "$APP_CANON" = "$ACTIVE_CANON" ]; then
+              echo "Keeping  $app"
+            else
+              echo "Removing $app"
+              sudo rm -rf "$app"
             fi
           done
 
