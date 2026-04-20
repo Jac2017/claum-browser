@@ -1,9 +1,3 @@
-# Claum branding constants.
-# Chromium's build system reads this file (via `chrome/app/theme/<brand>/BRANDING`)
-# to populate product names in menus, About pages, crash reports, etc.
-#
-# Format: KEY=VALUE (no spaces around =). Do not add quotes.
-
 COMPANY_FULLNAME=Claum
 COMPANY_SHORTNAME=Claum
 PRODUCT_FULLNAME=Claum
