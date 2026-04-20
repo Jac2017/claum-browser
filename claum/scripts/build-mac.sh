@@ -92,7 +92,13 @@ if ! command -v gn >/dev/null 2>&1; then
     log_warn "gn not found. Building it from source at gn.googlesource.com"
 
     if [ ! -d "$GN_DIR/.git" ]; then
-      git clone --depth=1 https://gn.googlesource.com/gn "$GN_DIR"
+      # IMPORTANT: do NOT use --depth=1 here. gn's build/gen.py runs
+      #   `git describe HEAD --abbrev=12 --match initial-commit`
+      # to stamp a version string into last_commit_position.h, and that
+      # requires the `initial-commit` tag to be present locally. A shallow
+      # clone drops tags, and gen.py dies with "fatal: No names found".
+      # A full clone of gn is only ~20 MB — trivial vs. Chromium's 3 GB.
+      git clone https://gn.googlesource.com/gn "$GN_DIR"
     fi
 
     # gn has its own self-hosted bootstrap (no chicken-and-egg problem):
