@@ -145,6 +145,10 @@ log_step "[2/6] Syncing ungoogled-chromium"
 clone_or_update_ungoogled
 
 # -------- [3/6] Download + unpack Chromium source --------------------------
+# IMPORTANT: ordering inside this block matters. Toolchain downloads (clang,
+# Rust) MUST happen BEFORE domain_substitution.py — otherwise the substitution
+# rewrites Google URLs in update.py / update_rust.py to fake stand-ins like
+# `9oo91eapis.qjz9zk` and the downloads fail with DNS errors.
 if [ "$SKIP_DOWNLOAD" -eq 0 ]; then
   log_step "[3/6] Downloading and unpacking Chromium $CHROMIUM_VERSION"
   cd "$CLAUM_BUILD_ROOT"
@@ -167,7 +171,39 @@ if [ "$SKIP_DOWNLOAD" -eq 0 ]; then
   # 4. Apply the ungoogled-chromium privacy patches on top of stock Chromium
   ./utils/patches.py apply build/src patches
 
-  # 5. Replace google.com / etc. with neutral alternates throughout the source
+  # 5. Download Chromium's build toolchains (clang + Rust) BEFORE domain
+  #    substitution runs. update.py / update_rust.py both contain the real
+  #    Google URLs (commondatastorage.googleapis.com) which they need in order
+  #    to reach the prebuilt-binary bucket. If domain substitution runs first,
+  #    those URLs become "commondatastorage.9oo91eapis.qjz9zk" (intentional
+  #    nonsense) and the downloads die with DNS failures.
+  log_step "[3a/6] Downloading Chromium build toolchains (clang + Rust)"
+  SRC="$CLAUM_BUILD_ROOT/build/src"
+
+  if [ -f "$SRC/tools/clang/scripts/update.py" ]; then
+    log_ok "Downloading clang toolchain (~150 MB)"
+    python3 "$SRC/tools/clang/scripts/update.py"
+  else
+    log_warn "clang update script not found — assuming system clang"
+  fi
+
+  if [ -f "$SRC/tools/rust/update_rust.py" ]; then
+    log_ok "Downloading Rust toolchain (~200 MB)"
+    python3 "$SRC/tools/rust/update_rust.py"
+  else
+    log_warn "Rust update script not found"
+  fi
+
+  # Stamp build/util/LASTCHANGE (used for version info embedded in the binary).
+  if [ -f "$SRC/build/util/lastchange.py" ]; then
+    log_ok "Generating LASTCHANGE"
+    python3 "$SRC/build/util/lastchange.py" -o "$SRC/build/util/LASTCHANGE" \
+      || log_warn "lastchange.py failed (non-fatal)"
+  fi
+
+  # 6. Replace google.com / etc. with neutral alternates throughout the source
+  #    NOW it's safe — clang/Rust are already on disk; gn won't need to fetch.
+  log_step "[3b/6] Applying domain substitution"
   ./utils/domain_substitution.py apply \
       -r domain_regex.list \
       -f domain_substitution.list \
@@ -176,56 +212,6 @@ if [ "$SKIP_DOWNLOAD" -eq 0 ]; then
 else
   log_ok "[3/6] Skipping download (--skip-download)"
 fi
-
-# -------- [3.5/6] Download Chromium build toolchains -----------------------
-# Chromium normally downloads its own clang + Rust toolchains via `gclient
-# sync` (which runs DEPS hooks at checkout time). We're skipping gclient
-# entirely (we use the ungoogled-chromium tarball flow), so those hooks
-# never run — which means the toolchain VERSION files don't exist and
-# `gn gen` later fails with "Could not read //third_party/rust-toolchain/VERSION".
-#
-# Solution: invoke the standalone toolchain-download scripts that ship in
-# Chromium source. They fetch prebuilt binaries from Google's CIPD bucket
-# into the right directories and populate the VERSION files gn expects.
-#
-# Re-runs are safe: each script is a no-op if the right version is already
-# installed, so the cache step in build-mac.yml works correctly.
-log_step "[3.5/6] Downloading Chromium build toolchains (clang + Rust)"
-SRC="$CLAUM_BUILD_ROOT/build/src"
-
-if [ -f "$SRC/tools/clang/scripts/update.py" ]; then
-  log_ok "Downloading clang toolchain (~150 MB)"
-  python3 "$SRC/tools/clang/scripts/update.py"
-else
-  log_warn "clang update script not found — assuming system clang"
-fi
-
-if [ -f "$SRC/tools/rust/update_rust.py" ]; then
-  log_ok "Downloading Rust toolchain (~200 MB)"
-  python3 "$SRC/tools/rust/update_rust.py"
-else
-  log_warn "Rust update script not found"
-fi
-
-# Some Chromium versions also need these. Each is a no-op if not present.
-for extra_script in \
-    "tools/perf/update_wpr.py" \
-    "build/util/lastchange.py" \
-    "build/mac_toolchain.py"; do
-  if [ -f "$SRC/$extra_script" ]; then
-    log_ok "Running $extra_script"
-    # build/util/lastchange.py needs an output file argument; the others
-    # take no args. We only invoke ones that are well-behaved without args.
-    case "$extra_script" in
-      build/util/lastchange.py)
-        # Generates LASTCHANGE file used by version stamping.
-        python3 "$SRC/$extra_script" -o "$SRC/build/util/LASTCHANGE" || \
-          log_warn "lastchange.py failed (non-fatal)"
-        ;;
-      *) : ;;
-    esac
-  fi
-done
 
 # -------- [4/6] Copy Claum resources into the tree -------------------------
 log_step "[4/6] Staging Claum resources"
