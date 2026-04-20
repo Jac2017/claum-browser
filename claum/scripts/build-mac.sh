@@ -115,17 +115,30 @@ if [ "$SKIP_DOWNLOAD" -eq 0 ]; then
   log_step "[3/6] Downloading and unpacking Chromium $CHROMIUM_VERSION"
   cd "$CLAUM_BUILD_ROOT"
 
-  # ungoogled-chromium's standard pipeline:
-  #  - download_source_files.py   fetches the Chromium tarball
-  #  - extract_tarball.sh         unpacks to build/src/
-  #  - prune_binaries.py          strips pre-built Google binaries
-  #  - apply_patches.py           applies the ungoogled privacy patches
-  ./utils/downloads.py retrieve  -c "$CHROMIUM_VERSION" -i downloads.ini -o build/downloads
-  ./utils/downloads.py unpack    -c build/downloads -i downloads.ini build/src
-  ./utils/prune_binaries.py      build/src pruning.list
-  ./utils/patches.py apply       build/src patches
-  ./utils/domain_substitution.py apply -r domain_regex.list \
-       -f domain_substitution.list -c build/domsubcache.tar.gz build/src
+  # The ungoogled-chromium tooling uses -i for the downloads.ini config
+  # (which itself names the Chromium version + tarball URL) and -c for the
+  # cache directory where tarballs are downloaded to / read from.
+  # Make sure the cache directory exists — downloads.py won't auto-create it.
+  mkdir -p build/downloads
+
+  # 1. Download the Chromium source tarball (~3 GB) into build/downloads/
+  ./utils/downloads.py retrieve -i downloads.ini -c build/downloads
+
+  # 2. Unpack the tarball into build/src/ (~25 GB unpacked)
+  ./utils/downloads.py unpack   -i downloads.ini -c build/downloads build/src
+
+  # 3. Strip Google's pre-built binaries (security + reproducibility)
+  ./utils/prune_binaries.py build/src pruning.list
+
+  # 4. Apply the ungoogled-chromium privacy patches on top of stock Chromium
+  ./utils/patches.py apply build/src patches
+
+  # 5. Replace google.com / etc. with neutral alternates throughout the source
+  ./utils/domain_substitution.py apply \
+      -r domain_regex.list \
+      -f domain_substitution.list \
+      -c build/domsubcache.tar.gz \
+      build/src
 else
   log_ok "[3/6] Skipping download (--skip-download)"
 fi

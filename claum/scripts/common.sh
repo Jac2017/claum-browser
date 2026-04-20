@@ -17,10 +17,16 @@ CLAUM_BUILD_ROOT="${CLAUM_BUILD_ROOT:-$HOME/claum-build}"
 
 # Upstream ungoogled-chromium repo we base Claum on.
 UNGOOGLED_REPO="${UNGOOGLED_REPO:-https://github.com/ungoogled-software/ungoogled-chromium.git}"
-UNGOOGLED_BRANCH="${UNGOOGLED_BRANCH:-master}"
 
 # Pinned Chromium version (must match CHROMIUM_VERSION at the repo root).
 CHROMIUM_VERSION="$(cat "$CLAUM_REPO_DIR/CHROMIUM_VERSION" | tr -d '[:space:]')"
+
+# We want ungoogled-chromium at the tag that matches our pinned Chromium
+# version — otherwise the downloads.ini will point at a DIFFERENT Chromium
+# version than the one our patches were written for. Upstream tags are
+# named <chromium-version>-1 (e.g. 146.0.7680.164-1).
+# You can override with UNGOOGLED_BRANCH=<some-ref> if needed.
+UNGOOGLED_BRANCH="${UNGOOGLED_BRANCH:-${CHROMIUM_VERSION}-1}"
 
 # --- Logging helpers --------------------------------------------------------
 # Color codes — skipped if stdout isn't a TTY.
@@ -38,17 +44,31 @@ log_err()  { echo -e "${_C_RED}  ✗${_C_RESET} $*" >&2; }
 # --- Reusable steps ---------------------------------------------------------
 
 # Clone or update ungoogled-chromium into $CLAUM_BUILD_ROOT.
+# $UNGOOGLED_BRANCH may be either a branch (e.g. "master") or a tag
+# (e.g. "146.0.7680.164-1"). `git clone --branch` accepts both.
 clone_or_update_ungoogled() {
   if [ -d "$CLAUM_BUILD_ROOT/.git" ]; then
-    log_step "Updating ungoogled-chromium"
-    git -C "$CLAUM_BUILD_ROOT" fetch --depth=1 origin "$UNGOOGLED_BRANCH"
-    git -C "$CLAUM_BUILD_ROOT" reset --hard "origin/$UNGOOGLED_BRANCH"
+    log_step "Updating ungoogled-chromium to $UNGOOGLED_BRANCH"
+    # Fetch the specific ref. For a tag, --depth=1 + refs/tags/<tag>:refs/tags/<tag>
+    # is the reliable incantation; for a branch it's origin/<branch>.
+    git -C "$CLAUM_BUILD_ROOT" fetch --depth=1 origin \
+        "+refs/heads/${UNGOOGLED_BRANCH}:refs/remotes/origin/${UNGOOGLED_BRANCH}" \
+        2>/dev/null \
+      || git -C "$CLAUM_BUILD_ROOT" fetch --depth=1 origin \
+        "+refs/tags/${UNGOOGLED_BRANCH}:refs/tags/${UNGOOGLED_BRANCH}"
+    git -C "$CLAUM_BUILD_ROOT" checkout --force "${UNGOOGLED_BRANCH}"
   else
-    log_step "Cloning ungoogled-chromium"
-    git clone --depth=1 --branch "$UNGOOGLED_BRANCH" \
-      "$UNGOOGLED_REPO" "$CLAUM_BUILD_ROOT"
+    log_step "Cloning ungoogled-chromium @ $UNGOOGLED_BRANCH"
+    # `git clone --branch` takes either a branch name or a tag name.
+    # If the tag doesn't exist upstream, fall back to master with a warning.
+    if ! git clone --depth=1 --branch "$UNGOOGLED_BRANCH" \
+         "$UNGOOGLED_REPO" "$CLAUM_BUILD_ROOT" 2>/dev/null; then
+      log_warn "Tag/branch '$UNGOOGLED_BRANCH' not found upstream — falling back to master."
+      log_warn "Chromium version may not match — patches may fail."
+      git clone --depth=1 --branch master "$UNGOOGLED_REPO" "$CLAUM_BUILD_ROOT"
+    fi
   fi
-  log_ok "ungoogled-chromium ready at $CLAUM_BUILD_ROOT"
+  log_ok "ungoogled-chromium ready at $CLAUM_BUILD_ROOT ($(git -C "$CLAUM_BUILD_ROOT" rev-parse --short HEAD))"
 }
 
 # Copy Claum extensions + resources into the Chromium source tree.
