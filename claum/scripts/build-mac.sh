@@ -82,31 +82,31 @@ for t in ninja python3 node git rsync; do
 done
 log_ok "ninja / python3 / node / git / rsync"
 
-# gn (Generate Ninja) is Chromium's meta-build tool. It's not on Homebrew —
-# it ships inside Google's depot_tools toolkit. Install that if missing and
-# add it to PATH for the rest of this script.
+# gn (Generate Ninja) is Chromium's meta-build tool. It's not in Homebrew,
+# and ungoogled-chromium prunes the pre-built gn from the Chromium source
+# tree — so we build it from its own upstream repo. Takes ~2 minutes.
 if ! command -v gn >/dev/null 2>&1; then
-  DEPOT_TOOLS_DIR="${DEPOT_TOOLS_DIR:-$HOME/depot_tools}"
-  if [ ! -d "$DEPOT_TOOLS_DIR/.git" ]; then
-    log_warn "gn not found. Cloning depot_tools to $DEPOT_TOOLS_DIR"
-    git clone --depth=1 \
-      https://chromium.googlesource.com/chromium/tools/depot_tools.git \
-      "$DEPOT_TOOLS_DIR"
+  GN_DIR="${GN_DIR:-$HOME/gn}"
 
-    # Bootstrap depot_tools. Fresh clones don't have `python3_bin_reldir.txt`
-    # or the CIPD-managed gn/ninja/etc. binaries — running gclient once
-    # triggers the bootstrap and downloads them. We just call --version
-    # because we don't actually want to do a checkout.
-    log_warn "Bootstrapping depot_tools (downloads ~200 MB of tooling)..."
+  if [ ! -x "$GN_DIR/out/gn" ]; then
+    log_warn "gn not found. Building it from source at gn.googlesource.com"
+
+    if [ ! -d "$GN_DIR/.git" ]; then
+      git clone --depth=1 https://gn.googlesource.com/gn "$GN_DIR"
+    fi
+
+    # gn has its own self-hosted bootstrap (no chicken-and-egg problem):
+    #   - build/gen.py generates a small ninja file
+    #   - ninja then compiles gn into out/gn
     (
-      export PATH="$DEPOT_TOOLS_DIR:$PATH"
-      # gclient self-bootstraps on first invocation.
-      "$DEPOT_TOOLS_DIR/gclient" --version || true
+      cd "$GN_DIR"
+      python3 build/gen.py
+      ninja -C out gn
     )
   fi
-  # Add to PATH and disable auto-updates for subsequent invocations.
-  export PATH="$DEPOT_TOOLS_DIR:$PATH"
-  export DEPOT_TOOLS_UPDATE=0
+
+  # Put the freshly-built gn on PATH for the rest of this script.
+  export PATH="$GN_DIR/out:$PATH"
 fi
 log_ok "gn: $(command -v gn)"
 

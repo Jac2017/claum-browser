@@ -80,11 +80,10 @@ jobs:
       - name: Install build dependencies
         run: |
           brew update
-          # gn = Chromium's build-config generator (Generate Ninja).
           # ninja = the actual build runner gn generates files for.
-          # ungoogled-chromium strips Google's pre-built gn binary out of the
-          # Chromium source, so we install it via Homebrew here.
-          brew install gn ninja python3 rsync
+          # gn itself isn't in Homebrew — we build it from source in the
+          # build script (see build-mac.sh step 1c).
+          brew install ninja python3 rsync
 
       - name: Cache Chromium source
         id: cache-chromium
