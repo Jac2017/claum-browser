@@ -107,6 +107,12 @@ apply_claum_patches() {
   pushd "$SRC" >/dev/null
   log_step "Applying Claum patches"
 
+  # IMPORTANT: temporarily disable errexit + pipefail. We're running commands
+  # that are EXPECTED to fail (git apply --check on a rejecting patch), and
+  # we want to gather all failures, not abort the whole build on the first one.
+  set +e
+  set +o pipefail
+
   local TOTAL=0 OK=0 FAILED=0
   local FAILED_LIST=""
 
@@ -119,18 +125,20 @@ apply_claum_patches() {
     echo "     -- $name --"
 
     # First attempt: strict git apply.
-    if git apply --check "$p" 2>/dev/null; then
+    if git apply --check "$p" >/dev/null 2>&1; then
       git apply "$p"
       OK=$((OK+1))
       log_ok "    applied cleanly"
       continue
     fi
 
-    # Show the real failure reason (not redirected to /dev/null this time).
+    # Show the real failure reason. Trailing `|| true` is belt-and-braces
+    # against pipefail in case the user re-enabled it.
     log_warn "    git apply --check failed, here's why:"
-    git apply --check "$p" 2>&1 | sed 's/^/        /' | head -20
+    git apply --check "$p" 2>&1 | sed 's/^/        /' | head -20 || true
 
-    # Second attempt: classic `patch` with fuzz tolerance.
+    # Second attempt: classic `patch` with fuzz tolerance (more lenient
+    # than git apply, can handle small line-number drift).
     log_warn "    retrying with patch -p1 --fuzz=3"
     if patch -p1 --no-backup-if-mismatch --fuzz=3 -i "$p" 2>&1 | sed 's/^/        /'; then
       OK=$((OK+1))
@@ -142,14 +150,19 @@ apply_claum_patches() {
     fi
   done
 
+  # Re-enable errexit for the rest of the build.
+  set -e
+  set -o pipefail
+
   popd >/dev/null
 
   echo ""
   if [ "$FAILED" -eq 0 ]; then
     log_ok "All $TOTAL Claum patches applied"
   else
-    log_warn "Patches summary: $OK/$TOTAL applied, $FAILED rejected ($FAILED_LIST)"
-    log_warn "Build will continue but rejected patches will need manual fixing."
+    log_warn "Patches summary: $OK/$TOTAL applied, $FAILED rejected:"
+    log_warn "$FAILED_LIST"
+    log_warn "Build will continue. Rejected patches will need manual fixing."
   fi
 }
 
