@@ -3,6 +3,27 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #29 status — 2026-04-21 17:21 GMT — JPEG FIX CONFIRMED WORKING
+
+Build #29 (commit c5fc5a4, job 72360492331) is at ninja action
+[2933/56129] after 20m 47s of compile time. That's well past #28's
+failure point of [1037/56129], and no `fatal error` / `error:` strings
+are present in the visible log. Conclusion: the jpeg-turbo install +
+`extra_cflags=-I<prefix>/include` fix DID resolve
+`libyuv/mjpeg_decoder.cc`'s missing `jpeglib.h`.
+
+Progression rate so far: ~2.5 actions/second. At that pace the remaining
+53,196 actions extrapolate to ~5.9 more hours of compile, though later
+parts (C++ template-heavy TU's, link step) are much slower per-action.
+Total wall-clock ETA: 6-8 hours from the 17:00:36 GMT start, so any
+time between 23:00 and 01:00 GMT today (2026-04-21 to -22).
+
+Next probable failure classes (unchanged from earlier prediction):
+  - Another `use_system_*` header gap — add brew formula + extend
+    extra_cflags.
+  - Link-time errors at the end (hours away) — typically missing
+    framework or library.
+
 ## Run #29 — fix drafted 2026-04-21 (for libjpeg header)
 
 Run #28 (a19ae35) got MUCH further than any previous run — past all the
