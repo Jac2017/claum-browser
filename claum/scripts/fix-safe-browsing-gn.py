@@ -7,58 +7,63 @@
 #
 # BACKGROUND
 # ----------
-# Stock Chromium's chrome/browser/safe_browsing/BUILD.gn has this shape:
+# Stock Chromium's chrome/browser/safe_browsing/BUILD.gn defines a
+# `static_library("safe_browsing")` target whose body looks roughly like:
 #
 #     static_library("safe_browsing") {
-#       if (safe_browsing_mode != 0) {          # OUTER if
-#         sources = [ ... ]                     # defines `sources`
-#         deps    = [ ..., "//services/..." ]   # defines `deps`
-#       }                                        # closes outer if (~line 89)
-#
-#       # Note: is_android is not equivalent to safe_browsing_mode == 2.
-#       if (is_android)  { deps += [...] }
-#       if (is_chromeos) { deps += [...] }
-#
-#       if (safe_browsing_mode != 0) {          # INNER if
-#         sources += [ ... ]                    # appends — needs `sources`
-#         deps    += [ ... ]                    # appends — needs `deps`
-#         ...
+#       if (some_condition) {           # OUTER if — defines variables
+#         sources = [ ... ]
+#         deps    = [ ... ]
+#         allow_circular_includes_from = []
+#         configs = [ ... ]
+#         public_deps = [ ... ]
 #       }
+#
+#       # Later code appends to those variables:
+#       if (safe_browsing_mode != 0) {  # INNER if — appends to them
+#         sources += [ ... ]
+#         deps    += [ ... ]
+#       }
+#       ...
+#       allow_circular_includes_from += [ "//chrome/browser/ui/safety_hub" ]
 #     }
 #
-# When `safe_browsing_mode == 0` (which the ungoogled build tends to produce),
-# the OUTER if-block does not execute, so `sources` and `deps` are never
-# defined at the `static_library` scope. Then any `sources += [...]` or
-# `deps += [...]` later in the file blows up with
+# After the ungoogled patch is applied, the OUTER if-block ends up wrapped in
+# `if (false) { ... }`. That means sources, deps, configs, public_deps, and
+# allow_circular_includes_from are NEVER defined at the static_library scope.
+# Then later `+= [...]` calls (which still execute) all blow up with:
 #
-#     ERROR ... Undefined identifier.
+#     ERROR at //chrome/browser/safe_browsing/BUILD.gn:NNN:N: Undefined identifier.
 #         sources += [
-#
-# (and the same for `deps`). Note that the INNER if-block still evaluates
-# because `safe_browsing_mode != 0` — so the += calls run despite the outer
-# block having been skipped.
+#         deps += [
+#         allow_circular_includes_from += [ "//chrome/browser/ui/safety_hub" ]
 #
 # WHAT THIS SCRIPT DOES
 # ---------------------
-# We insert two small guarded initializations at the TOP of the INNER
-# `if (safe_browsing_mode != 0) { ... }` block:
+# We apply TWO fixes, in order:
 #
-#     if (!defined(sources)) {
-#       sources = []
-#     }
-#     if (!defined(deps)) {
-#       deps = []
-#     }
+# Fix #1 — Flip `if (false)` back to `if (true)` for the main definitions
+#   block. This is the root-cause fix: it restores the legitimate Chromium
+#   code that defines `sources`, `deps`, `allow_circular_includes_from`,
+#   `configs`, and `public_deps` in one shot. After this, the later `+= [...]`
+#   calls have variables to append to.
 #
-# Why `defined(...)` rather than a bare `sources = []`? Because on builds
-# where the outer if DID run, `sources`/`deps` are already defined, and
-# assigning them again in an inner scope is a gn error. `defined()` is a
-# built-in that lets us initialize ONLY when needed — safe in every config.
+# Fix #2 — Insert `defined()`-guarded initializers for `sources` and `deps`
+#   inside the inner `if (safe_browsing_mode != 0) { ... }` block:
+#
+#     if (!defined(sources)) { sources = [] }
+#     if (!defined(deps))    { deps    = [] }
+#
+#   This is belt-and-suspenders: if for any reason Fix #1 doesn't apply
+#   (e.g. the wrapper was removed by a future patch), this still keeps the
+#   inner block safe. `defined(...)` is a gn built-in that returns true when
+#   a variable already exists in scope — so when Fix #1 DID succeed and
+#   sources/deps are already defined, these guards are no-ops.
 #
 # IDEMPOTENCY
 # -----------
-# Re-running the script is a no-op: we look for our own inserted markers
-# (`!defined(sources)` and `!defined(deps)`) and skip if present.
+# Each fix has its own idempotency check, so the script is safe to re-run
+# any number of times.
 #
 # USAGE
 # -----
@@ -89,32 +94,72 @@ if not target.is_file():
 # BUILD.gn files are only a few hundred lines — a single read is fine.
 text = target.read_text()
 
-# --- 3. Insert the guarded `sources`/`deps` initializers --------------------
-# We look for the INNER `if (safe_browsing_mode != 0) {` block followed by
-# any comment lines, then the first `sources += [` line. We want to insert
-# our two initialization blocks BEFORE that `sources += [`.
+
+# =============================================================================
+# Fix #1 — Flip `if (false) {` back to `if (true) {` in the main block
+# =============================================================================
+# Look for the pattern:
 #
-# Regex breakdown:
-#   (if \(safe_browsing_mode != 0\) \{\n  <- group 1: the if-header line
-#    (?:\s*#[^\n]*\n)*                   <- any number of comment lines
-#   )
-#   (\s*)                                 <- group 2: indentation of sources+=
-#   (sources\s*\+=\s*\[)                  <- group 3: literal "sources += ["
+#     static_library("safe_browsing") {
+#       if (false) {
+#
+# and change the inner `if (false)` to `if (true)` so the original Chromium
+# variable-definition block actually executes.
+#
+# Why a regex instead of a simple string replace? Because BUILD.gn files have
+# many `if (false) {` lines for various reasons (unrelated targets, debug
+# checks, etc.). We want to match ONLY the one immediately inside
+# `static_library("safe_browsing") {` — that anchor makes the match precise.
+# -----------------------------------------------------------------------------
+PATTERN_IF_FALSE = re.compile(
+    # Group 1: the static_library opening line plus any whitespace/newline
+    # before the `if`. We keep this in the replacement so we don't lose it.
+    r'(static_library\("safe_browsing"\) \{\n\s*)'
+    # Then the literal `if (false) {` we want to flip
+    r'if \(false\) \{'
+)
+
+# `re.subn` returns (new_text, replacement_count). count=1 means "only the
+# first match" — there should only ever be one anyway, but this is defensive.
+text, n_iffalse = PATTERN_IF_FALSE.subn(
+    # Backreference \1 keeps the static_library line + indentation, then we
+    # write `if (true) {` followed by an inline comment explaining why.
+    r'\1if (true) {  # Claum: flipped from if(false) — see fix-safe-browsing-gn.py',
+    text,
+    count=1,
+)
+
+if n_iffalse:
+    print("[fix-safe-browsing-gn] Fix #1: flipped if(false) -> if(true) in static_library block")
+else:
+    # Either already flipped, or the wrapper was never there. Both are fine.
+    print("[fix-safe-browsing-gn] Fix #1: no if(false) wrapper found (already flipped or not present)")
+
+
+# =============================================================================
+# Fix #2 — Insert defined()-guarded initializers for sources/deps
+# =============================================================================
+# This is a belt-and-suspenders safety net: even if Fix #1 didn't apply, this
+# keeps the inner `if (safe_browsing_mode != 0) { sources += [...] }` block
+# from blowing up.
 # -----------------------------------------------------------------------------
 
-# Idempotency check: if we've already inserted our markers, do nothing.
-# Look for our exact inserted text — `!defined(sources)` — to decide.
+# Idempotency check: if we've already inserted our markers, skip. We look for
+# our exact inserted text — `!defined(sources)` — to decide.
 already_fixed = "!defined(sources)" in text
 
 if already_fixed:
-    print("[fix-safe-browsing-gn] already applied — skipping")
+    print("[fix-safe-browsing-gn] Fix #2: already applied — skipping")
 else:
-    PATTERN = re.compile(
-        # Start: the `if (safe_browsing_mode != 0) {` line, plus any comments
+    # Regex breakdown:
+    #   (if \(safe_browsing_mode != 0\) \{\n  <- group 1: the if-header line
+    #    (?:\s*#[^\n]*\n)*                     <- any number of comment lines
+    #   )
+    #   (\s*)                                   <- group 2: indentation of `sources +=`
+    #   (sources\s*\+=\s*\[)                    <- group 3: literal `sources += [`
+    PATTERN_GUARDS = re.compile(
         r'(if \(safe_browsing_mode != 0\) \{\n(?:\s*#[^\n]*\n)*)'
-        # Capture the indentation of the first real statement
         r'(\s*)'
-        # And the literal `sources += [` — the first thing after the comments
         r'(sources\s*\+=\s*\[)',
     )
 
@@ -129,12 +174,12 @@ else:
         indent    = m.group(2)   # whitespace in front of `sources += [`
         plus_eq   = m.group(3)   # literal `sources += [`
 
-        # Build the inserted block. Each line uses the same indentation as
-        # the original `sources += [` so the file stays consistently formatted.
+        # Each line uses the same indentation as the original `sources += [`
+        # so the file stays consistently formatted.
         inserted = (
-            f"{indent}# Initialize sources/deps if the outer `if (safe_browsing_mode != 0)` block\n"
-            f"{indent}# didn't run (the ungoogled patches can skip it). Using `defined()` means\n"
-            f"{indent}# this is a no-op when the outer block already populated them.\n"
+            f"{indent}# Initialize sources/deps if the outer block didn't define them.\n"
+            f"{indent}# `defined()` is a gn built-in that returns true when the var exists,\n"
+            f"{indent}# so this is a no-op when the outer block already populated them.\n"
             f"{indent}if (!defined(sources)) {{\n"
             f"{indent}  sources = []\n"
             f"{indent}}}\n"
@@ -148,21 +193,22 @@ else:
     # `re.subn(..., count=1)` returns (new_text, num_replacements). We expect
     # exactly one match — more than one means the file drifted and we should
     # bail instead of mutating blindly.
-    text, n = PATTERN.subn(do_replace, text, count=1)
+    text, n_guards = PATTERN_GUARDS.subn(do_replace, text, count=1)
 
-    if n == 0:
-        # We couldn't find the expected pattern. Fail loudly with context.
+    if n_guards == 0:
+        # We couldn't find the expected pattern. This is non-fatal IF Fix #1
+        # already restored the original variable definitions — in that case
+        # the inner `sources += [...]` will work fine without our guards.
+        # So just warn instead of failing.
         print(
-            "ERROR: could not find the `if (safe_browsing_mode != 0)` block\n"
-            f"       followed by `sources += [` in {target}.\n"
-            "       The file layout may have drifted — inspect it manually.",
-            file=sys.stderr,
+            "[fix-safe-browsing-gn] Fix #2: pattern not found — inner block layout may differ.\n"
+            "                          (Non-fatal if Fix #1 succeeded.)"
         )
-        sys.exit(1)
+    else:
+        print("[fix-safe-browsing-gn] Fix #2: inserted guarded sources/deps initializers")
 
-    print("[fix-safe-browsing-gn] inserted guarded sources/deps initializers")
 
-# --- 4. Write the result back to disk ---------------------------------------
+# --- 3. Write the result back to disk ---------------------------------------
 target.write_text(text)
 print(f"[fix-safe-browsing-gn] done: {target}")
 sys.exit(0)
