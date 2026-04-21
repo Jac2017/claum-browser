@@ -3,7 +3,7 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
-## Run #27 — triggered 2026-04-21 (commit TBD)
+## Run #27 — triggered 2026-04-21 (commit 0979202)
 
 Run #26 made it to action [1037/56129] — confirmed the libnode.127.dylib
 staging fix works. Then died at the `devtools-frontend .../issue_counter:css_files`
