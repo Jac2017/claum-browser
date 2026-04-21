@@ -3,7 +3,7 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
-## Run #24 — triggered 2026-04-21 (commit TBD)
+## Run #24 — triggered 2026-04-21 (commit af83a87)
 
 Run #23 got FURTHER than #22 (node staging fix worked — no more missing
 third_party/node/mac_arm64/... error). Compiled 204 files of base/ and
