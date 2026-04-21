@@ -265,6 +265,45 @@ else
   echo "  node already present at $NODE_DIR_REL/node"
 fi
 
+# ----------------------------------------------------------------------------
+# Stage google_toolbox_for_mac — a Chromium third_party dep that ungoogled
+# strips along with other Google-hosted repos.
+# ----------------------------------------------------------------------------
+# Chromium uses this Obj-C utility library on macOS for things like UI
+# localization (GTMUILocalizer). It lives at:
+#   third_party/google_toolbox_for_mac/src/
+# After ungoogled's pruning step the `src/` subdirectory is empty, so ninja
+# dies with:
+#   ninja: error: '../../third_party/google_toolbox_for_mac/src/AppKit/GTMUILocalizer.m',
+#          needed by '.../GTMUILocalizer.o', missing and no known rule to make it
+#
+# Fix: clone the public Apache-2.0 repo into the expected path AFTER the
+# pruning step. This mirrors the node-staging pattern (ungoogled-chromium
+# PR #2954 discussion): any Google-hosted dep that got pruned must be
+# restored AFTER pruning or it just gets deleted again.
+#
+# Chromium's DEPS file pins a specific commit, but for our purposes the
+# public tip-of-main is fine — the library is small and the Obj-C API
+# we're using (GTMUILocalizer, GTMLogger, etc.) has been stable for years.
+# ----------------------------------------------------------------------------
+log_step "Staging google_toolbox_for_mac sources"
+GTM_DIR_ABS="$CLAUM_BUILD_ROOT/build/src/third_party/google_toolbox_for_mac/src"
+if [ ! -f "$GTM_DIR_ABS/AppKit/GTMUILocalizer.m" ]; then
+  # If the directory exists but is missing the expected file, remove it so
+  # `git clone` has a clean target. `-rf` is safe here because this path is
+  # controlled entirely by us (it's inside our build tree).
+  rm -rf "$GTM_DIR_ABS"
+  mkdir -p "$(dirname "$GTM_DIR_ABS")"
+  # --depth 1 = shallow clone (no history). We only need the working tree,
+  # not the full commit history — saves ~50 MB and a few seconds.
+  git clone --depth 1 \
+    https://github.com/google/google-toolbox-for-mac.git \
+    "$GTM_DIR_ABS"
+  echo "  cloned google-toolbox-for-mac into third_party/google_toolbox_for_mac/src"
+else
+  echo "  google_toolbox_for_mac already present"
+fi
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"

@@ -3,6 +3,33 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #24 — triggered 2026-04-21 (commit TBD)
+
+Run #23 got FURTHER than #22 (node staging fix worked — no more missing
+third_party/node/mac_arm64/... error). Compiled 204 files of base/ and
+gn-bootstrapped a new gn binary. Then failed at 8m 7s with:
+    ninja: error:
+      '../../third_party/google_toolbox_for_mac/src/AppKit/GTMUILocalizer.m',
+      needed by 'obj/.../GTMUILocalizer.o',
+      missing and no known rule to make it
+
+Another Google-hosted third_party dep that ungoogled pruned. Same fix
+pattern as the node staging: clone google-toolbox-for-mac from its public
+GitHub mirror into the expected path AFTER ungoogled pruning has run.
+
+Fix applied in build-mac.sh: after the Node staging step and before
+[6/6] gn gen, `git clone --depth 1 google/google-toolbox-for-mac`
+into third_party/google_toolbox_for_mac/src. It's Apache-2.0 licensed
+so the clone is fine.
+
+If #24 gets past this and hits YET another missing third_party source,
+the same pattern applies. Likely next candidates (all of which ungoogled
+sometimes prunes):
+  - third_party/grpc/src
+  - third_party/webrtc
+  - third_party/angle
+  - third_party/openscreen
+
 ## Run #23 — triggered 2026-04-20 (commit a311924)
 
 Run #22 made it past gn gen and into ninja (huge win!) but then failed
