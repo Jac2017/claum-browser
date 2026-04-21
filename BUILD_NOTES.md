@@ -3,6 +3,31 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #23 — triggered 2026-04-20 (commit a311924)
+
+Run #22 made it past gn gen and into ninja (huge win!) but then failed
+at 6m 45s with:
+    ninja: error: '../../third_party/node/mac_arm64/node-darwin-arm64/bin/node',
+           needed by 'gen/third_party/lit/v3_0/bundled/lit.rollup.js',
+           missing and no known rule to make it
+
+Chromium's JS bundler uses a Node binary that Google normally downloads
+from GCS via a gclient hook, but ungoogled's privacy pruning strips it.
+
+Fix applied in commit a311924: after the [5/6] Apply Claum patches step
+(which is after all ungoogled pruning), stage the Homebrew-installed
+node into the expected path. Using `install -m 0755` so it's executable.
+
+This is also the official workaround suggested in the ungoogled-chromium
+PR #2954 discussion: "create the link to node AFTER running the pruning
+script, otherwise it will prune the link you made."
+
+If #23 gets past this and hits more missing-binary errors, the same
+pattern applies: any Google-hosted binary ungoogled pruned needs to be
+staged back in AFTER the pruning step. Likely candidates:
+  - third_party/llvm-build/Release+Asserts/bin/clang (use system clang)
+  - third_party/rust-toolchain (use rustup)
+
 ## Run #22 — triggered 2026-04-20 (commit 4b1fad2)
 
 Applied three fixes for the `DarwinFoundation1.modulemap missing` error
