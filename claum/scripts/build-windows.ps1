@@ -134,6 +134,20 @@ if (Test-Path "$RepoDir\claum\branding\icons\app.ico") {
             "$Src\chrome\app\theme\chromium\win\app.ico" -Force
 }
 
+# ---------------------------------------------------------------------------
+# FIX: ungoogled-chromium's fix-building-without-safebrowsing.patch REMOVES
+# the initial `sources = [...]` in chrome/browser/safe_browsing/BUILD.gn but
+# leaves in place a later `sources += [...]`. Without a matching `sources =`
+# in scope, `gn gen` dies with "Undefined identifier. sources += [".
+#
+# The helper script inserts `sources = []` just before the orphan `+=` so
+# that gn has something to append to. Idempotent — safe to re-run.
+# (Same script runs on mac and windows — it's just Python.)
+# ---------------------------------------------------------------------------
+Step 'Fixing chrome/browser/safe_browsing/BUILD.gn (ungoogled patch artifact)'
+# On Windows the Python launcher is usually `python` (not `python3`).
+python "$RepoDir\claum\scripts\fix-safe-browsing-gn.py" $Src
+
 # -------- [6/6] gn gen + ninja ---------------------------------------------
 Step '[6/6] Running gn gen and ninja'
 Push-Location $Src

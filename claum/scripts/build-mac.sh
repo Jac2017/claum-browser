@@ -264,18 +264,23 @@ GN_ARGS="
 mkdir -p "$OUT_DIR"
 
 # ---------------------------------------------------------------------------
-# DIAGNOSTIC: dump the lines around where gn gen has been failing.
+# FIX: ungoogled-chromium's fix-building-without-safebrowsing.patch REMOVES
+# the initial `sources = [...]` in chrome/browser/safe_browsing/BUILD.gn but
+# leaves in place a later `sources += [...]`. Without a matching `sources =`
+# in scope, `gn gen` dies with "Undefined identifier. sources += [".
 #
-# WHY: Last build failed with:
-#   ERROR at //chrome/browser/safe_browsing/BUILD.gn:114:5: Undefined identifier.
-#       sources += [
-# That error means gn hit a `sources += [...]` before `sources` was defined.
-# Since this file lives in Chromium's own tree (not our patches), we need to
-# SEE what's actually on the runner's disk — maybe ungoogled's prune_binaries
-# or a patch stripped a `sources = [...]` block that the `+=` depends on.
-#
-# Sending `|| true` ensures this diagnostic never causes the build to abort
-# if the file or path is slightly different in a future Chromium version.
+# The helper script inserts `sources = []` just before the orphan `+=` so
+# that gn has something to append to. See fix-safe-browsing-gn.py for the
+# full story. The script is idempotent and safe to re-run.
+# ---------------------------------------------------------------------------
+log_step "Fixing chrome/browser/safe_browsing/BUILD.gn (ungoogled patch artifact)"
+python3 "$CLAUM_REPO_DIR/claum/scripts/fix-safe-browsing-gn.py" \
+        "$CLAUM_BUILD_ROOT/build/src"
+
+# ---------------------------------------------------------------------------
+# DIAGNOSTIC: dump the lines around where gn gen was previously failing.
+# Kept in place so we always have the context if gn gen errors here again.
+# The `|| true` ensures the diagnostic never fails the build by itself.
 # ---------------------------------------------------------------------------
 SB_FILE="$CLAUM_BUILD_ROOT/build/src/chrome/browser/safe_browsing/BUILD.gn"
 if [ -f "$SB_FILE" ]; then
