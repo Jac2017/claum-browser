@@ -230,6 +230,41 @@ if [ -f "$CLAUM_REPO_DIR/claum/branding/icons/app.icns" ]; then
      "$CLAUM_BUILD_ROOT/build/src/chrome/app/theme/chromium/mac/app.icns"
 fi
 
+# ----------------------------------------------------------------------------
+# Stage the bundled Node.js that Chromium's build scripts expect.
+# ----------------------------------------------------------------------------
+# Chromium's JS bundler (lit.rollup.js and friends) shells out to a Node
+# binary that Google hosts on GCS and downloads via a `gclient sync` hook:
+#   third_party/node/mac_arm64/node-darwin-arm64/bin/node
+# ungoogled-chromium strips those Google-hosted binary downloads for
+# privacy. Without the file, ninja dies with:
+#     ninja: error: '../../third_party/node/mac_arm64/node-darwin-arm64/bin/node',
+#            needed by 'gen/third_party/lit/v3_0/bundled/lit.rollup.js',
+#            missing and no known rule to make it
+#
+# Fix: copy the Homebrew-installed `node` into the expected path. Chromium
+# mostly just uses node to run rollup.js / tsc.js; it doesn't care whether
+# the binary is the exact pinned version, so the system copy works fine
+# for a one-shot build. We use `install -m 0755` instead of cp so the
+# binary is marked executable even on filesystems that ignore +x copies.
+# ----------------------------------------------------------------------------
+log_step "Staging bundled Node.js for Chromium's JS bundler"
+NODE_DIR_REL="third_party/node/mac_${ARCH}/node-darwin-${ARCH}/bin"
+NODE_DIR_ABS="$CLAUM_BUILD_ROOT/build/src/$NODE_DIR_REL"
+mkdir -p "$NODE_DIR_ABS"
+
+if [ ! -x "$NODE_DIR_ABS/node" ]; then
+  SYS_NODE="$(command -v node || true)"
+  if [ -z "$SYS_NODE" ]; then
+    log_err "System node not found on PATH; install it via 'brew install node'"
+    exit 1
+  fi
+  install -m 0755 "$SYS_NODE" "$NODE_DIR_ABS/node"
+  echo "  staged $(basename $SYS_NODE) ($("$SYS_NODE" --version)) -> $NODE_DIR_REL/node"
+else
+  echo "  node already present at $NODE_DIR_REL/node"
+fi
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"
