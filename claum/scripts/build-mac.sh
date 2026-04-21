@@ -452,6 +452,53 @@ else
   echo "  dsymutil already present at $DSYM_DIR_REL/dsymutil"
 fi
 
+# ----------------------------------------------------------------------------
+# Stage system `otool` as `llvm-otool` for Chromium's linker_driver.py.
+# ----------------------------------------------------------------------------
+# Chromium's `build/toolchain/apple/linker_driver.py` shells out to
+# `third_party/llvm-build/Release+Asserts/bin/llvm-otool` during SOLINK to
+# extract the Mach-O table of contents (TOC) that feeds incremental links.
+# The `tools/clang/scripts/update.py` gclient hook normally provisions that
+# binary — but ungoogled-chromium strips the hook, so the path is empty.
+#
+# Build #32 proved this: it reached ninja [12846/56129] then died at the
+# first SOLINK (libvk_swiftshader.dylib) with:
+#
+#     FileNotFoundError: [Errno 2] No such file or directory:
+#       '../../third_party/llvm-build/Release+Asserts/bin/llvm-otool'
+#
+# Fix: same "stage after pruning" pattern used for dsymutil above. macOS
+# ships `/usr/bin/otool` as part of the Xcode command-line tools, and it
+# accepts the same `-l` flag the linker_driver uses (it's literally the
+# Apple binutils otool — LLVM's llvm-otool is an argv-compatible re-impl).
+# Copy it into the pruned path so the linker driver finds it by literal
+# path without needing any GN arg changes.
+# ----------------------------------------------------------------------------
+log_step "Staging system otool as llvm-otool for linker_driver.py"
+OTOOL_DIR_REL="third_party/llvm-build/Release+Asserts/bin"
+OTOOL_DIR_ABS="$CLAUM_BUILD_ROOT/build/src/$OTOOL_DIR_REL"
+mkdir -p "$OTOOL_DIR_ABS"
+if [ ! -x "$OTOOL_DIR_ABS/llvm-otool" ]; then
+  # Prefer xcrun to find the otool inside the active Xcode (keeps us in sync
+  # with the SDK selected by the workflow's Xcode step). Fall back to
+  # command -v otool (Xcode CLT install also puts it in /usr/bin).
+  SYS_OTOOL="$(xcrun --find otool 2>/dev/null || command -v otool || true)"
+  if [ -z "$SYS_OTOOL" ] || [ ! -x "$SYS_OTOOL" ]; then
+    log_err "System otool not found — can't stage into $OTOOL_DIR_REL"
+    log_err "  Tried: 'xcrun --find otool' and 'command -v otool'"
+    exit 1
+  fi
+  # Copy rather than symlink so the staged binary is self-contained in the
+  # build tree (Chromium's deps graph sometimes stats paths and dislikes
+  # symlinks that point outside the repo). mode 0755 = rwx for owner,
+  # rx for group+other — same as dsymutil above.
+  install -m 0755 "$SYS_OTOOL" "$OTOOL_DIR_ABS/llvm-otool"
+  echo "  staged $(basename "$SYS_OTOOL") -> $OTOOL_DIR_REL/llvm-otool"
+  echo "  (source: $SYS_OTOOL)"
+else
+  echo "  llvm-otool already present at $OTOOL_DIR_REL/llvm-otool"
+fi
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"

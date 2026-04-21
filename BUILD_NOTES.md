@@ -3,6 +3,42 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #33 — fix drafted 2026-04-21 23:15 GMT (llvm-otool prune)
+
+Build #32 (03f3efc, job 72400207191) FAILED at ninja [12846/56129] after
+1h 6m 41s on the compile step. Best progress of any build so far — past
+[5684] node-check, past [3191] jpeglib.h, past [1037] dsymutil. Dead at
+the first SOLINK (libvk_swiftshader.dylib) with:
+
+    FileNotFoundError: [Errno 2] No such file or directory:
+      '../../third_party/llvm-build/Release+Asserts/bin/llvm-otool'
+      (called from build/toolchain/apple/linker_driver.py _extract_toc)
+
+Classic pruned-binary class (same as node, dsymutil, google_toolbox): the
+`tools/clang/scripts/update.py` gclient hook normally provisions an LLVM
+pre-built llvm-otool, but ungoogled-chromium strips that hook. The path
+stays empty so the linker_driver crashes.
+
+Fix (applied in this push): stage `/usr/bin/otool` (shipped with Xcode
+CLT) at `third_party/llvm-build/Release+Asserts/bin/llvm-otool` in
+build-mac.sh — same "stage after pruning" pattern as dsymutil. Apple's
+otool accepts `-l` identically to llvm-otool (they're argv-compatible,
+llvm-otool is literally a re-impl of Apple's).
+
+Next probable failure classes after #33:
+  - Further SOLINK steps may reach into other pruned LLVM tools
+    (llvm-nm, llvm-ar, llvm-install_name_tool, llvm-strip). Pattern:
+    same stage-system-tool approach. We can either pre-stage all of
+    them, or fail-and-fix one at a time. Currently fail-and-fix.
+  - Another `use_system_*` header gap.
+  - Link-time undefined symbols once we get past SOLINK machinery.
+
+Also noted: the scheduled `claum-build-watcher` cron task has NOT been
+firing in this environment (lastRunAt stays at 07:41 GMT, 16h ago,
+despite updates to the cron). Cowork/sandbox scheduled-task worker
+appears not to wake up when the user session is idle. Watcher workflow
+needs to be rethought — for now, manual + spawned Agent iteration.
+
 ## Run #32 live — 2026-04-21 21:21 GMT (watcher session ended)
 
 Build #32 (commit 03f3efc, run 24746743686, job 72400207191) is
