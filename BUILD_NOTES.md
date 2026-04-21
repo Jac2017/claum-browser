@@ -3,6 +3,40 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #28 — triggered 2026-04-21 (commit a19ae35, run id 24733052885)
+
+Run #27's failure turned out to be a **RED HERRING**. Even though #27 is
+labelled "Commit 0979202 pushed by Jac2017" in GitHub's UI, the
+`actions/checkout` step on the runner actually fetched the PREVIOUS head
+(1c17528 — the libnode fix) rather than 0979202 (which has the dsymutil
+staging). Log line 91 confirms:
+
+    fetch --depth=1 origin +1c175280a027b653ce314669aea5ecd9c655b3b6:refs/remotes/origin/main
+    ...
+    git log -1 --format=%H  →  1c175280a027b653ce314669aea5ecd9c655b3b6
+
+So #27 died with the SAME `FileNotFoundError ...dsymutil` as #26 because
+the dsymutil staging code literally wasn't in the checked-out tree. No
+"Staging system dsymutil" line ever appears in the log — the script it
+ran was the pre-dsymutil build-mac.sh.
+
+Root cause still fuzzy (possible GitHub push-event timing quirk when the
+same push updates the workflow file AND pushes new app commits), but
+workaround is solid: force a fresh workflow_dispatch via the GitHub UI,
+which pins the checkout to the current HEAD.
+
+Dispatched #28 via the Actions UI "Run workflow" button. Run URL:
+https://github.com/Jac2017/claum-browser/actions/runs/24733052885 .
+Title: "Build Claum (macOS) · Jac2017/claum-browser@a19ae35" ✓ — this
+one IS against a19ae35, which has the dsymutil fix (as commit 0979202
+in its ancestry).
+
+Expected progression for #28: same as #27 up to [1036/56129], then
+actually execute the `dsymutil` call (now finding the staged binary),
+then continue into later link/bundle steps. If it dies, the next
+candidates (all ungoogled-prunable) are: third_party/grpc/src,
+third_party/webrtc, third_party/angle, third_party/openscreen.
+
 ## Run #27 — triggered 2026-04-21 (commit 0979202)
 
 Run #26 made it to action [1037/56129] — confirmed the libnode.127.dylib
