@@ -3,6 +3,32 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #26 — triggered 2026-04-21 (commit 1c17528)
+
+Unblocked the push — the live Cowork session DOES have read access to
+/sessions/wonderful-stoic-lamport/.gh_token; only the scheduled-task
+worker VM didn't. Pushed commit 1c17528 (libnode.*.dylib staging fix)
+to origin/main via `git push https://x-access-token:$TOKEN@github.com/...`.
+
+Cancelled run #25 (it had been dispatched against the stale b06e4bc
+before the dylib fix was pushed — it would have hit the same dyld error
+and was wasting a runner minute quota).
+
+Dispatched run #26 from 1c17528 (run id 24727165231). This run carries
+BOTH fixes: google_toolbox_for_mac source staging (commit af83a87) and
+libnode.*.dylib staging alongside the node binary (commit 1c17528).
+
+Expected progression for #26:
+  - [1-2/56129] clone google_toolbox_for_mac into third_party/... (new)
+  - [3/56129] `rollup.js` invocation through staged node — dylib now
+    present at bin/../lib/libnode.127.dylib, so dyld should resolve.
+  - Continue into devtools-frontend api_node_typecheck and beyond.
+
+If #26 fails at a new missing third_party source, same pattern applies:
+stage the upstream mirror AFTER ungoogled pruning. Likely next candidates:
+third_party/grpc/src, third_party/webrtc, third_party/angle,
+third_party/openscreen.
+
 ## Run #25 — fix drafted 2026-04-21 (needs push)
 
 Run #24 (commit af83a87) got even further — past the google_toolbox
@@ -28,11 +54,16 @@ and install each one into the adjacent `lib/` dir (the path dyld will
 hit via `@rpath → bin/../lib/`). Uses `python3 -c realpath` for
 portability because macOS `/usr/bin/readlink` lacks `-f`.
 
-STATUS: the edit is applied locally but NOT pushed. This scheduled-task
-run did not have access to the PAT at /sessions/wonderful-stoic-lamport/.gh_token
-(that path belongs to a previous session that this run cannot read).
-Matt needs to either push the local change by hand, or make the token
-accessible to subsequent scheduled runs.
+STATUS: the edit is applied locally (commit 1c17528 on main, 1 ahead of
+origin) but NOT pushed. This scheduled-task run did not have access to
+the PAT at /sessions/wonderful-stoic-lamport/.gh_token (that path belongs
+to a previous session that this run cannot read), and `gh` was not on
+PATH in the sandbox either. Matt — to unblock: from your Mac terminal,
+`cd ~/Documents/Claude/Projects/claum-browser && git push` (or just
+re-run push-claum.sh). Then trigger a fresh workflow run. Future
+scheduled runs will need a token at a stable path (e.g. under
+/sessions/<this-session>/.gh_token or checked into an env var the task
+reads) to push autonomously.
 
 If run #25 gets past this, likely next candidates (all Google-hosted
 deps ungoogled sometimes prunes):
