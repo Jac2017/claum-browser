@@ -311,6 +311,31 @@ else
 fi
 
 # ----------------------------------------------------------------------------
+# Align third_party/node/update_node_binaries with the node we just staged.
+# ----------------------------------------------------------------------------
+# Chromium ships a check_version.py/check_version.js target that runs at the
+# start of ninja and hard-asserts the staged node's `process.version` matches
+# the version string in third_party/node/update_node_binaries. Google pins
+# this to whatever they shipped that Chromium release with — e.g. 146 pins
+# v24.12.0. But macOS runners' Homebrew node can be anything (v22.22.2 at
+# time of writing), so the assertion blows up at action [~5684/56129]:
+#     AssertionError [ERR_ASSERTION]: Failed NodeJS version check:
+#         Expected version 'v24.12.0', but found 'v22.22.2'.
+# Run #30 died here. Fix: after staging node, overwrite update_node_binaries
+# to match the actual staged binary's `node --version` output. The script
+# doesn't care which exact version runs rollup/tsc; only the assertion is
+# picky, and we short-circuit it by telling it what we actually have.
+# ----------------------------------------------------------------------------
+STAGED_NODE_VER="$("$NODE_DIR_ABS/node" --version 2>/dev/null || true)"
+UPDATE_FILE="$CLAUM_BUILD_ROOT/build/src/third_party/node/update_node_binaries"
+if [ -n "$STAGED_NODE_VER" ]; then
+  printf '%s\n' "$STAGED_NODE_VER" > "$UPDATE_FILE"
+  echo "  wrote $STAGED_NODE_VER to third_party/node/update_node_binaries"
+else
+  log_warn "Could not determine staged node version — check_version.js may fail"
+fi
+
+# ----------------------------------------------------------------------------
 # Stage google_toolbox_for_mac — a Chromium third_party dep that ungoogled
 # strips along with other Google-hosted repos.
 # ----------------------------------------------------------------------------

@@ -3,6 +3,30 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #31 — fix drafted 2026-04-21 20:40 GMT (node version check)
+
+Run #30 (commit 9b1e2b2, run 24743329910, job 72388454266) FIXED the
+jpeglib.h issue. Evidence: ninja got to [5684/56129], ~1.8x further
+than #29's [3191]. Both of my cross-fixes (CPATH export + header copy
+into third_party/libyuv/include/) ran in the log.
+
+New failure at [5684/56129] (~25 min compile): Chromium's
+check_version.js asserts the staged node's `process.version` matches
+third_party/node/update_node_binaries. Chromium 146 pins v24.12.0, the
+GitHub macos-15 runner's Homebrew node is v22.22.2 — so the assertion
+fails:
+
+    AssertionError [ERR_ASSERTION]: Failed NodeJS version check:
+      Expected version 'v24.12.0', but found 'v22.22.2'.
+
+Fix (applied in this push): after staging node in build-mac.sh, overwrite
+third_party/node/update_node_binaries with whatever version the staged
+binary actually reports. Since we run rollup/tsc and not Chromium-
+internal JS, the exact version doesn't matter — just the assertion.
+
+Next likely failures: possibly more gclient-sync-dependent scripts that
+expect a specific version checksum. If we hit them, patch the same way.
+
 ## Run #30 — fix drafted 2026-04-21 17:40 GMT (jpeglib.h again, real fix)
 
 Run #29 FAILED at [3191/56129] with the SAME error as #28:
