@@ -11,6 +11,8 @@
 name: Build Claum (macOS)
 
 on:
+  # Manual dispatch (Actions tab → Run workflow) — preserves the inputs so
+  # Matt can still pick an arch/search at trigger time.
   workflow_dispatch:
     inputs:
       arch:
@@ -23,6 +25,25 @@ on:
         default: "bing"
         type: choice
         options: [bing, duckduckgo, google, startpage]
+
+  # Auto-trigger on any push to main, so the autonomous debug loop just
+  # needs to push a fix — a new build runs automatically. Skip builds for
+  # docs-only commits (BUILD_NOTES, READMEs) to avoid wasting runner minutes.
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'BUILD_NOTES.md'
+      - 'README.md'
+      - 'docs/**'
+      - '**/*.md'
+
+# Only one build of this workflow runs at a time per ref. If a new commit
+# lands while a build is in progress, the in-flight build is cancelled
+# (because its fix was stale). This saves lots of runner minutes during
+# the iterate-fix-push loop.
+concurrency:
+  group: build-mac-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -236,21 +257,27 @@ jobs:
           CLAUM_BUILD_ROOT: ${{ github.workspace }}/claum-build
         run: |
           chmod +x claum/scripts/build-mac.sh
+          # `inputs.arch` / `inputs.default_search` are only set on
+          # workflow_dispatch triggers. On push triggers they're empty —
+          # the `||` fallback picks our defaults (arm64 / bing).
           ./claum/scripts/build-mac.sh \
-            --arch           "${{ inputs.arch }}" \
-            --default-search "${{ inputs.default_search }}"
+            --arch           "${{ inputs.arch || 'arm64' }}" \
+            --default-search "${{ inputs.default_search || 'bing' }}"
 
       - name: Package .app as .dmg
+        # Same inputs-fallback pattern as the build step above.
+        env:
+          ARCH: ${{ inputs.arch || 'arm64' }}
         run: |
           cd $CLAUM_BUILD_ROOT/build/src/out/Claum
           hdiutil create -volname "Claum" \
                          -srcfolder "Claum.app" \
                          -ov -format UDZO \
-                         "Claum-${{ inputs.arch }}.dmg"
+                         "Claum-${ARCH}.dmg"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Claum-macOS-${{ inputs.arch }}
-          path: ${{ env.CLAUM_BUILD_ROOT }}/build/src/out/Claum/Claum-${{ inputs.arch }}.dmg
+          name: Claum-macOS-${{ inputs.arch || 'arm64' }}
+          path: ${{ env.CLAUM_BUILD_ROOT }}/build/src/out/Claum/Claum-${{ inputs.arch || 'arm64' }}.dmg
           retention-days: 14
