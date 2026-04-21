@@ -256,6 +256,20 @@ GN_ARGS="
   use_system_zlib=true
   chrome_pgo_phase=0                 # profile-guided opt off (faster build)
   is_component_build=false
+  # ---------------------------------------------------------------------
+  # libc++ module compilation workaround
+  # ---------------------------------------------------------------------
+  # Chromium 146 + Xcode 16.0/16.1/16.2 have a known mismatch where
+  # Chromium's libc++ build rules expect .modulemap files at paths the
+  # Xcode 16.x SDK doesn't have (e.g. DarwinFoundation1.modulemap), and
+  # ninja fails with:
+  #   'DarwinFoundation1.modulemap' missing and no known rule to make it
+  # Turning off libc++ module compilation skips the broken rule entirely.
+  # It's a speculative fix — if the arg doesn't exist in this Chromium
+  # version, gn just prints a harmless "argument has no effect" warning
+  # (same as it already does for `claum_component_extensions`).
+  # ---------------------------------------------------------------------
+  use_libcxx_modules=false
   # --- Claum-specific flags ---
   claum_default_search=\"$DEFAULT_SEARCH\"
   claum_component_extensions=true

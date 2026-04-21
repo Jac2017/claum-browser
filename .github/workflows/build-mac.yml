@@ -190,6 +190,36 @@ jobs:
           # build script (see build-mac.sh step 1c).
           brew install ninja python3 rsync
 
+      # ------------------------------------------------------------------
+      # Diagnostic: inspect the SDK's modulemap layout.
+      #
+      # Chromium's libc++ build compiles Clang modules from .modulemap
+      # files that live somewhere under the SDK's usr/include/. Depending
+      # on the Xcode version, these files can be either directly in
+      # usr/include/ OR in a subdirectory like _AvailabilityInternal/.
+      #
+      # If our build fails with a "missing and no known rule to make it"
+      # error for a .modulemap file, this diagnostic tells us exactly
+      # where those files actually live on this runner — so we can decide
+      # whether to patch Chromium, disable modules, or switch Xcode.
+      # ------------------------------------------------------------------
+      - name: Diagnostic - SDK modulemap layout
+        run: |
+          SDK_INC="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include"
+          echo "==> SDK include path: $SDK_INC"
+          echo ""
+          echo "==> All .modulemap files under the SDK include dir (first 40):"
+          find "$SDK_INC" -name '*.modulemap' 2>/dev/null | head -40 || true
+          echo ""
+          echo "==> Files with 'Darwin' in their name (first 20):"
+          find "$SDK_INC" -iname '*Darwin*' 2>/dev/null | head -20 || true
+          echo ""
+          echo "==> Is _AvailabilityInternal a directory?"
+          ls -la "$SDK_INC/_AvailabilityInternal" 2>/dev/null || echo "(not a directory / does not exist)"
+          echo ""
+          echo "==> Does DarwinFoundation1.modulemap exist anywhere in the SDK?"
+          find "$DEVELOPER_DIR" -name 'DarwinFoundation*.modulemap' 2>/dev/null | head -10 || echo "(none found)"
+
       - name: Cache Chromium source
         id: cache-chromium
         uses: actions/cache@v4
