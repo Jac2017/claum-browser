@@ -3,6 +3,39 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #34 — fix drafted 2026-04-21 23:20 GMT (preemptive llvm-* binutils stage)
+
+Run #33 is still in-flight from 23:18 GMT (commit 217f53e) — it will be
+superseded by this push via cancel-in-progress concurrency. Rather than
+wait ~1h for run #33 to inevitably die on the next pruned llvm-* binary
+after llvm-otool, pre-staging the full LLVM binutils set now.
+
+Chromium's apple linker_driver.py and related action scripts shell out to
+these by LITERAL path during SOLINK / TOC extract / dylib fixup:
+
+    third_party/llvm-build/Release+Asserts/bin/llvm-nm
+    third_party/llvm-build/Release+Asserts/bin/llvm-ar
+    third_party/llvm-build/Release+Asserts/bin/llvm-install_name_tool
+    third_party/llvm-build/Release+Asserts/bin/llvm-strip
+    third_party/llvm-build/Release+Asserts/bin/llvm-ranlib
+    third_party/llvm-build/Release+Asserts/bin/llvm-lipo
+
+Each has an argv-compatible Apple equivalent reachable via
+`xcrun --find <tool>`. Fix applied in build-mac.sh right after the
+llvm-otool block: loop over the six pairs and `install -m 0755` each
+Apple tool into the pruned path, mirroring the dsymutil/otool pattern.
+
+Skipped:
+  - llvm-dwp — DWARF package, Mach-O uses .dSYM instead, unlikely on mac.
+  - llvm-objcopy — no Apple equivalent; Chromium mac toolchain uses
+    install_name_tool + strip instead.
+If either is hit we'll see FileNotFoundError and can add a different fix.
+
+Next expected failure classes once binutils staging is solid:
+  - `use_system_*` header gaps (libpng/libwebp/freetype/harfbuzz/libxml2).
+    Pattern: brew install + CPATH export.
+  - Link-time undefined symbols — trickier, report and punt.
+
 ## Run #33 — fix drafted 2026-04-21 23:15 GMT (llvm-otool prune)
 
 Build #32 (03f3efc, job 72400207191) FAILED at ninja [12846/56129] after

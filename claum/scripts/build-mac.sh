@@ -499,6 +499,58 @@ else
   echo "  llvm-otool already present at $OTOOL_DIR_REL/llvm-otool"
 fi
 
+# ----------------------------------------------------------------------------
+# Pre-emptively stage the rest of the LLVM binutils Chromium expects during
+# SOLINK / link-time TOC extraction / dylib fixup.
+# ----------------------------------------------------------------------------
+# Chromium's build/toolchain/apple/linker_driver.py and related action scripts
+# routinely shell out to the following tools by LITERAL path:
+#     third_party/llvm-build/Release+Asserts/bin/llvm-nm
+#     third_party/llvm-build/Release+Asserts/bin/llvm-ar
+#     third_party/llvm-build/Release+Asserts/bin/llvm-install_name_tool
+#     third_party/llvm-build/Release+Asserts/bin/llvm-strip
+#     third_party/llvm-build/Release+Asserts/bin/llvm-ranlib
+#     third_party/llvm-build/Release+Asserts/bin/llvm-lipo
+# Each one is pruned for the same reason llvm-otool was (the
+# tools/clang/scripts/update.py hook is gone). Rather than burn a 1+ hour
+# build cycle per tool, stage them all now — each has an argv-compatible
+# Apple equivalent that xcrun can locate inside the active Xcode.
+#
+# We skip llvm-dwp (DWARF package; Mach-O uses .dSYM not .dwp) and
+# llvm-objcopy (no Apple equivalent; Chromium's mac toolchain uses
+# install_name_tool + strip instead). If either is actually invoked on mac
+# we'll see a FileNotFoundError and add them then.
+# ----------------------------------------------------------------------------
+log_step "Staging system binutils as llvm-* for Chromium toolchain path"
+# Space-separated pairs: "<apple_name> <llvm_staged_name>". Using a case
+# statement instead of an associative array to stay POSIX/bash-3 compatible
+# (macOS /bin/bash is 3.2 and we're being conservative).
+for PAIR in \
+    "nm llvm-nm" \
+    "ar llvm-ar" \
+    "install_name_tool llvm-install_name_tool" \
+    "strip llvm-strip" \
+    "ranlib llvm-ranlib" \
+    "lipo llvm-lipo"
+do
+  APPLE_NAME="${PAIR% *}"
+  LLVM_NAME="${PAIR#* }"
+  DEST="$OTOOL_DIR_ABS/$LLVM_NAME"
+  if [ -x "$DEST" ]; then
+    echo "  $LLVM_NAME already present at $OTOOL_DIR_REL/$LLVM_NAME"
+    continue
+  fi
+  SRC="$(xcrun --find "$APPLE_NAME" 2>/dev/null || command -v "$APPLE_NAME" || true)"
+  if [ -z "$SRC" ] || [ ! -x "$SRC" ]; then
+    log_warn "System $APPLE_NAME not found via xcrun/command -v — skipping $LLVM_NAME stage"
+    log_warn "  If ninja actually calls $LLVM_NAME this build will fail; re-add manually."
+    continue
+  fi
+  install -m 0755 "$SRC" "$DEST"
+  echo "  staged $APPLE_NAME -> $OTOOL_DIR_REL/$LLVM_NAME"
+  echo "  (source: $SRC)"
+done
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"
