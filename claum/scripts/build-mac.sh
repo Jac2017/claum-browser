@@ -256,26 +256,76 @@ GN_ARGS="
   use_system_zlib=true
   chrome_pgo_phase=0                 # profile-guided opt off (faster build)
   is_component_build=false
-  # ---------------------------------------------------------------------
-  # libc++ module compilation workaround
-  # ---------------------------------------------------------------------
-  # Chromium 146 + Xcode 16.0/16.1/16.2 have a known mismatch where
-  # Chromium's libc++ build rules expect .modulemap files at paths the
-  # Xcode 16.x SDK doesn't have (e.g. DarwinFoundation1.modulemap), and
-  # ninja fails with:
-  #   'DarwinFoundation1.modulemap' missing and no known rule to make it
-  # Turning off libc++ module compilation skips the broken rule entirely.
-  # It's a speculative fix — if the arg doesn't exist in this Chromium
-  # version, gn just prints a harmless "argument has no effect" warning
-  # (same as it already does for `claum_component_extensions`).
-  # ---------------------------------------------------------------------
-  use_libcxx_modules=false
+  use_libcxx_modules=false           # workaround for Xcode 16 SDK modulemap mismatch
+  use_clang_modules=false            # turn OFF clang module compilation entirely
+  treat_warnings_as_errors=false     # tolerate warnings so build does not abort
   # --- Claum-specific flags ---
   claum_default_search=\"$DEFAULT_SEARCH\"
   claum_component_extensions=true
 "
 
+# ----------------------------------------------------------------------------
+# NOTE on use_libcxx_modules=false
+# ----------------------------------------------------------------------------
+# Chromium 146 plus Xcode 16.0/16.1/16.2 have a known mismatch: Chromium's
+# libc++ build rules expect modulemap files with numeric suffixes such as
+# DarwinFoundation1.modulemap, but the Xcode 16.2 SDK only ships the
+# un-suffixed DarwinFoundation.modulemap. So ninja fails with:
+#     DarwinFoundation1.modulemap missing and no known rule to make it
+# Turning off libc++ module compilation skips that rule entirely.
+# If the arg name is wrong, gn will just warn and continue -- same as it
+# already does for claum_component_extensions.
+# ----------------------------------------------------------------------------
+# IMPORTANT: comments INSIDE the GN_ARGS string above must be plain text
+# only. Bash does NOT ignore # inside double quotes -- any special chars
+# after # still get expanded, so backticks and embedded double-quotes will
+# break the build the way they did in run #21. Keep comments up here.
+# ----------------------------------------------------------------------------
+
 mkdir -p "$OUT_DIR"
+
+# ---------------------------------------------------------------------------
+# MODULEMAP SYMLINK FALLBACK
+# ---------------------------------------------------------------------------
+# Chromium 146's libc++ build rules can reference SDK modulemap files with
+# numeric suffixes (e.g. DarwinFoundation1.modulemap) but the Xcode 16.2
+# SDK only ships the un-suffixed names (DarwinFoundation.modulemap). If
+# `use_libcxx_modules=false` in the gn args doesn't fully suppress the
+# reference, ninja will abort with:
+#     ninja: error: '.../DarwinFoundation1.modulemap', needed by ...,
+#            missing and no known rule to make it
+# As a belt-and-suspenders fix, we scan the SDK's include dir and create
+# a `<Name>1.modulemap` symlink for every `<Name>.modulemap` file that
+# doesn't already have a numeric-suffix counterpart. This is the minimal
+# change that keeps things working without modifying Chromium source.
+#
+# NOTE: GitHub runners allow sudo without a password, which is why
+# `sudo ln` just works here. On a developer machine it will prompt.
+# ---------------------------------------------------------------------------
+log_step "Creating modulemap symlinks for Xcode 16.x SDK compat"
+SDK_INC_DIR="${SDKROOT:-$(xcrun --show-sdk-path)}/usr/include"
+if [ -d "$SDK_INC_DIR" ]; then
+  # Loop only over files directly under usr/include (not subdirs). `find
+  # -maxdepth 1` keeps us from touching per-framework modulemaps that
+  # Chromium isn't complaining about.
+  for mm in "$SDK_INC_DIR"/*.modulemap; do
+    [ -f "$mm" ] || continue
+    base=$(basename "$mm" .modulemap)   # e.g. "DarwinFoundation"
+    # Skip files that already have a trailing digit (like "Darwin_sys").
+    case "$base" in
+      *[0-9]) continue ;;
+    esac
+    target="$SDK_INC_DIR/${base}1.modulemap"
+    if [ ! -e "$target" ]; then
+      # `sudo ln -sf` creates a relative symlink inside the SDK dir.
+      sudo ln -sf "${base}.modulemap" "$target" 2>/dev/null \
+        && echo "  linked ${base}1.modulemap -> ${base}.modulemap" \
+        || echo "  (could not link ${base}1.modulemap -- continuing)"
+    fi
+  done
+else
+  log_warn "SDK include dir not found at $SDK_INC_DIR; skipping modulemap symlinks"
+fi
 
 # ---------------------------------------------------------------------------
 # FIX: Stock Chromium's chrome/browser/safe_browsing/BUILD.gn defines

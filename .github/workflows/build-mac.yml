@@ -26,8 +26,10 @@ on:
 
 jobs:
   build:
-    # macos-14 = Apple Silicon. Upgrade to macos-15 when available for your plan.
-    runs-on: macos-14
+    # macos-15 = Apple Silicon M1 with Xcode 16.3+ (has newer MacOSX SDK with
+    # the DarwinFoundation1.modulemap file that Chromium 146 references).
+    # Was macos-14, which ships Xcode 16.2 and triggers the modulemap bug.
+    runs-on: macos-15
     timeout-minutes: 330   # 5 hr 30 min — just under GitHub's 6 hr cap
     steps:
       - name: Check out Claum repo
