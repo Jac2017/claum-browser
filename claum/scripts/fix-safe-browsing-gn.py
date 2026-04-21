@@ -3,180 +3,166 @@
 # fix-safe-browsing-gn.py
 # -----------------------------------------------------------------------------
 # Surgical fix for chrome/browser/safe_browsing/BUILD.gn after ungoogled-
-# chromium's patches mangle it. We apply TWO fixes:
+# chromium's `fix-building-without-safebrowsing.patch` runs.
 #
-#   FIX A — Remove the stray `}` on line 89
-#   ---------------------------------------
-#   ungoogled's patch appears to have removed an enclosing block like
-#       if (some_google_feature) {
-#         sources = [ ... ]
-#         deps = [ ... ]
+# BACKGROUND
+# ----------
+# Stock Chromium's chrome/browser/safe_browsing/BUILD.gn has this shape:
+#
+#     static_library("safe_browsing") {
+#       if (safe_browsing_mode != 0) {          # OUTER if
+#         sources = [ ... ]                     # defines `sources`
+#         deps    = [ ..., "//services/..." ]   # defines `deps`
+#       }                                        # closes outer if (~line 89)
+#
+#       # Note: is_android is not equivalent to safe_browsing_mode == 2.
+#       if (is_android)  { deps += [...] }
+#       if (is_chromeos) { deps += [...] }
+#
+#       if (safe_browsing_mode != 0) {          # INNER if
+#         sources += [ ... ]                    # appends — needs `sources`
+#         deps    += [ ... ]                    # appends — needs `deps`
+#         ...
 #       }
-#   but it only removed the OPENING `if (...) {` line. The closing `}` was
-#   left behind, and it now prematurely closes the surrounding
-#   source_set("safe_browsing") { ... } scope.
+#     }
 #
-#   Everything after that stray `}` becomes top-level in the file, outside
-#   any source_set. Later on you get errors like
-#       ERROR at //chrome/browser/safe_browsing/BUILD.gn:243:5:
-#       Undefined identifier.    deps += [
-#   because `deps` (defined at line 80-88 inside the now-closed source_set)
-#   is no longer in scope for `deps += [...]`.
+# When `safe_browsing_mode == 0` (which the ungoogled build tends to produce),
+# the OUTER if-block does not execute, so `sources` and `deps` are never
+# defined at the `static_library` scope. Then any `sources += [...]` or
+# `deps += [...]` later in the file blows up with
 #
-#   Removing that one stray `}` reunites everything back inside the
-#   source_set, so every later `<var> += [...]` finds its variable.
+#     ERROR ... Undefined identifier.
+#         sources += [
 #
-#   FIX B — Insert `sources = []` before `sources += [`
-#   ---------------------------------------------------
-#   The same patch also removed the original `sources = [ ... ]` assignment.
-#   Even after Fix A puts things back inside the source_set, `sources` has
-#   no initial value, so `sources += [...]` inside the
-#       if (safe_browsing_mode != 0) { ... }
-#   block still fails.
+# (and the same for `deps`). Note that the INNER if-block still evaluates
+# because `safe_browsing_mode != 0` — so the += calls run despite the outer
+# block having been skipped.
 #
-#   We insert `sources = []` right before the orphan `+=` to give gn
-#   something to append to.
+# WHAT THIS SCRIPT DOES
+# ---------------------
+# We insert two small guarded initializations at the TOP of the INNER
+# `if (safe_browsing_mode != 0) { ... }` block:
 #
-# IDEMPOTENT: running the script twice does nothing on the second run
-# because the bad patterns are already gone.
+#     if (!defined(sources)) {
+#       sources = []
+#     }
+#     if (!defined(deps)) {
+#       deps = []
+#     }
 #
-# USAGE:
+# Why `defined(...)` rather than a bare `sources = []`? Because on builds
+# where the outer if DID run, `sources`/`deps` are already defined, and
+# assigning them again in an inner scope is a gn error. `defined()` is a
+# built-in that lets us initialize ONLY when needed — safe in every config.
+#
+# IDEMPOTENCY
+# -----------
+# Re-running the script is a no-op: we look for our own inserted markers
+# (`!defined(sources)` and `!defined(deps)`) and skip if present.
+#
+# USAGE
+# -----
 #   python3 fix-safe-browsing-gn.py <chromium_src_dir>
 # where <chromium_src_dir> is the directory containing chrome/, content/, etc.
 # =============================================================================
 
-import pathlib   # modern, cross-platform file path handling
+import pathlib   # cross-platform file path handling
 import re        # regex — used for multi-line pattern matching
-import sys       # for argv and exit codes
+import sys       # argv + exit codes
 
 # --- 1. Locate the target file ----------------------------------------------
-# Expect exactly one positional arg: path to the chromium `src` directory.
+# Expect exactly one positional arg: the path to chromium's `src` directory.
 if len(sys.argv) != 2:
     print("Usage: fix-safe-browsing-gn.py <chromium_src_dir>", file=sys.stderr)
     sys.exit(2)
 
 src_dir = pathlib.Path(sys.argv[1])
-# The `/` operator on Path joins paths in an OS-agnostic way.
+# `pathlib.Path`'s `/` operator joins paths in an OS-agnostic way.
 target = src_dir / "chrome" / "browser" / "safe_browsing" / "BUILD.gn"
 
 if not target.is_file():
-    # Fail loudly if the file isn't where we expect — better to stop early
-    # than silently do nothing and have the build fail elsewhere.
+    # Bail early so we get a clean error message instead of a cryptic build fail.
     print(f"ERROR: {target} not found", file=sys.stderr)
     sys.exit(1)
 
-# --- 2. Read the file's current contents into memory ------------------------
-# read_text() returns the whole file as a single string. These BUILD.gn
-# files are only a few hundred lines — reading the full thing is fine.
+# --- 2. Read the file into memory -------------------------------------------
+# BUILD.gn files are only a few hundred lines — a single read is fine.
 text = target.read_text()
 
-# ---------------------------------------------------------------------------
-# FIX A: Remove the stray `}` on line 89.
-# ---------------------------------------------------------------------------
-# The signature we're looking for: the unique sequence of lines around the
-# stray brace. Matching the surrounding context (instead of a specific line
-# number) survives future Chromium version bumps.
-#
-# Before fix:
-#       "//services/preferences/public/cpp",   (line 87)
-#     ]                                        (line 88, closes deps list)
-#     }                                        (line 89, STRAY — delete this)
-#                                              (line 90, blank)
-#                                              (line 91, blank)
-#     # Note: is_android ...                   (line 92, comment)
-#
-# After fix: the `  }` line is gone; everything else stays the same.
-# ---------------------------------------------------------------------------
-STRAY_BRACE_BEFORE = (
-    '    "//services/preferences/public/cpp",\n'
-    '  ]\n'
-    '  }\n'      # <- this line is what we want to delete
-    '\n'
-    '\n'
-    '  # Note: is_android is not equivalent to safe_browsing_mode == 2.\n'
-)
-STRAY_BRACE_AFTER = (
-    '    "//services/preferences/public/cpp",\n'
-    '  ]\n'
-    '\n'
-    '\n'
-    '  # Note: is_android is not equivalent to safe_browsing_mode == 2.\n'
-)
-
-if STRAY_BRACE_BEFORE in text:
-    # str.replace returns a NEW string; we reassign `text` to the fixed one.
-    text = text.replace(STRAY_BRACE_BEFORE, STRAY_BRACE_AFTER, 1)
-    print("[fix-safe-browsing-gn] Fix A applied: removed stray `}` around line 89")
-else:
-    # Either Fix A was already applied on a previous run, or upstream
-    # changed the file so that this signature no longer matches. Either way,
-    # don't abort — just note and move on to Fix B.
-    print("[fix-safe-browsing-gn] Fix A: stray-brace pattern not found (maybe already fixed)")
-
-# ---------------------------------------------------------------------------
-# FIX B: Insert `sources = []` before the orphan `sources += [`.
-# ---------------------------------------------------------------------------
-# Even after Fix A reunites everything inside the source_set, `sources`
-# still has no initial value (the patch removed the `sources = [ ... ]`
-# assignment). We insert a zero-element initialization right before the
-# `sources += [...]` inside the if-block.
+# --- 3. Insert the guarded `sources`/`deps` initializers --------------------
+# We look for the INNER `if (safe_browsing_mode != 0) {` block followed by
+# any comment lines, then the first `sources += [` line. We want to insert
+# our two initialization blocks BEFORE that `sources += [`.
 #
 # Regex breakdown:
-#   (if \(safe_browsing_mode != 0\) \{\n     <- group 1: the `if (...) {` line
-#    (?:\s*#[^\n]*\n)*                       <- non-capturing: any number of
-#                                                comment lines that follow
+#   (if \(safe_browsing_mode != 0\) \{\n  <- group 1: the if-header line
+#    (?:\s*#[^\n]*\n)*                   <- any number of comment lines
 #   )
-#   (\s*)                                     <- group 2: whitespace before
-#                                                `sources += [` (captures
-#                                                the indentation to reuse)
-#   (sources\s*\+=\s*\[)                      <- group 3: literal `sources += [`
-# ---------------------------------------------------------------------------
+#   (\s*)                                 <- group 2: indentation of sources+=
+#   (sources\s*\+=\s*\[)                  <- group 3: literal "sources += ["
+# -----------------------------------------------------------------------------
 
-# First, an idempotency check: if our inserted `sources = []` marker is
-# already right above the `sources += [`, skip Fix B entirely.
-already_fixed = re.search(
-    r'sources\s*=\s*\[\s*\]\s*\n\s*sources\s*\+=\s*\[',
-    text,
-)
+# Idempotency check: if we've already inserted our markers, do nothing.
+# Look for our exact inserted text — `!defined(sources)` — to decide.
+already_fixed = "!defined(sources)" in text
 
 if already_fixed:
-    print("[fix-safe-browsing-gn] Fix B: already applied — skipping")
+    print("[fix-safe-browsing-gn] already applied — skipping")
 else:
     PATTERN = re.compile(
-        r'(if \(safe_browsing_mode != 0\) \{\n(?:\s*#[^\n]*\n)*)(\s*)(sources\s*\+=\s*\[)',
+        # Start: the `if (safe_browsing_mode != 0) {` line, plus any comments
+        r'(if \(safe_browsing_mode != 0\) \{\n(?:\s*#[^\n]*\n)*)'
+        # Capture the indentation of the first real statement
+        r'(\s*)'
+        # And the literal `sources += [` — the first thing after the comments
+        r'(sources\s*\+=\s*\[)',
     )
 
     def do_replace(m):
-        """Build the replacement for one regex match.
+        """Build the replacement text for one regex match.
 
-        match.group(N) returns the Nth captured group. We stitch them back
-        together with a new `sources = []` line inserted between the
-        header and the `sources += [`, preserving the original indentation.
+        We reconstruct the if-header + comments, then insert our guarded
+        initializers at the same indentation, and finally the original
+        `sources += [` that was already there.
         """
-        if_header = m.group(1)  # "if (safe_browsing_mode != 0) {\n<comments>\n"
-        indent    = m.group(2)  # the whitespace before `sources += [`
-        plus_eq   = m.group(3)  # `sources += [`
-        return f"{if_header}{indent}sources = []\n{indent}{plus_eq}"
+        if_header = m.group(1)   # "if (safe_browsing_mode != 0) {\n<comments>"
+        indent    = m.group(2)   # whitespace in front of `sources += [`
+        plus_eq   = m.group(3)   # literal `sources += [`
 
-    # `subn` returns (new_string, count). We use count=1 because we only
-    # expect one match — multiple matches would mean the file drifted and
-    # we should bail rather than mutate blindly.
+        # Build the inserted block. Each line uses the same indentation as
+        # the original `sources += [` so the file stays consistently formatted.
+        inserted = (
+            f"{indent}# Initialize sources/deps if the outer `if (safe_browsing_mode != 0)` block\n"
+            f"{indent}# didn't run (the ungoogled patches can skip it). Using `defined()` means\n"
+            f"{indent}# this is a no-op when the outer block already populated them.\n"
+            f"{indent}if (!defined(sources)) {{\n"
+            f"{indent}  sources = []\n"
+            f"{indent}}}\n"
+            f"{indent}if (!defined(deps)) {{\n"
+            f"{indent}  deps = []\n"
+            f"{indent}}}\n"
+        )
+
+        return f"{if_header}{inserted}{indent}{plus_eq}"
+
+    # `re.subn(..., count=1)` returns (new_text, num_replacements). We expect
+    # exactly one match — more than one means the file drifted and we should
+    # bail instead of mutating blindly.
     text, n = PATTERN.subn(do_replace, text, count=1)
 
     if n == 0:
-        # Fix B was needed (idempotency check said "not applied yet") but
-        # we couldn't find the pattern to fix. That means the file
-        # structure drifted — fail loudly.
+        # We couldn't find the expected pattern. Fail loudly with context.
         print(
-            "ERROR: Fix B needed but could not find the `if (safe_browsing_mode != 0)`\n"
-            f"       block with `sources += [` in {target}.",
+            "ERROR: could not find the `if (safe_browsing_mode != 0)` block\n"
+            f"       followed by `sources += [` in {target}.\n"
+            "       The file layout may have drifted — inspect it manually.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    print("[fix-safe-browsing-gn] Fix B applied: inserted `sources = []` before `sources += [`")
+    print("[fix-safe-browsing-gn] inserted guarded sources/deps initializers")
 
-# --- 3. Write the final result back to disk ---------------------------------
+# --- 4. Write the result back to disk ---------------------------------------
 target.write_text(text)
-print(f"[fix-safe-browsing-gn] Done: {target}")
+print(f"[fix-safe-browsing-gn] done: {target}")
 sys.exit(0)

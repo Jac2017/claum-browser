@@ -135,14 +135,17 @@ if (Test-Path "$RepoDir\claum\branding\icons\app.ico") {
 }
 
 # ---------------------------------------------------------------------------
-# FIX: ungoogled-chromium's fix-building-without-safebrowsing.patch REMOVES
-# the initial `sources = [...]` in chrome/browser/safe_browsing/BUILD.gn but
-# leaves in place a later `sources += [...]`. Without a matching `sources =`
-# in scope, `gn gen` dies with "Undefined identifier. sources += [".
-#
-# The helper script inserts `sources = []` just before the orphan `+=` so
-# that gn has something to append to. Idempotent — safe to re-run.
-# (Same script runs on mac and windows — it's just Python.)
+# FIX: Stock Chromium's chrome/browser/safe_browsing/BUILD.gn defines
+# `sources = [...]` and `deps = [...]` inside an outer
+# `if (safe_browsing_mode != 0) { ... }` block, and appends to them with
+# `sources += [...]` / `deps += [...]` later in the file. When ungoogled's
+# build skips the outer block, the later += calls die with "Undefined
+# identifier". The helper script inserts guarded initializers
+#     if (!defined(sources)) { sources = [] }
+#     if (!defined(deps))    { deps    = [] }
+# at the top of the inner `if (safe_browsing_mode != 0)` block, which are
+# no-ops when the outer block already populated them. Idempotent — safe
+# to re-run. (Same script on mac and windows — it's just Python.)
 # ---------------------------------------------------------------------------
 Step 'Fixing chrome/browser/safe_browsing/BUILD.gn (ungoogled patch artifact)'
 # On Windows the Python launcher is usually `python` (not `python3`).

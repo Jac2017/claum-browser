@@ -264,31 +264,53 @@ GN_ARGS="
 mkdir -p "$OUT_DIR"
 
 # ---------------------------------------------------------------------------
-# FIX: ungoogled-chromium's fix-building-without-safebrowsing.patch REMOVES
-# the initial `sources = [...]` in chrome/browser/safe_browsing/BUILD.gn but
-# leaves in place a later `sources += [...]`. Without a matching `sources =`
-# in scope, `gn gen` dies with "Undefined identifier. sources += [".
+# FIX: Stock Chromium's chrome/browser/safe_browsing/BUILD.gn defines
+# `sources = [...]` and `deps = [...]` inside an outer `if (safe_browsing_mode
+# != 0) { ... }` block, and then appends to them with `sources += [...]` and
+# `deps += [...]` in a later inner block. When ungoogled's build flips
+# safe_browsing_mode to 0, the outer block is skipped — but the later += calls
+# still run and gn dies with "Undefined identifier. sources += [" (and later
+# the same for `deps +=`).
 #
-# The helper script inserts `sources = []` just before the orphan `+=` so
-# that gn has something to append to. See fix-safe-browsing-gn.py for the
-# full story. The script is idempotent and safe to re-run.
+# The helper script inserts guarded initializers at the top of the inner
+# `if (safe_browsing_mode != 0) { ... }` block:
+#     if (!defined(sources)) { sources = [] }
+#     if (!defined(deps))    { deps    = [] }
+# which are no-ops if the outer block already populated them, and safely
+# initialize to empty lists otherwise. See fix-safe-browsing-gn.py for the
+# full write-up. The script is idempotent and safe to re-run.
 # ---------------------------------------------------------------------------
 log_step "Fixing chrome/browser/safe_browsing/BUILD.gn (ungoogled patch artifact)"
 python3 "$CLAUM_REPO_DIR/claum/scripts/fix-safe-browsing-gn.py" \
         "$CLAUM_BUILD_ROOT/build/src"
 
 # ---------------------------------------------------------------------------
-# DIAGNOSTIC: dump the lines around where gn gen was previously failing.
-# Kept in place so we always have the context if gn gen errors here again.
+# DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
+# see exactly what state it's in. We dump:
+#   * lines 1-30   — the file header + `source_set("safe_browsing") {` opening
+#   * lines 80-160 — the area we already fixed (sources= / deps+)
+#   * lines 700-760 — the tail end, where a new "Expecting assignment..."
+#                     error showed up at line 746 (likely another stray `}`).
 # The `|| true` ensures the diagnostic never fails the build by itself.
 # ---------------------------------------------------------------------------
 SB_FILE="$CLAUM_BUILD_ROOT/build/src/chrome/browser/safe_browsing/BUILD.gn"
 if [ -f "$SB_FILE" ]; then
-  log_step "Diagnostic: lines 80-160 of chrome/browser/safe_browsing/BUILD.gn"
-  # `cat -n` prepends line numbers so the output lines line up with gn's error.
-  # `sed` then slices out just the window we care about.
+  # Report the total number of lines so we know whether line 746 is near EOF.
+  TOTAL_LINES=$(wc -l < "$SB_FILE")
+  log_step "Diagnostic: BUILD.gn has $TOTAL_LINES lines"
+
+  log_step "Diagnostic A: lines 1-30 of safe_browsing/BUILD.gn (file header)"
+  cat -n "$SB_FILE" | sed -n '1,30p' || true
+  echo "---- end diagnostic A ----"
+
+  log_step "Diagnostic B: lines 80-160 of safe_browsing/BUILD.gn"
   cat -n "$SB_FILE" | sed -n '80,160p' || true
-  echo "---- end BUILD.gn diagnostic ----"
+  echo "---- end diagnostic B ----"
+
+  log_step "Diagnostic C: lines 700-760 of safe_browsing/BUILD.gn (around the new error)"
+  # If the file is shorter than 700 lines, sed just prints nothing.
+  cat -n "$SB_FILE" | sed -n '700,760p' || true
+  echo "---- end diagnostic C ----"
 else
   log_warn "Could not find $SB_FILE — skipping diagnostic."
 fi
