@@ -404,8 +404,43 @@ if [ "$CLEAN" -eq 1 ] && [ -d "$OUT_DIR" ]; then
   rm -rf "$OUT_DIR"
 fi
 
+# ----------------------------------------------------------------------------
+# Locate Homebrew's jpeg-turbo include/lib dirs so we can hand them to GN.
+# ----------------------------------------------------------------------------
+# We ask Homebrew for the install prefix rather than hard-coding /opt/homebrew
+# because:
+#   - Apple Silicon runners use /opt/homebrew
+#   - Intel runners use /usr/local
+#   - A user-local Homebrew install could live anywhere
+# `brew --prefix jpeg-turbo` returns the canonical path or an empty string if
+# the formula isn't installed. The workflow's "Install build dependencies"
+# step runs `brew install jpeg-turbo`, so by the time this script runs the
+# prefix WILL exist — we still guard with `|| true` so a missing brew doesn't
+# nuke the whole script on a dev machine.
+# Run #28 failed at [1037/56129] with:
+#     fatal error: 'jpeglib.h' file not found
+# in third_party/libyuv/source/mjpeg_decoder.cc because use_system_libjpeg=true
+# tells Chromium to do `#include "jpeglib.h"` from a SYSTEM include path, and
+# macOS doesn't ship jpeglib.h. Feeding Chromium's cflags the Homebrew
+# include dir fixes that resolution without abandoning system libjpeg.
+JPEG_TURBO_PREFIX="$(brew --prefix jpeg-turbo 2>/dev/null || true)"
+if [ -n "$JPEG_TURBO_PREFIX" ] && [ -d "$JPEG_TURBO_PREFIX/include" ]; then
+  JPEG_INC_FLAG="-I$JPEG_TURBO_PREFIX/include"
+  JPEG_LIB_FLAG="-L$JPEG_TURBO_PREFIX/lib"
+  echo "  jpeg-turbo prefix: $JPEG_TURBO_PREFIX"
+else
+  JPEG_INC_FLAG=""
+  JPEG_LIB_FLAG=""
+  log_warn "jpeg-turbo not found via brew — build WILL fail on mjpeg_decoder.cc"
+fi
+
 # GN args — these tune how the Chromium build system generates ninja files.
 # Each one is explained because this is where most build mistakes happen.
+#
+# extra_cflags / extra_ldflags are appended to EVERY compile/link command,
+# which is what we want because Chromium's libyuv target doesn't declare a
+# direct dep on //third_party/libjpeg (ungoogled severed it). The extra
+# include dir gets every TU that `#include`s jpeglib.h to resolve correctly.
 GN_ARGS="
   is_debug=false                     # release build (no debug symbols)
   is_official_build=true             # enable optimizations + LTO
@@ -423,6 +458,9 @@ GN_ARGS="
   use_libcxx_modules=false           # workaround for Xcode 16 SDK modulemap mismatch
   use_clang_modules=false            # turn OFF clang module compilation entirely
   treat_warnings_as_errors=false     # tolerate warnings so build does not abort
+  extra_cflags=\"$JPEG_INC_FLAG\"
+  extra_cxxflags=\"$JPEG_INC_FLAG\"
+  extra_ldflags=\"$JPEG_LIB_FLAG\"
   # --- Claum-specific flags ---
   claum_default_search=\"$DEFAULT_SEARCH\"
   claum_component_extensions=true

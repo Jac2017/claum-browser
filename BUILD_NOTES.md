@@ -3,6 +3,45 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #29 — fix drafted 2026-04-21 (for libjpeg header)
+
+Run #28 (a19ae35) got MUCH further than any previous run — past all the
+pruned-binary staging fixes (node, libnode.dylib, google_toolbox, dsymutil)
+and 2627 ninja actions deep into the base/ and third-party compiles.
+Confirmed the dsymutil staging works (the "==> Staging system dsymutil for
+Chromium toolchain path" line showed up in the log exactly where we expected).
+
+#28 then died at [1037/56129] (21m 24s into the run) with:
+
+    ../../third_party/libyuv/source/mjpeg_decoder.cc:35:10:
+        fatal error: 'jpeglib.h' file not found
+    ninja: build stopped: subcommand failed.
+
+Root cause: our GN_ARGS include `use_system_libjpeg=true`, which makes
+Chromium's libyuv target do `#include "jpeglib.h"` expecting the header in
+a system include path. macOS does NOT ship jpeglib.h (unlike libpng/libz).
+The compile command also defined `-DUSE_SYSTEM_LIBJPEG`, confirming the
+GN arg took effect — so we need to provide the header, not switch back to
+bundled libjpeg.
+
+Fix (applied in this push):
+1. build-mac.yml "Install build dependencies" step now installs `jpeg-turbo`
+   via Homebrew. On Apple Silicon this puts jpeglib.h under
+   `/opt/homebrew/opt/jpeg-turbo/include/`.
+2. build-mac.sh resolves `brew --prefix jpeg-turbo` at runtime and passes
+   `-I<prefix>/include` via GN's `extra_cflags` + `extra_cxxflags`, and
+   `-L<prefix>/lib` via `extra_ldflags`. These get appended to every compile
+   and link command, so libyuv's mjpeg_decoder.cc now resolves the include.
+
+If #29 gets past [1037], we'll be into compiler/toolchain territory that's
+unlikely to hit another missing-third-party-source error for a while — the
+Chromium/base compile has already succeeded; libyuv was the first libyuv-
+specific action. Next likely classes of errors:
+  - Other "-DUSE_SYSTEM_*" flags where Chromium expects headers we haven't
+    installed (e.g. use_system_libpng, use_system_libwebp). Pattern: add
+    the brew formula + extend extra_cflags.
+  - Link-time errors once ninja reaches the link step (hours from now).
+
 ## Run #28 — triggered 2026-04-21 (commit a19ae35, run id 24733052885)
 
 Run #27's failure turned out to be a **RED HERRING**. Even though #27 is

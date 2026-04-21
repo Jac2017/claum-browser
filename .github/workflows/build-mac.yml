@@ -211,7 +211,17 @@ jobs:
           # ninja = the actual build runner gn generates files for.
           # gn itself isn't in Homebrew — we build it from source in the
           # build script (see build-mac.sh step 1c).
-          brew install ninja python3 rsync
+          #
+          # jpeg-turbo: Chromium's GN_ARGS sets `use_system_libjpeg=true`,
+          # which means its libyuv/mjpeg_decoder.cc does `#include "jpeglib.h"`
+          # expecting the header to live in a system include dir. macOS does
+          # NOT ship jpeglib.h by default, so without this install ninja
+          # dies at [1037/56129] with:
+          #   fatal error: 'jpeglib.h' file not found
+          # Homebrew puts the header at /opt/homebrew/opt/jpeg-turbo/include/
+          # on Apple Silicon. The build script then passes that dir to GN
+          # via extra_cflags so Chromium actually sees it.
+          brew install ninja python3 rsync jpeg-turbo
 
       # ------------------------------------------------------------------
       # Diagnostic: inspect the SDK's modulemap layout.
