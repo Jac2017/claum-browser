@@ -3,6 +3,45 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #25 — fix drafted 2026-04-21 (needs push)
+
+Run #24 (commit af83a87) got even further — past the google_toolbox
+fix — and died at 7m 11s inside the ninja build on a `devtools-frontend
+api_node_typecheck` step. Root cause (from log lines 1722-1734):
+
+    TypeScript compilation failed. Used tsconfig ...-tsconfig.json
+    dyld[18997]: Library not loaded: @rpath/libnode.127.dylib
+      Referenced from: .../third_party/node/mac_arm64/node-darwin-arm64/bin/node
+      Reason: tried: '.../bin/libnode.127.dylib' (no such file),
+              '.../bin/../lib/libnode.127.dylib' (no such file), ...
+    ninja: build stopped: subcommand failed.
+
+The node binary we staged in run #23 is dynamically linked against
+libnode.127.dylib (Homebrew's modern node ships that way). We only
+copied the `node` executable, not the `libnode.<ABI>.dylib` it depends
+on at launch. dyld tries `bin/libnode...` and `bin/../lib/libnode...`
+and fails.
+
+Fix drafted in claum/scripts/build-mac.sh (node-staging block): after
+copying the node binary, also `find "$NODE_PREFIX" -name 'libnode.*.dylib'`
+and install each one into the adjacent `lib/` dir (the path dyld will
+hit via `@rpath → bin/../lib/`). Uses `python3 -c realpath` for
+portability because macOS `/usr/bin/readlink` lacks `-f`.
+
+STATUS: the edit is applied locally but NOT pushed. This scheduled-task
+run did not have access to the PAT at /sessions/wonderful-stoic-lamport/.gh_token
+(that path belongs to a previous session that this run cannot read).
+Matt needs to either push the local change by hand, or make the token
+accessible to subsequent scheduled runs.
+
+If run #25 gets past this, likely next candidates (all Google-hosted
+deps ungoogled sometimes prunes):
+  - third_party/grpc/src
+  - third_party/webrtc
+  - third_party/angle
+  - third_party/openscreen
+  - also third_party/llvm-build/... (but we download clang separately)
+
 ## Run #24 — triggered 2026-04-21 (commit af83a87)
 
 Run #23 got FURTHER than #22 (node staging fix worked — no more missing

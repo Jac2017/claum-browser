@@ -251,7 +251,13 @@ fi
 log_step "Staging bundled Node.js for Chromium's JS bundler"
 NODE_DIR_REL="third_party/node/mac_${ARCH}/node-darwin-${ARCH}/bin"
 NODE_DIR_ABS="$CLAUM_BUILD_ROOT/build/src/$NODE_DIR_REL"
-mkdir -p "$NODE_DIR_ABS"
+# lib/ sits next to bin/ in the Chromium-expected layout. Modern Homebrew
+# node (v22+) is dynamically linked against libnode.<ABI>.dylib, and the
+# node binary looks it up via @rpath which dyld resolves to `../lib/` —
+# so we MUST populate both bin/ and lib/, otherwise the staged node dies
+# at launch with `dyld: Library not loaded: @rpath/libnode.127.dylib`.
+NODE_LIB_ABS="$CLAUM_BUILD_ROOT/build/src/third_party/node/mac_${ARCH}/node-darwin-${ARCH}/lib"
+mkdir -p "$NODE_DIR_ABS" "$NODE_LIB_ABS"
 
 if [ ! -x "$NODE_DIR_ABS/node" ]; then
   SYS_NODE="$(command -v node || true)"
@@ -259,8 +265,47 @@ if [ ! -x "$NODE_DIR_ABS/node" ]; then
     log_err "System node not found on PATH; install it via 'brew install node'"
     exit 1
   fi
-  install -m 0755 "$SYS_NODE" "$NODE_DIR_ABS/node"
+
+  # Resolve through any symlinks so we copy the real binary (Homebrew keeps
+  # `node` as a symlink under /opt/homebrew/bin that points at the real
+  # binary inside /opt/homebrew/Cellar/node/<version>/bin/). We use python3
+  # for portability — macOS's /usr/bin/readlink doesn't support `-f`.
+  SYS_NODE_REAL="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$SYS_NODE")"
+
+  install -m 0755 "$SYS_NODE_REAL" "$NODE_DIR_ABS/node"
   echo "  staged $(basename $SYS_NODE) ($("$SYS_NODE" --version)) -> $NODE_DIR_REL/node"
+
+  # Modern Homebrew `node` is linked against libnode.<ABI>.dylib which
+  # lives somewhere under the Homebrew Cellar for node. The node binary
+  # looks it up via `@rpath/libnode.<ABI>.dylib`, which dyld resolves
+  # against `bin/../lib/libnode.<ABI>.dylib` — so we must copy the dylib
+  # into the lib/ adjacent to bin/ (NOT inside bin/).
+  #
+  # Run #24 failed here: the libnode dylib was missing and dyld printed:
+  #   Library not loaded: @rpath/libnode.127.dylib
+  #   tried: '.../bin/libnode.127.dylib' (no such file),
+  #          '.../bin/../lib/libnode.127.dylib' (no such file)
+  #
+  # We search the whole node install prefix (one level above bin/) because
+  # Homebrew has moved dylibs around over the years (sometimes lib/,
+  # sometimes libexec/lib/). Copying every libnode.*.dylib we find
+  # future-proofs us against ABI version bumps too.
+  NODE_PREFIX="$(dirname "$(dirname "$SYS_NODE_REAL")")"
+  dylib_count=0
+  # `find -print0 | xargs -0` pattern adapted for bash: we read NUL-separated
+  # names via a process substitution so filenames with spaces are safe.
+  while IFS= read -r -d '' lib; do
+    install -m 0644 "$lib" "$NODE_LIB_ABS/$(basename "$lib")"
+    echo "  staged $(basename "$lib") -> third_party/node/.../lib/"
+    dylib_count=$((dylib_count + 1))
+  done < <(find "$NODE_PREFIX" -name 'libnode.*.dylib' -type f -print0 2>/dev/null)
+
+  if [ "$dylib_count" -eq 0 ]; then
+    # Not fatal — some older Homebrew node versions are statically linked,
+    # in which case the binary has no @rpath dylib deps and this is fine.
+    log_warn "No libnode.*.dylib found under $NODE_PREFIX."
+    log_warn "  If node fails at runtime with 'Library not loaded: @rpath/libnode...', this is why."
+  fi
 else
   echo "  node already present at $NODE_DIR_REL/node"
 fi
