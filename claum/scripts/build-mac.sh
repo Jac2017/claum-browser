@@ -349,6 +349,51 @@ else
   echo "  google_toolbox_for_mac already present"
 fi
 
+# ----------------------------------------------------------------------------
+# Stage system `dsymutil` into the Chromium-expected toolchain path.
+# ----------------------------------------------------------------------------
+# dsymutil is Apple's debug-symbol utility, used by Chromium when packaging
+# devtools-frontend (see build/toolchain/mac: the `mac_strip_dsymutil`
+# helper invokes `tools/clang/dsymutil/bin/dsymutil`). Chromium normally
+# gets a pre-built LLVM dsymutil via its `tools/clang/scripts/update.py`
+# gclient hook — ungoogled-chromium strips that hook as part of privacy
+# pruning, so the binary never lands in our checkout.
+#
+# Run #26 failed here at action [1036/56129]:
+#     FileNotFoundError: [Errno 2] No such file or directory:
+#       '../../tools/clang/dsymutil/bin/dsymutil'
+#     [1036/56129] ACTION //third_party/devtools-frontend/.../issue_counter:css_files
+#     ninja: build stopped: subcommand failed.
+#
+# Fix: same "stage after pruning" pattern as node and google_toolbox_for_mac.
+# Apple's Xcode ships a perfectly good `dsymutil` — we locate it via
+# `xcrun --find dsymutil` and copy it into the expected path.
+# ----------------------------------------------------------------------------
+log_step "Staging system dsymutil for Chromium toolchain path"
+DSYM_DIR_REL="tools/clang/dsymutil/bin"
+DSYM_DIR_ABS="$CLAUM_BUILD_ROOT/build/src/$DSYM_DIR_REL"
+mkdir -p "$DSYM_DIR_ABS"
+if [ ! -x "$DSYM_DIR_ABS/dsymutil" ]; then
+  # xcrun --find resolves to the dsymutil inside the active Xcode
+  # (DEVELOPER_DIR). This is Apple's dsymutil, not LLVM's — they're API
+  # compatible for the ops Chromium uses (dumping debug maps, producing
+  # .dSYM bundles), so the substitution works fine for a one-shot build.
+  SYS_DSYM="$(xcrun --find dsymutil 2>/dev/null || command -v dsymutil || true)"
+  if [ -z "$SYS_DSYM" ] || [ ! -x "$SYS_DSYM" ]; then
+    log_err "System dsymutil not found — can't stage into $DSYM_DIR_REL"
+    log_err "  Tried: 'xcrun --find dsymutil' and 'command -v dsymutil'"
+    exit 1
+  fi
+  # install -m 0755 both copies AND sets the executable bit. We don't use
+  # `ln -s` here because ungoogled's prune pass can follow and delete
+  # symlinks that point outside the repo.
+  install -m 0755 "$SYS_DSYM" "$DSYM_DIR_ABS/dsymutil"
+  echo "  staged $(basename "$SYS_DSYM") -> $DSYM_DIR_REL/dsymutil"
+  echo "  (source: $SYS_DSYM)"
+else
+  echo "  dsymutil already present at $DSYM_DIR_REL/dsymutil"
+fi
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"

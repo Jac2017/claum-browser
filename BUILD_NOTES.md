@@ -3,6 +3,38 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #27 — triggered 2026-04-21 (commit TBD)
+
+Run #26 made it to action [1037/56129] — confirmed the libnode.127.dylib
+staging fix works. Then died at the `devtools-frontend .../issue_counter:css_files`
+ninja action with:
+
+    FileNotFoundError: [Errno 2] No such file or directory:
+      '../../tools/clang/dsymutil/bin/dsymutil'
+    [1036/56129] ACTION //third_party/devtools-frontend/.../issue_counter:css_files
+    ninja: build stopped: subcommand failed.
+
+Another Google-hosted toolchain binary that ungoogled pruned along with
+the LLVM clang bundle (normally fetched by `tools/clang/scripts/update.py`).
+The Python wrapper around it calls `subprocess.check_call([...dsymutil, ...])`
+and Python dies trying to resolve the binary path.
+
+Fix (applied in build-mac.sh right after google_toolbox_for_mac staging):
+`xcrun --find dsymutil` -> copy into `build/src/tools/clang/dsymutil/bin/`.
+Apple's dsymutil is API-compatible with LLVM's for the ops Chromium uses
+(debug-map dumping, .dSYM packaging).
+
+Also in this push: workflow file now triggers on `push: branches:[main]`
+(with paths-ignore for BUILD_NOTES.md and other *.md) and has
+`concurrency.cancel-in-progress: true` so the autonomous loop can just
+commit+push a fix and a fresh build runs automatically.
+
+If #27 gets past this, likely next candidates (same pattern, bin staging
+after prune):
+  - `third_party/llvm-build/Release+Asserts/bin/clang` (use system clang)
+  - `third_party/rust-toolchain/bin/rustc` (use system rustc / rustup)
+  - `buildtools/mac/clang-format` (use system clang-format)
+
 ## Run #26 — triggered 2026-04-21 (commit 1c17528)
 
 Unblocked the push — the live Cowork session DOES have read access to
