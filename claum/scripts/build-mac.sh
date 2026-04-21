@@ -428,6 +428,38 @@ if [ -n "$JPEG_TURBO_PREFIX" ] && [ -d "$JPEG_TURBO_PREFIX/include" ]; then
   JPEG_INC_FLAG="-I$JPEG_TURBO_PREFIX/include"
   JPEG_LIB_FLAG="-L$JPEG_TURBO_PREFIX/lib"
   echo "  jpeg-turbo prefix: $JPEG_TURBO_PREFIX"
+
+  # ---------------------------------------------------------------------
+  # Run #29 fix: extra_cflags in GN does NOT propagate to every target.
+  # Specifically, third_party/libyuv strips extra_cflags from its compile
+  # commands, so `#include <jpeglib.h>` in mjpeg_decoder.cc still fails
+  # even though we set extra_cflags=-I/opt/homebrew/opt/jpeg-turbo/include.
+  #
+  # Belt-and-suspenders fix: set CPATH / LIBRARY_PATH env vars, which
+  # clang honors as implicit include / library search paths for ALL
+  # compilations (ninja inherits them from the parent shell). Also
+  # symlink the header directly into /opt/homebrew/include, which is
+  # on clang's default Homebrew-aware search list on Apple Silicon.
+  # ---------------------------------------------------------------------
+  export CPATH="${CPATH:+$CPATH:}$JPEG_TURBO_PREFIX/include"
+  export LIBRARY_PATH="${LIBRARY_PATH:+$LIBRARY_PATH:}$JPEG_TURBO_PREFIX/lib"
+  echo "  exported CPATH=$CPATH"
+  echo "  exported LIBRARY_PATH=$LIBRARY_PATH"
+
+  # Also drop a symlink/copy of jpeglib.h (and its siblings) into a path
+  # that IS inside the Chromium source tree — specifically the libyuv
+  # include dir, which libyuv's BUILD.gn already adds via -I. That way
+  # the header is guaranteed reachable even if env vars get scrubbed by
+  # a sandbox or gn toolchain config.
+  LIBYUV_INC_DIR="$CLAUM_BUILD_ROOT/build/src/third_party/libyuv/include"
+  if [ -d "$LIBYUV_INC_DIR" ]; then
+    for h in jpeglib.h jmorecfg.h jconfig.h jerror.h jpegint.h; do
+      if [ -f "$JPEG_TURBO_PREFIX/include/$h" ] && [ ! -e "$LIBYUV_INC_DIR/$h" ]; then
+        cp "$JPEG_TURBO_PREFIX/include/$h" "$LIBYUV_INC_DIR/$h"
+        echo "  copied $h -> third_party/libyuv/include/"
+      fi
+    done
+  fi
 else
   JPEG_INC_FLAG=""
   JPEG_LIB_FLAG=""

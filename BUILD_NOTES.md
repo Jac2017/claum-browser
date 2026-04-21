@@ -3,20 +3,55 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
-## Run #29 status — 2026-04-21 17:21 GMT — JPEG FIX CONFIRMED WORKING
+## Run #30 — fix drafted 2026-04-21 17:40 GMT (jpeglib.h again, real fix)
 
-Build #29 (commit c5fc5a4, job 72360492331) is at ninja action
-[2933/56129] after 20m 47s of compile time. That's well past #28's
-failure point of [1037/56129], and no `fatal error` / `error:` strings
-are present in the visible log. Conclusion: the jpeg-turbo install +
-`extra_cflags=-I<prefix>/include` fix DID resolve
-`libyuv/mjpeg_decoder.cc`'s missing `jpeglib.h`.
+Run #29 FAILED at [3191/56129] with the SAME error as #28:
 
-Progression rate so far: ~2.5 actions/second. At that pace the remaining
-53,196 actions extrapolate to ~5.9 more hours of compile, though later
-parts (C++ template-heavy TU's, link step) are much slower per-action.
-Total wall-clock ETA: 6-8 hours from the 17:00:36 GMT start, so any
-time between 23:00 and 01:00 GMT today (2026-04-21 to -22).
+    ../../third_party/libyuv/source/mjpeg_decoder.cc:35:10:
+        fatal error: 'jpeglib.h' file not found
+    1 error generated.
+    ninja: build stopped: subcommand failed.
+
+I was wrong at 17:21 GMT — the "past #28's point" reading was misleading
+because ninja had reordered tasks. The jpeg-turbo+extra_cflags fix from
+#29 did NOT propagate to libyuv's compile commands. Evidence from the log:
+
+    -DUSE_SYSTEM_LIBJPEG -I../.. -Igen -I../../buildtools/third_party/libc++
+    -I../../third_party/libyuv/include ...
+    (no -I/opt/homebrew/opt/jpeg-turbo/include anywhere)
+
+So `extra_cflags` in GN is NOT a universal knob — specific third_party
+targets (libyuv among them) build their cflags from a narrower template
+that ignores it. Ninja invoked clang with `-DUSE_SYSTEM_LIBJPEG` but no
+-I path to the header, so resolution failed.
+
+Fix (applied in this push, belt-and-suspenders):
+1. Export `CPATH=/opt/homebrew/opt/jpeg-turbo/include` and
+   `LIBRARY_PATH=/opt/homebrew/opt/jpeg-turbo/lib` from build-mac.sh
+   BEFORE `ninja`. Clang honors CPATH/LIBRARY_PATH as implicit search
+   paths for every compile + link invocation, regardless of what GN
+   does with cflags.
+2. ALSO copy jpeglib.h, jmorecfg.h, jconfig.h, jerror.h, jpegint.h into
+   `third_party/libyuv/include/` — which libyuv's BUILD.gn already
+   adds via `-I../../third_party/libyuv/include` (confirmed in the
+   compile command above). This bypasses env var handling entirely for
+   the one target that definitely needs the header.
+
+Either mechanism alone should fix libyuv. If both work, the next TU
+that touches jpeglib.h will also resolve it via CPATH even if its
+BUILD.gn doesn't have a -I of its own.
+
+Also kept `extra_cflags=$JPEG_INC_FLAG` in the GN args as before — it's
+harmless in targets that do consume it.
+
+Re-running: push to main will auto-trigger build #30 via push trigger.
+
+## Run #29 status — 2026-04-21 17:21 GMT — (prior reading, INCORRECT)
+
+Earlier today I logged that #29 was "well past #28's failure point" —
+but ninja re-ordered libyuv tasks behind a bunch of unrelated compiles
+and the jpeglib.h error finally surfaced at [3191/56129] around 17:36 GMT.
+The fix from #29 didn't actually work; see Run #30 section above.
 
 Next probable failure classes (unchanged from earlier prediction):
   - Another `use_system_*` header gap — add brew formula + extend
