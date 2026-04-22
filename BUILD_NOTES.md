@@ -3,6 +3,42 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Run #35 — fix drafted 2026-04-22 00:42 GMT (stage otool-classic wrapper sibling)
+
+Run #34 (commit 64a2412, job 72415546522) FAILED at ninja [12845/56129]
+— the very first SOLINK — with:
+
+    fatal error: .../llvm-build/Release+Asserts/bin/llvm-otool:
+      can't find or exec:
+      .../llvm-build/Release+Asserts/bin/otool-classic
+      (No such file or directory)
+    subprocess.CalledProcessError: Command
+      '['../../third_party/llvm-build/Release+Asserts/bin/llvm-otool',
+        '-l', './libvk_swiftshader.dylib']'
+      returned non-zero exit status 1.
+
+Different class than run #33. This time llvm-otool WAS found and run —
+but Apple's `/usr/bin/otool` is a thin DISPATCHER that argv[0]-execs
+`otool-classic` from its OWN directory when given Mach-O input. We
+staged otool only. The wrapper couldn't find its classic backend in
+`third_party/llvm-build/Release+Asserts/bin/` and aborted.
+
+Fix (applied in this push): also stage `otool-classic` next to our
+llvm-otool. xcrun finds it; fall back to CLT/Xcode paths if xcrun
+doesn't know it. Same `install -m 0755` pattern.
+
+Positive signal from #34: we got PAST the first SOLINK invocation,
+confirming our llvm-nm/ar/install_name_tool/strip/ranlib/lipo pre-stages
+were correct enough — the link itself produced the dylib. Only the
+post-link TOC extraction failed.
+
+Next probable failure classes after #35:
+  - More SOLINK steps could hit other wrapper/backend issues. Apple's
+    `nm` similarly wraps llvm-nm on recent macOS; if llvm-nm fails
+    because it can't find its sibling, add that too.
+  - Same `use_system_*` header gaps as before.
+  - Link-time undefined symbols.
+
 ## Run #34 — fix drafted 2026-04-21 23:20 GMT (preemptive llvm-* binutils stage)
 
 Run #33 is still in-flight from 23:18 GMT (commit 217f53e) — it will be

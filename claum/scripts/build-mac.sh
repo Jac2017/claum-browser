@@ -499,6 +499,39 @@ else
   echo "  llvm-otool already present at $OTOOL_DIR_REL/llvm-otool"
 fi
 
+# Apple's /usr/bin/otool is a dispatcher wrapper: when called with Mach-O
+# args it execs `otool-classic` from its own directory (argv[0]-relative).
+# Run #34 proved this: after we staged /usr/bin/otool as llvm-otool,
+# linker_driver invoked it and got:
+#     fatal error: .../llvm-otool: can't find or exec:
+#       .../third_party/llvm-build/Release+Asserts/bin/otool-classic
+# So we also need to stage the classic backend next to our llvm-otool.
+if [ ! -x "$OTOOL_DIR_ABS/otool-classic" ]; then
+  SYS_OTOOL_CLASSIC="$(xcrun --find otool-classic 2>/dev/null || command -v otool-classic || true)"
+  if [ -z "$SYS_OTOOL_CLASSIC" ] || [ ! -x "$SYS_OTOOL_CLASSIC" ]; then
+    # Older Xcodes might not expose otool-classic via xcrun; fall back to a
+    # common-ish path. If this also doesn't exist, skip — the build will
+    # tell us where it lives.
+    for CAND in \
+        "/Library/Developer/CommandLineTools/usr/bin/otool-classic" \
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/otool-classic" \
+        "/usr/bin/otool-classic"
+    do
+      if [ -x "$CAND" ]; then SYS_OTOOL_CLASSIC="$CAND"; break; fi
+    done
+  fi
+  if [ -n "$SYS_OTOOL_CLASSIC" ] && [ -x "$SYS_OTOOL_CLASSIC" ]; then
+    install -m 0755 "$SYS_OTOOL_CLASSIC" "$OTOOL_DIR_ABS/otool-classic"
+    echo "  staged otool-classic -> $OTOOL_DIR_REL/otool-classic"
+    echo "  (source: $SYS_OTOOL_CLASSIC)"
+  else
+    log_warn "otool-classic not found via xcrun or fallback paths."
+    log_warn "  Apple's otool wrapper may fail at runtime; consider swapping to llvm-nm-based TOC extraction."
+  fi
+else
+  echo "  otool-classic already present at $OTOOL_DIR_REL/otool-classic"
+fi
+
 # ----------------------------------------------------------------------------
 # Pre-emptively stage the rest of the LLVM binutils Chromium expects during
 # SOLINK / link-time TOC extraction / dylib fixup.
