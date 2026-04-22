@@ -67,9 +67,20 @@ permissions:
 
 jobs:
   handle-failure:
-    # Only run for real failures. Skip `success`, `cancelled` (concurrency
-    # supersede), `skipped`, etc. This saves runner minutes.
-    if: github.event.workflow_run.conclusion == 'failure'
+    # Fire for:
+    #   - failure: real build errors (compile/link/etc)
+    #   - cancelled: usually GitHub's 5h30m timeout OR concurrency supersede
+    #   - timed_out: explicit step-level timeout
+    # We DO want to retry on cancelled because sccache means a fresh run will
+    # near-instantly pick up where the previous timed-out run left off, via
+    # the actions-cache-backed compile cache. The 2-retry cap still applies,
+    # so a malicious-cancel loop isn't possible. If a user manually cancels
+    # multiple times, the attempt counter hits the cap and stops.
+    # Skip success + skipped.
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'cancelled' ||
+      github.event.workflow_run.conclusion == 'timed_out'
 
     runs-on: ubuntu-latest
 
@@ -192,6 +203,10 @@ jobs:
             'The action .* failed with an internal error'
             'Error: The operation was canceled\.'
             'No space left on device'          # runner out of disk
+            # GitHub's hard per-job wall clock (5h30m in our case).
+            # sccache will pick up most of the compiled work on retry.
+            'The job has exceeded the maximum execution time'
+            'Job was cancelled'
           )
 
           # --------------------------------------------------------------

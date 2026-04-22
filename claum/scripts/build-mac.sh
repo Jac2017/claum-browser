@@ -663,9 +663,40 @@ fi
 # which is what we want because Chromium's libyuv target doesn't declare a
 # direct dep on //third_party/libjpeg (ungoogled severed it). The extra
 # include dir gets every TU that `#include`s jpeglib.h to resolve correctly.
+# ----------------------------------------------------------------------------
+# sccache hookup — if $CLAUM_USE_SCCACHE is set (CI does this), we pass
+# `cc_wrapper = "sccache"` to gn so every clang++ invocation becomes
+# `sccache clang++ ...`. sccache talks to a daemon that hits a content-
+# addressable cache (GitHub Actions cache backend, 10 GB). On a re-run,
+# 95% of .o files are cached and reappear in milliseconds — so even if the
+# previous run was killed by the 5h30m timeout, the next run can pick up
+# near-instantly and spend its budget on new work + the link phase.
+#
+# We also turn OFF LTO (is_official_build=false, use_thin_lto=false).
+# LTO defers code-gen until link time, which busts per-file caching: the
+# compile output is IR not a final .o, so cache hits are tiny and the link
+# step still has to redo the whole-program work. For iterative CI builds
+# we want cache-friendly; LTO can be re-enabled for release builds once we
+# have a successful first build to warm the cache.
+# ----------------------------------------------------------------------------
+if [ -n "${CLAUM_USE_SCCACHE:-}" ] && command -v sccache >/dev/null 2>&1; then
+  CC_WRAPPER_ARG='cc_wrapper="sccache"'
+  # Start the sccache daemon so the first ninja invocation doesn't pay
+  # startup cost. The server runs in the background and auto-exits when
+  # the cache goes idle.
+  sccache --start-server 2>/dev/null || true
+  log_ok "sccache wired up — $(sccache --version)"
+  SCCACHE_LTO_OFF='is_official_build=false
+  use_thin_lto=false'
+else
+  CC_WRAPPER_ARG=''
+  SCCACHE_LTO_OFF='is_official_build=true             # enable optimizations + LTO'
+fi
+
 GN_ARGS="
   is_debug=false                     # release build (no debug symbols)
-  is_official_build=true             # enable optimizations + LTO
+  $SCCACHE_LTO_OFF
+  $CC_WRAPPER_ARG
   symbol_level=1                     # minimal symbols (keep backtraces readable)
   blink_symbol_level=0               # no blink symbols (saves disk)
   enable_nacl=false                  # NaCl is deprecated, skip

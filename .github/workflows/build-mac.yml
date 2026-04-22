@@ -224,6 +224,41 @@ jobs:
           brew install ninja python3 rsync jpeg-turbo
 
       # ------------------------------------------------------------------
+      # sccache = "shared compiler cache". It wraps every clang++ invocation
+      # and stores the resulting .o file in a content-addressable cache
+      # keyed by (compiler version + flags + preprocessed source hash). If
+      # the same translation unit has been compiled before, sccache returns
+      # the cached .o in milliseconds, skipping the real compile entirely.
+      #
+      # Why we need it: Chromium has 56k source files and compiling them on
+      # GitHub's M1 runner takes ~8h, but GitHub kills a job after 6h. Even
+      # with our 5h30m timeout, we run out of time before ninja reaches the
+      # final link. sccache lets us RESUME where we left off: the killed
+      # build populated the cache with whatever it compiled; the next run
+      # starts fresh but hits the cache on 95%+ of files and only compiles
+      # what's new + runs the linker.
+      #
+      # SCCACHE_GHA_ENABLED=true tells sccache to use GitHub Actions' built-in
+      # cache as its backend. That's free, auto-saves on job post-hooks
+      # (even for cancelled/timed-out jobs!), and gives us 10 GB per repo —
+      # plenty for the compile objects.
+      # ------------------------------------------------------------------
+      - name: Install sccache (compile cache to survive timeouts)
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Configure sccache for the build
+        run: |
+          # The sccache binary was just put on PATH by the action above.
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          # build-mac.sh reads this env var and passes `cc_wrapper="sccache"`
+          # into gn gen when it's set. (See build-mac.sh near GN_ARGS.)
+          echo "CLAUM_USE_SCCACHE=1" >> "$GITHUB_ENV"
+          # Sanity: log the sccache version + initial stats so the build log
+          # shows what we started with (useful diffing against end-of-build stats).
+          sccache --version
+          sccache --show-stats || true
+
+      # ------------------------------------------------------------------
       # Diagnostic: inspect the SDK's modulemap layout.
       #
       # Chromium's libc++ build compiles Clang modules from .modulemap
@@ -274,8 +309,24 @@ jobs:
             --arch           "${{ inputs.arch || 'arm64' }}" \
             --default-search "${{ inputs.default_search || 'bing' }}"
 
+      # `if: always()` runs this step even if the Run Claum build step
+      # failed or the job was cancelled by timeout. That lets us see the
+      # cache hit rate even on partial runs (to confirm sccache is working).
+      - name: Show sccache stats
+        if: always()
+        run: |
+          echo "=== sccache final stats ==="
+          sccache --show-stats || true
+          # Flush + stop the server so the GH cache save in the post-hook
+          # picks up every compiled object.
+          sccache --stop-server || true
+
       - name: Package .app as .dmg
         # Same inputs-fallback pattern as the build step above.
+        # `continue-on-error: true` means if this step fails (because the
+        # build above was killed mid-link and Claum.app isn't complete),
+        # the workflow doesn't mark as hard failure — the build-failure-handler
+        # will still classify it but we preserve the cache for a retry.
         env:
           ARCH: ${{ inputs.arch || 'arm64' }}
         run: |
@@ -287,6 +338,10 @@ jobs:
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
+        # `if: success()` ensures we only upload if the .dmg actually exists.
+        # If the build timed out, there's no .dmg to upload — we just rely on
+        # sccache to warm the cache for the next auto-retry.
+        if: success()
         with:
           name: Claum-macOS-${{ inputs.arch || 'arm64' }}
           path: ${{ env.CLAUM_BUILD_ROOT }}/build/src/out/Claum/Claum-${{ inputs.arch || 'arm64' }}.dmg
