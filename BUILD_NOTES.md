@@ -3,6 +3,50 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Handoff 2026-04-22 00:55 GMT — session ending
+
+Interactive 2-hour watcher session ends here. Two builds were kicked off:
+
+1. **Run #34** (commit 64a2412, job 72415546522) — FAILED at ninja
+   [12845/56129] during SOLINK libvk_swiftshader.dylib. Root cause:
+   Apple's `otool` is a wrapper that execs `otool-classic` from its own
+   dir. We staged only `otool` → wrapper couldn't find sibling. Good
+   news: our preemptive llvm-nm/ar/install_name_tool/strip/ranlib/lipo
+   stages appear to have worked (the SOLINK itself produced the dylib,
+   only post-link TOC extract failed).
+
+2. **Run #35** (commit a0b4cc9, job 72423353221) — IN PROGRESS at
+   session end. Adds `otool-classic` staging in the same dir. Per
+   timing on #34 (~1h to reach [12845]), expect #35 to either cross
+   that point (validating the fix) or hit a new class of failure
+   around 01:45 GMT.
+
+What to check next session:
+
+    https://github.com/Jac2017/claum-browser/actions/runs/24754054471
+
+If #35 died at the same [12845] SOLINK: either otool-classic wasn't in
+xcrun's known tools, or a different Apple binutil wrapper is at play.
+Look for `ninja_count`, `solink_count`, and the text of `fatal error:`
+messages. The scripted poll pattern used this session:
+
+    var lines = document.body.innerText.split('\n');
+    var ninjaLines = lines.filter(l => l.match(/\[\d+\/56129\]/));
+    var errLines   = lines.filter(l => l.match(/fatal error|FileNotFoundError|ninja: build stopped/i));
+    var solink     = lines.filter(l => l.match(/SOLINK/));
+
+If #35 progressed past [12845]: expect the NEXT failure class somewhere
+further in the tree — most likely another `use_system_*` header gap (see
+"Expected next failure classes" in agent's system prompt), OR another
+wrapper dispatch issue inside `nm`/`install_name_tool` (less likely, but
+Apple's nm does wrap llvm-nm on modern macOS).
+
+Known tools NOT yet staged preemptively (skipped deliberately): llvm-dwp
+and llvm-objcopy — if one appears, stage them by symlinking to a no-op
+or the Xcode equivalents if they exist. For llvm-dwp, there's no mac
+equivalent; a no-op script `#!/bin/sh\nexit 0\n` usually works because
+mac uses .dSYM separately.
+
 ## Run #35 — fix drafted 2026-04-22 00:42 GMT (stage otool-classic wrapper sibling)
 
 Run #34 (commit 64a2412, job 72415546522) FAILED at ninja [12845/56129]
