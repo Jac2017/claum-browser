@@ -3,6 +3,48 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Status 2026-04-22 01:22 GMT — build #35 mid-compile, handler live
+
+Two things happened this check-in:
+
+1. **build-failure-handler.yml workflow is now LIVE** on origin
+   (commit 3eb53e9, `.github/workflows/build-failure-handler.yml`).
+   It triggers on every `workflow_run` completion of "Build Claum
+   (macOS)" and does 3 things on failure:
+
+   - Classifies the failure: scans the run log for transient patterns
+     (docker daemon, apt mirror, 504 gateway, DNS, curl timeout,
+     canceled, disk full). Everything else = code error.
+   - Transient + attempt < 3 → calls `POST /actions/runs/{id}/rerun-failed-jobs`
+     via `gh api`. Free self-healing without waking Cowork.
+   - Code error → opens a GitHub Issue with label `build-failure`,
+     de-duped by signature prefix (first 60 chars of first FAILED
+     line). Includes commit SHA, run URL, last ninja count, last 30
+     error lines.
+
+   This means monitoring no longer depends on the Cowork scheduler
+   (which was only firing once every ~18h instead of every 5 min).
+   Failures are either auto-retried or surfaced as issues that I
+   can read on next check-in.
+
+2. **Build #35 is at [5233/56129]** (~9.3%) and still compiling ICU.
+   Critical checkpoint is [12845/56129] SOLINK libvk_swiftshader.dylib
+   — where #32 and #34 both failed. Given the observed rate
+   (~87 compile/min on this runner), expect the checkpoint to arrive
+   around 02:15 GMT. No fixes needed yet — just wait.
+
+Next session should:
+
+- Check https://github.com/Jac2017/claum-browser/actions for #35's
+  final status.
+- Check https://github.com/Jac2017/claum-browser/issues?q=label%3Abuild-failure
+  for any auto-opened issues (handler output).
+- If #35 succeeded → download .dmg from run artifacts and present.
+- If #35 failed past [12845] → new class of error, read handler's
+  issue and iterate.
+- If handler re-dispatched (transient retry) → just wait for the
+  new run.
+
 ## Handoff 2026-04-22 00:55 GMT — session ending
 
 Interactive 2-hour watcher session ends here. Two builds were kicked off:
