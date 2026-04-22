@@ -1,0 +1,370 @@
+# ============================================================================
+# Claum — Build failure handler (auto-retry + auto-issue)
+# ----------------------------------------------------------------------------
+# PURPOSE
+#   This workflow runs AFTER the main "Build Claum (macOS)" workflow finishes
+#   and takes different actions depending on the outcome:
+#
+#     - If the build SUCCEEDED:      do nothing, exit.
+#     - If the build was CANCELLED:  do nothing (usually means a newer push
+#                                    superseded it via cancel-in-progress).
+#     - If the build FAILED:         classify the failure.
+#         * Transient (CDN/network/disk/runner glitch) → re-run the job,
+#           up to 2 retries total. No human touch needed.
+#         * Real code error (compile/link/missing file) → open or update
+#           a GitHub issue tagged `build-failure` with the error signature,
+#           last ninja progress, and a link to the failing run.
+#
+# WHY THIS EXISTS
+#   The Claum build takes ~1h+ per attempt. Without this handler:
+#     - Flaky transient failures silently waste an hour.
+#     - Code failures sit unnoticed until someone (Matt, Claude, scheduled
+#       task) polls the UI, which has been unreliable in this sandbox.
+#
+#   With it:
+#     - Transient failures self-heal.
+#     - Real failures land in GitHub's issue tracker — a persistent,
+#       de-duplicated backlog we can work through.
+#     - The handler runs on free `ubuntu-latest` minutes, NOT mac minutes,
+#       so it's cheap.
+#
+# SAFETY / SCOPE
+#   - Only acts on the "Build Claum (macOS)" workflow, not other workflows.
+#   - Retries are capped at 2 — we never loop forever.
+#   - Issues are de-duplicated by signature, so we don't spam the tracker.
+#   - Uses the default GITHUB_TOKEN (scoped to this repo), no PAT needed.
+# ============================================================================
+
+name: Build failure handler
+
+# ----------------------------------------------------------------------------
+# Trigger: `workflow_run` fires whenever the named workflow completes.
+# ----------------------------------------------------------------------------
+# `types: [completed]` means we get all conclusions — success, failure,
+# cancelled, neutral, skipped, timed_out, action_required, stale. We filter
+# to just `failure` in the job's `if:` guard below.
+#
+# Important quirk: `workflow_run` handlers ALWAYS run on the repo's default
+# branch, regardless of which branch the parent workflow ran on. That's
+# fine for us — we only build on `main`.
+# ----------------------------------------------------------------------------
+on:
+  workflow_run:
+    workflows: ["Build Claum (macOS)"]
+    types: [completed]
+
+# ----------------------------------------------------------------------------
+# Permissions: by default GITHUB_TOKEN is "read-only" for workflow_run
+# triggers. We need to ELEVATE two:
+#   - issues: write   — to open/comment on tracking issues
+#   - actions: write  — to POST /actions/runs/{id}/rerun-failed-jobs
+# Everything else stays at the minimum (read).
+# ----------------------------------------------------------------------------
+permissions:
+  issues: write
+  actions: write
+  contents: read
+
+jobs:
+  handle-failure:
+    # Only run for real failures. Skip `success`, `cancelled` (concurrency
+    # supersede), `skipped`, etc. This saves runner minutes.
+    if: github.event.workflow_run.conclusion == 'failure'
+
+    runs-on: ubuntu-latest
+
+    # Give ourselves a generous budget but cap it so a wedged handler
+    # can't eat the billing quota. 15 min is well above what we need.
+    timeout-minutes: 15
+
+    steps:
+      # ----------------------------------------------------------------
+      # Step 1: Fetch metadata about the failed run.
+      # ----------------------------------------------------------------
+      # We use `actions/github-script` (official action that exposes an
+      # authenticated Octokit client + the workflow context). Output the
+      # values we care about so later steps can use them.
+      # ----------------------------------------------------------------
+      - name: Gather failed run info
+        id: run
+        uses: actions/github-script@v7
+        with:
+          # `script` is inline JS run in the action's Node runtime.
+          # `github` = Octokit client. `context` = GitHub event payload.
+          # `core` = toolkit helpers (setOutput, setFailed, summary).
+          script: |
+            // The parent run payload is in `context.payload.workflow_run`.
+            const wr     = context.payload.workflow_run;
+            const runId  = wr.id;
+            const sha    = wr.head_sha;
+            const branch = wr.head_branch;
+            const attempt = wr.run_attempt;  // 1 on first run, 2 after rerun, etc.
+            const url    = wr.html_url;
+
+            // List jobs inside the parent run (usually just "build"). We
+            // need a job id to a) download logs, b) target the rerun API.
+            const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              run_id: runId,
+            });
+
+            // There might be multiple failed jobs in theory; we treat the
+            // first one as "the" failure for signature purposes, and pass
+            // the ids of all of them to the rerun step.
+            const failed = jobs.filter(j => j.conclusion === 'failure');
+            if (failed.length === 0) {
+              core.setFailed('workflow_run says conclusion=failure but no failed job found');
+              return;
+            }
+
+            // Expose for downstream steps.
+            core.setOutput('run_id',   runId);
+            core.setOutput('job_id',   failed[0].id);
+            core.setOutput('job_name', failed[0].name);
+            core.setOutput('head_sha', sha);
+            core.setOutput('branch',   branch);
+            core.setOutput('attempt',  attempt);
+            core.setOutput('html_url', url);
+
+            // Friendly log that shows up in the handler's own run page.
+            await core.summary
+              .addHeading(`Handling failed run #${runId}`)
+              .addRaw(`Job: **${failed[0].name}** (id \`${failed[0].id}\`)`).addBreak()
+              .addRaw(`Commit: \`${sha}\``).addBreak()
+              .addRaw(`Attempt: **${attempt}**`).addBreak()
+              .addLink('Open failed run', url).addBreak()
+              .write();
+
+      # ----------------------------------------------------------------
+      # Step 2: Download the failed job's raw log.
+      # ----------------------------------------------------------------
+      # The logs REST endpoint returns plain text (after following a
+      # redirect to Azure blob). `gh api` handles the redirect for us,
+      # so we get the log directly on stdout.
+      # ----------------------------------------------------------------
+      - name: Download failed job log
+        env:
+          # GITHUB_TOKEN is auto-provided to the runner with the perms
+          # defined above. `gh` picks it up from GH_TOKEN.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOB_ID:   ${{ steps.run.outputs.job_id }}
+        # `set -e` makes the shell exit on first error — safer than the
+        # default where a failed command silently continues.
+        # `set -o pipefail` makes pipelines fail if ANY command fails,
+        # not just the last one.
+        run: |
+          set -euo pipefail
+          echo "Fetching log for job ${JOB_ID}"
+          gh api \
+            "/repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs" \
+            -H "Accept: application/vnd.github+json" \
+            > log.txt
+          # Report the log size so we can sanity-check in the UI.
+          echo "Log size: $(wc -c < log.txt) bytes"
+
+      # ----------------------------------------------------------------
+      # Step 3: Classify the failure.
+      # ----------------------------------------------------------------
+      # We distinguish "transient" (retry) from "code error" (issue).
+      # Transient patterns are curated — extend the list as new classes
+      # of flake show up.
+      # ----------------------------------------------------------------
+      - name: Classify failure
+        id: classify
+        run: |
+          set -euo pipefail
+
+          # --------------------------------------------------------------
+          # Transient signature list. Each entry is a grep -E regex.
+          # Keep entries narrow to avoid misclassifying real bugs.
+          # --------------------------------------------------------------
+          TRANSIENT_PATTERNS=(
+            'Cannot connect to the Docker daemon'
+            'Unable to locate package'
+            'Could not resolve host'
+            '504 Gateway Timeout'
+            'Connection timed out'
+            'Temporary failure in name resolution'
+            'curl: \(28\)'                     # curl operation timeout
+            'curl: \(56\)'                     # curl receive failure
+            'fatal: unable to access'          # git over https failure
+            'The action .* failed with an internal error'
+            'Error: The operation was canceled\.'
+            'No space left on device'          # runner out of disk
+          )
+
+          # --------------------------------------------------------------
+          # Last ninja progress marker for context in the issue body.
+          # Pattern is [N/56129] where 56129 is our total action count.
+          # --------------------------------------------------------------
+          LAST_NINJA="$(grep -oE '\[[0-9]+/56129\]' log.txt | tail -1 || true)"
+          [ -n "$LAST_NINJA" ] || LAST_NINJA='none'
+          echo "last_ninja=$LAST_NINJA" >> "$GITHUB_OUTPUT"
+
+          # --------------------------------------------------------------
+          # Pick the first diagnostic signature we can find. Priority:
+          #   1. FileNotFoundError  — we've seen 5+ of these (pruned bins)
+          #   2. fatal error:       — clang compile errors
+          #   3. error:             — generic linker/tool errors
+          #   4. ninja: build stopped — fallback
+          # Truncate to 180 chars to keep issue titles sane.
+          # --------------------------------------------------------------
+          SIG="$(grep -m1 -E 'FileNotFoundError' log.txt || true)"
+          if [ -z "$SIG" ]; then
+            SIG="$(grep -m1 -E 'fatal error:' log.txt || true)"
+          fi
+          if [ -z "$SIG" ]; then
+            SIG="$(grep -m1 -E '^[^ ]+: error:' log.txt || true)"
+          fi
+          if [ -z "$SIG" ]; then
+            SIG="$(grep -m1 -E 'ninja: build stopped' log.txt || true)"
+          fi
+          [ -n "$SIG" ] || SIG='Unknown failure (no diagnostic match)'
+
+          # Truncate + normalise whitespace for stable dedup + title length.
+          SIG_TRIMMED="$(printf '%s' "$SIG" | tr -s '[:space:]' ' ' | cut -c1-180)"
+
+          # Heredoc-style multiline output so embedded chars don't break parsing.
+          {
+            echo "signature<<EOF"
+            printf '%s\n' "$SIG_TRIMMED"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          # --------------------------------------------------------------
+          # Run the transient patterns against the log. First match wins.
+          # --------------------------------------------------------------
+          IS_TRANSIENT=false
+          MATCHED_PATTERN=''
+          for p in "${TRANSIENT_PATTERNS[@]}"; do
+            if grep -qE "$p" log.txt; then
+              IS_TRANSIENT=true
+              MATCHED_PATTERN="$p"
+              break
+            fi
+          done
+
+          echo "is_transient=$IS_TRANSIENT" >> "$GITHUB_OUTPUT"
+          echo "matched_pattern=$MATCHED_PATTERN" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "Classification: transient=$IS_TRANSIENT  last_ninja=$LAST_NINJA"
+          echo "Signature: $SIG_TRIMMED"
+          [ -n "$MATCHED_PATTERN" ] && echo "Matched transient pattern: $MATCHED_PATTERN"
+
+      # ----------------------------------------------------------------
+      # Step 4a: TRANSIENT + attempt < 3 → re-run the failed jobs.
+      # ----------------------------------------------------------------
+      # The `rerun-failed-jobs` endpoint retries ONLY the failed steps,
+      # so it doesn't redo the 30 min source unpack if that already
+      # succeeded. It uses the same commit (head_sha), no code change.
+      # ----------------------------------------------------------------
+      - name: Re-run failed jobs (transient)
+        if: >-
+          steps.classify.outputs.is_transient == 'true' &&
+          fromJSON(steps.run.outputs.attempt) < 3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID:   ${{ steps.run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          echo "Transient failure on attempt ${{ steps.run.outputs.attempt }}."
+          echo "Matched pattern: ${{ steps.classify.outputs.matched_pattern }}"
+          echo "Re-running failed jobs..."
+          gh api \
+            --method POST \
+            "/repos/${{ github.repository }}/actions/runs/${RUN_ID}/rerun-failed-jobs"
+          echo "Rerun requested OK."
+
+      # ----------------------------------------------------------------
+      # Step 4b: CODE ERROR (or retry exhausted) → open/update an issue.
+      # ----------------------------------------------------------------
+      # We dedup by signature prefix so repeated hits of the same error
+      # collapse into one issue with comments, not a flood.
+      # ----------------------------------------------------------------
+      - name: Create or update tracking issue
+        if: >-
+          steps.classify.outputs.is_transient == 'false' ||
+          fromJSON(steps.run.outputs.attempt) >= 3
+        uses: actions/github-script@v7
+        env:
+          SIG:        ${{ steps.classify.outputs.signature }}
+          LAST_NINJA: ${{ steps.classify.outputs.last_ninja }}
+          HTML_URL:   ${{ steps.run.outputs.html_url }}
+          HEAD_SHA:   ${{ steps.run.outputs.head_sha }}
+          ATTEMPT:    ${{ steps.run.outputs.attempt }}
+          JOB_NAME:   ${{ steps.run.outputs.job_name }}
+        with:
+          script: |
+            // Pull env vars into locals for readability.
+            const sig       = process.env.SIG        || 'Unknown failure';
+            const lastNinja = process.env.LAST_NINJA || 'none';
+            const url       = process.env.HTML_URL;
+            const sha       = process.env.HEAD_SHA;
+            const attempt   = process.env.ATTEMPT;
+            const jobName   = process.env.JOB_NAME;
+
+            // Dedup key: first 60 chars of signature, whitespace collapsed.
+            // This keeps "fatal error: 'jpeglib.h' file not found" issues
+            // from multiplying across runs.
+            const dedupKey = sig.replace(/\s+/g, ' ').trim().slice(0, 60);
+            const title = `[build] ${dedupKey}`;
+
+            // Issue body — Markdown rendered in the GitHub UI.
+            const body = [
+              `**Failure signature**`,
+              '```',
+              sig,
+              '```',
+              '',
+              `- **Last ninja progress:** \`${lastNinja}\` / [56129]`,
+              `- **Failed run:** ${url}`,
+              `- **Commit:** \`${sha}\``,
+              `- **Attempt:** ${attempt}`,
+              `- **Job:** \`${jobName}\``,
+              '',
+              `_Auto-filed by the \`build-failure-handler\` workflow._`,
+              `_Assign to Claude / fix, and close the issue once the next build passes._`,
+            ].join('\n');
+
+            // Look for an existing open issue with the same title. We filter
+            // by label to avoid colliding with any hand-written issues.
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              state: 'open',
+              labels: 'build-failure',
+              per_page: 100,
+            });
+
+            const match = existing.find(i => i.title === title);
+
+            if (match) {
+              // Update existing: comment with the new run details.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                issue_number: match.number,
+                body: `Another hit of this signature:\n\n${body}`,
+              });
+              core.info(`Commented on existing issue #${match.number}`);
+              await core.summary
+                .addHeading('Commented on tracking issue')
+                .addLink(`#${match.number}: ${title}`, match.html_url)
+                .write();
+            } else {
+              // Create fresh issue. `ensureLabelExists` isn't part of the
+              // API — we pass labels that get auto-created if absent.
+              const { data: created } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                title,
+                body,
+                labels: ['build-failure', 'automated'],
+              });
+              core.info(`Created new issue #${created.number}`);
+              await core.summary
+                .addHeading('Opened tracking issue')
+                .addLink(`#${created.number}: ${title}`, created.html_url)
+                .write();
+            }
