@@ -775,14 +775,64 @@ fi
 # have a successful first build to warm the cache.
 # ----------------------------------------------------------------------------
 if [ -n "${CLAUM_USE_SCCACHE:-}" ] && command -v sccache >/dev/null 2>&1; then
-  CC_WRAPPER_ARG='cc_wrapper="sccache"'
-  # Start the sccache daemon so the first ninja invocation doesn't pay
-  # startup cost. The server runs in the background and auto-exits when
-  # the cache goes idle.
-  sccache --start-server 2>/dev/null || true
-  log_ok "sccache wired up — $(sccache --version)"
-  SCCACHE_LTO_OFF='is_official_build=false
-  use_thin_lto=false'
+  # ------------------------------------------------------------------
+  # Health-check sccache BEFORE wiring it into the build.
+  # ------------------------------------------------------------------
+  # Build #37 caught this: when GitHub Actions' cache backend (Azure
+  # storage) is unhealthy, sccache crashes during `--start-server`
+  # because it can't read its stats blob:
+  #
+  #   sccache: error: Server startup failed: cache storage failed to
+  #     read: Unexpected (permanent) at read => <h2>Our services
+  #     aren't available right now</h2>...
+  #
+  # If sccache then becomes the cc_wrapper for every clang invocation,
+  # EVERY .o build dies and we lose 8+ minutes per attempt. The cure
+  # is worse than the disease in that case — fall back to direct clang.
+  #
+  # Strategy:
+  #   1. Try `sccache --start-server`. If exit ≠ 0 → fall back.
+  #   2. Try `sccache --show-stats`. If it fails or its output contains
+  #      a "Server startup failed" / "services aren't available"
+  #      message → fall back.
+  #   3. Otherwise we're good — wire it in.
+  # ------------------------------------------------------------------
+  SCCACHE_OK=1
+  SCCACHE_PROBE_LOG="$(mktemp)"
+  if ! sccache --start-server >"$SCCACHE_PROBE_LOG" 2>&1; then
+    log_warn "sccache --start-server exit ≠ 0:"
+    sed 's/^/    /' "$SCCACHE_PROBE_LOG"
+    SCCACHE_OK=0
+  fi
+  if [ "$SCCACHE_OK" = "1" ]; then
+    if ! sccache --show-stats >"$SCCACHE_PROBE_LOG" 2>&1; then
+      log_warn "sccache --show-stats failed:"
+      sed 's/^/    /' "$SCCACHE_PROBE_LOG"
+      SCCACHE_OK=0
+    elif grep -qE "Server startup failed|services aren't available|cache storage failed" "$SCCACHE_PROBE_LOG"; then
+      log_warn "sccache stats indicate backend outage:"
+      sed 's/^/    /' "$SCCACHE_PROBE_LOG"
+      SCCACHE_OK=0
+    fi
+  fi
+  rm -f "$SCCACHE_PROBE_LOG"
+
+  if [ "$SCCACHE_OK" = "1" ]; then
+    CC_WRAPPER_ARG='cc_wrapper="sccache"'
+    log_ok "sccache wired up — $(sccache --version)"
+    SCCACHE_LTO_OFF='is_official_build=false
+    use_thin_lto=false'
+  else
+    log_warn "sccache health check failed — building WITHOUT cache wrapper."
+    log_warn "  Subsequent ninja errors will be your real failures, not cache outages."
+    CC_WRAPPER_ARG=''
+    # Even with no sccache, keep is_official_build=false: LTO is still a
+    # bad idea for our slow incremental retries (we'd lose the link
+    # phase's whole work to any single source file change). The whole
+    # point of this build is iteration speed, not release perf.
+    SCCACHE_LTO_OFF='is_official_build=false
+    use_thin_lto=false'
+  fi
 else
   CC_WRAPPER_ARG=''
   SCCACHE_LTO_OFF='is_official_build=true             # enable optimizations + LTO'

@@ -253,6 +253,13 @@ jobs:
             # sccache will pick up most of the compiled work on retry.
             'The job has exceeded the maximum execution time'
             'Job was cancelled'
+            # sccache backend (GH Actions cache → Azure storage) outage.
+            # Build #37 hit this — Azure returned an HTML "services
+            # unavailable" page; sccache crashed at startup and every
+            # `sccache clang++` invocation died. Retry usually works.
+            'sccache: error: Server startup failed'
+            'cache storage failed to read'
+            "services aren'\''t available right now"
           )
 
           # --------------------------------------------------------------
@@ -265,21 +272,40 @@ jobs:
 
           # --------------------------------------------------------------
           # Pick the first diagnostic signature we can find. Priority:
-          #   1. FileNotFoundError  — we've seen 5+ of these (pruned bins)
-          #   2. fatal error:       — clang compile errors
-          #   3. error:             — generic linker/tool errors
-          #   4. ninja: build stopped — fallback
+          #   1. sccache server failure  — Azure cache outage (#37)
+          #   2. FileNotFoundError       — pruned bins (5+ occurrences)
+          #   3. fatal error:            — clang compile errors
+          #   4. error:                  — generic linker/tool errors
+          #   5. ninja: build stopped    — fallback
           # Truncate to 180 chars to keep issue titles sane.
           # --------------------------------------------------------------
-          SIG="$(grep -m1 -E 'FileNotFoundError' log.txt || true)"
+          # IMPORTANT: filter out comments from our own bash scripts.
+          # build-mac.sh has lines like "#     fatal error: 'jpeglib.h'"
+          # in its comments documenting old failures, and `set -x` echoes
+          # those to the log during execution. Build #37 was misclassified
+          # because the classifier matched our own historical comment
+          # instead of the real sccache failure.
+          #
+          # The grep below `-v`-excludes lines that look like a bash
+          # script comment line: they begin with optional whitespace,
+          # then a `#`, then more text. We pipe log.txt through that
+          # filter BEFORE searching for the signature.
+          # --------------------------------------------------------------
+          # Strip comment lines once for all signature greps.
+          grep -v -E '^[[:space:]]*#' log.txt > log_nocomments.txt || true
+
+          SIG="$(grep -m1 -E 'sccache: error: Server startup failed' log_nocomments.txt || true)"
           if [ -z "$SIG" ]; then
-            SIG="$(grep -m1 -E 'fatal error:' log.txt || true)"
+            SIG="$(grep -m1 -E 'FileNotFoundError' log_nocomments.txt || true)"
           fi
           if [ -z "$SIG" ]; then
-            SIG="$(grep -m1 -E '^[^ ]+: error:' log.txt || true)"
+            SIG="$(grep -m1 -E 'fatal error:' log_nocomments.txt || true)"
           fi
           if [ -z "$SIG" ]; then
-            SIG="$(grep -m1 -E 'ninja: build stopped' log.txt || true)"
+            SIG="$(grep -m1 -E '^[^ ]+: error:' log_nocomments.txt || true)"
+          fi
+          if [ -z "$SIG" ]; then
+            SIG="$(grep -m1 -E 'ninja: build stopped' log_nocomments.txt || true)"
           fi
           [ -n "$SIG" ] || SIG='Unknown failure (no diagnostic match)'
 
@@ -311,7 +337,13 @@ jobs:
           echo ""
           echo "Classification: transient=$IS_TRANSIENT  last_ninja=$LAST_NINJA"
           echo "Signature: $SIG_TRIMMED"
-          [ -n "$MATCHED_PATTERN" ] && echo "Matched transient pattern: $MATCHED_PATTERN"
+          # IMPORTANT: append `|| true` here. Under `set -e`, the bare
+          # `[ -n "" ] && echo ...` returns exit 1 when MATCHED_PATTERN
+          # is empty — and with `set -e` that kills the entire step
+          # before downstream Re-run / Issue-creation steps can execute.
+          # That bug bit handler run #3 (build #37). The `|| true` makes
+          # the whole compound expression always succeed.
+          { [ -n "$MATCHED_PATTERN" ] && echo "Matched transient pattern: $MATCHED_PATTERN"; } || true
 
       # ----------------------------------------------------------------
       # Step 4a: TRANSIENT + attempt < 3 → re-run the failed jobs.
