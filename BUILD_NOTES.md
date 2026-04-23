@@ -3,6 +3,49 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+## Status 2026-04-22 19:25 GMT — build #37 dispatched (esbuild + handler fixes)
+
+Two-fix commit `427d334` pushed and dispatched as run **#37**
+(GitHub Actions run id `24812971697`, status: In progress).
+
+What we fixed:
+
+1. **esbuild staging** in `claum/scripts/build-mac.sh` (~line 587).
+   Build #36 died at 12m 23s with:
+       ninja: error: '../../third_party/devtools-frontend/src/third_party/
+       esbuild/esbuild' missing
+   Reason: ungoogled prunes the gclient-fetched esbuild binary. The
+   `is_official_build=false` flip we made in build #36 (so sccache could
+   actually cache .o files) routed DevTools through the esbuild bundler
+   target, exposing the missing bin. Fix follows the existing "stage
+   after pruning" pattern: `npm install esbuild@0.21` to a tmp prefix,
+   copy `node_modules/@esbuild/darwin-{arm64,x64}/bin/esbuild` into the
+   expected literal path with mode 0755.
+
+2. **build-failure-handler hardening** in
+   `.github/workflows/build-failure-handler.yml`. Handler run #2 failed
+   in 0s at "Create or update tracking issue" because the labels
+   `build-failure` and `automated` don't exist on the repo and
+   `issues.create` rejects with 422 when any label is missing. Added
+   Step 0 "Ensure issue labels exist" (idempotent createLabel calls,
+   422 = already-exists is swallowed) plus a try/catch fallback around
+   `issues.create` itself that retries without labels if a 422 still
+   slips through.
+
+Next checkpoints for build #37:
+- T+12m: should clear the esbuild missing-file gate that killed #36.
+- T+~30m: ninja [5000/56129] (~ICU compilation phase).
+- T+~3h: ninja [12845/56129] SOLINK libvk_swiftshader.dylib (the
+  llvm-otool / otool-classic gauntlet — already passed in build #35).
+- T+5h30m: hard timeout. If hit, handler should auto-retry (now with
+  working issue creation as backup if anything else fails). sccache
+  cache from #37's first run will make the retry near-instant for
+  cached objects.
+
+If build #37 hits a fresh "missing file after prune" error, follow the
+same staging template — read the ninja error, find the binary in npm or
+xcrun, install -m 0755 it into the expected path.
+
 ## Status 2026-04-22 01:22 GMT — build #35 mid-compile, handler live
 
 Two things happened this check-in:
