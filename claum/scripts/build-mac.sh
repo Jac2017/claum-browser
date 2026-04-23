@@ -584,6 +584,101 @@ do
   echo "  (source: $SRC)"
 done
 
+# ----------------------------------------------------------------------------
+# Stage the `esbuild` binary into the DevTools-frontend third_party path.
+# ----------------------------------------------------------------------------
+# Build #36 (sccache enabled, LTO off) failed at 12m 23s with:
+#
+#   ninja: error:
+#     '../../third_party/devtools-frontend/src/third_party/esbuild/esbuild',
+#     needed by 'gen/.../core/common/common.prebundle.js',
+#     missing and no known rule to make it
+#
+# Why it's missing:
+#   Chromium's DevTools front-end uses esbuild as its JS bundler — it
+#   pre-bundles ESM modules into single files for faster load. Upstream
+#   gclient fetches a pinned esbuild binary into
+#   `third_party/devtools-frontend/src/third_party/esbuild/esbuild`.
+#   ungoogled-chromium's prune pass strips ALL Google-hosted prebuilt
+#   binaries, including esbuild, so the file is gone after our checkout.
+#
+# Why we hit this NOW (and not in earlier runs):
+#   Build #34 used is_official_build=true which routed JS bundling through
+#   a different rollup-based pipeline. Build #36 added is_official_build=false
+#   (so sccache could actually cache .o files instead of LTO IR) — and that
+#   flip made DevTools' BUILD.gn switch to the esbuild bundling target,
+#   exposing the missing binary.
+#
+# Fix (same pattern as dsymutil / llvm-otool / etc):
+#   1. Install the npm `esbuild` package into a tmp dir; npm fetches the
+#      platform-specific binary via the @esbuild/darwin-arm64 optional dep.
+#   2. Copy the binary into the expected literal path so ninja's static
+#      missing-file check passes and the bundling action can run.
+#
+# Notes for the novice reader:
+#   - `npm install --prefix /tmp/esbuild-stage` puts node_modules in that
+#     dir without polluting the build tree's package.json (we don't have one).
+#   - `--no-audit --no-fund --silent` keeps CI logs short.
+#   - On Apple Silicon the binary lands at:
+#       node_modules/@esbuild/darwin-arm64/bin/esbuild
+#     On Intel macs it would be node_modules/@esbuild/darwin-x64/bin/esbuild
+#     — we detect arch with `uname -m` for portability.
+#   - We pin esbuild to 0.21.x (stable, ABI-compatible with what Chromium
+#     146's DEPS file pinned). Latest also works but pinning avoids surprise
+#     CLI flag changes between npm releases.
+# ----------------------------------------------------------------------------
+log_step "Staging esbuild binary for DevTools front-end bundler"
+ESBUILD_DEST_REL="third_party/devtools-frontend/src/third_party/esbuild"
+ESBUILD_DEST_ABS="$CLAUM_BUILD_ROOT/build/src/$ESBUILD_DEST_REL"
+mkdir -p "$ESBUILD_DEST_ABS"
+if [ ! -x "$ESBUILD_DEST_ABS/esbuild" ]; then
+  # Detect macOS arch — npm picks the @esbuild/darwin-{arm64,x64} optional
+  # dep based on the host, so the path varies. `uname -m` returns "arm64"
+  # on Apple Silicon and "x86_64" on Intel.
+  HOST_ARCH="$(uname -m)"
+  case "$HOST_ARCH" in
+    arm64)   ESBUILD_PKG="darwin-arm64" ;;
+    x86_64)  ESBUILD_PKG="darwin-x64" ;;
+    *)
+      log_err "Unsupported host arch for esbuild staging: $HOST_ARCH"
+      exit 1
+      ;;
+  esac
+
+  # Install into a private tmp prefix so we never collide with anything in
+  # the build tree. `--no-save` because there's no parent package.json,
+  # `--silent --no-audit --no-fund` to keep CI logs tidy.
+  ESBUILD_STAGE="$(mktemp -d -t esbuild-stage.XXXXXX)"
+  echo "  installing esbuild@0.21 into $ESBUILD_STAGE"
+  if ! npm install --prefix "$ESBUILD_STAGE" \
+        --no-save --no-audit --no-fund --silent \
+        esbuild@0.21 2>&1 | tail -20
+  then
+    log_err "npm install esbuild@0.21 failed — see lines above"
+    exit 1
+  fi
+
+  ESBUILD_SRC="$ESBUILD_STAGE/node_modules/@esbuild/$ESBUILD_PKG/bin/esbuild"
+  if [ ! -x "$ESBUILD_SRC" ]; then
+    log_err "Expected esbuild binary not found after npm install"
+    log_err "  Looked at: $ESBUILD_SRC"
+    log_err "  Listing:"
+    find "$ESBUILD_STAGE/node_modules/@esbuild" -type f 2>/dev/null | head -10
+    exit 1
+  fi
+
+  install -m 0755 "$ESBUILD_SRC" "$ESBUILD_DEST_ABS/esbuild"
+  echo "  staged esbuild -> $ESBUILD_DEST_REL/esbuild"
+  echo "  (source: $ESBUILD_SRC, version: $("$ESBUILD_DEST_ABS/esbuild" --version 2>/dev/null || echo unknown))"
+
+  # Clean up the staging dir — the binary is now copied into the build tree,
+  # we don't need the npm install dir anymore. `|| true` so a failed cleanup
+  # doesn't fail the whole script.
+  rm -rf "$ESBUILD_STAGE" || true
+else
+  echo "  esbuild already present at $ESBUILD_DEST_REL/esbuild"
+fi
+
 # -------- [6/6] gn gen + ninja --------------------------------------------
 log_step "[6/6] Running gn gen and ninja"
 cd "$CLAUM_BUILD_ROOT/build/src"

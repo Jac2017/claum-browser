@@ -90,6 +90,52 @@ jobs:
 
     steps:
       # ----------------------------------------------------------------
+      # Step 0: Make sure our labels exist before any issue creation.
+      # ----------------------------------------------------------------
+      # Handler run #2 failed at "Create or update tracking issue" in 0s
+      # because `github.rest.issues.create({ labels: [...] })` rejects with
+      # 422 if any label in the array doesn't exist on the repo. Despite
+      # what some old docs imply, GitHub does NOT auto-create labels here.
+      #
+      # Cheapest robust fix: try to create each label up-front. If it
+      # already exists, GitHub returns 422 and we swallow it — the call is
+      # idempotent in effect. No PAT needed, default GITHUB_TOKEN is fine
+      # because we already requested `issues: write` above.
+      # ----------------------------------------------------------------
+      - name: Ensure issue labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Two labels we attach to every auto-filed issue.
+            // color = hex without leading #. Pick obvious-but-distinct
+            // colors so they're easy to spot in the issue list.
+            const labels = [
+              { name: 'build-failure', color: 'd73a4a',
+                description: 'Auto-filed by build-failure-handler workflow.' },
+              { name: 'automated',     color: 'cccccc',
+                description: 'Created by an automated workflow, not a human.' },
+            ];
+
+            for (const lbl of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  ...lbl,
+                });
+                core.info(`Created label "${lbl.name}"`);
+              } catch (err) {
+                // 422 = label already exists. Anything else, log and keep
+                // going — issue creation step has its own fallback below.
+                if (err.status === 422) {
+                  core.info(`Label "${lbl.name}" already exists — OK`);
+                } else {
+                  core.warning(`Failed to create label "${lbl.name}": ${err.message}`);
+                }
+              }
+            }
+
+      # ----------------------------------------------------------------
       # Step 1: Fetch metadata about the failed run.
       # ----------------------------------------------------------------
       # We use `actions/github-script` (official action that exposes an
@@ -368,15 +414,38 @@ jobs:
                 .addLink(`#${match.number}: ${title}`, match.html_url)
                 .write();
             } else {
-              // Create fresh issue. `ensureLabelExists` isn't part of the
-              // API — we pass labels that get auto-created if absent.
-              const { data: created } = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo:  context.repo.repo,
-                title,
-                body,
-                labels: ['build-failure', 'automated'],
-              });
+              // Create fresh issue. Step 0 ("Ensure issue labels exist")
+              // pre-creates the labels we attach here, so this should
+              // succeed. Belt-and-suspenders: if it 422s for any reason
+              // (e.g. labels deleted between steps), retry without labels
+              // so the issue still lands.
+              let created;
+              try {
+                ({ data: created } = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  title,
+                  body,
+                  labels: ['build-failure', 'automated'],
+                }));
+              } catch (err) {
+                if (err.status === 422) {
+                  core.warning(
+                    `Issue create with labels failed (${err.message}); ` +
+                    `retrying without labels.`
+                  );
+                  ({ data: created } = await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    title,
+                    body,
+                    // No labels — guarantee the create call goes through.
+                  }));
+                } else {
+                  // Non-422 error: re-throw so the workflow surfaces it.
+                  throw err;
+                }
+              }
               core.info(`Created new issue #${created.number}`);
               await core.summary
                 .addHeading('Opened tracking issue')
