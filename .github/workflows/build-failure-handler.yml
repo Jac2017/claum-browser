@@ -166,28 +166,66 @@ jobs:
               run_id: runId,
             });
 
-            // There might be multiple failed jobs in theory; we treat the
-            // first one as "the" failure for signature purposes, and pass
-            // the ids of all of them to the rerun step.
-            const failed = jobs.filter(j => j.conclusion === 'failure');
-            if (failed.length === 0) {
-              core.setFailed('workflow_run says conclusion=failure but no failed job found');
+            // Accept ANY non-success terminal conclusion as a "failed job"
+            // candidate. Handler run #4 exposed the bug: a 5h30m timeout
+            // surfaces jobs with `conclusion: 'cancelled'` (not 'failure'),
+            // so the old strict `=== 'failure'` filter returned empty and
+            // the handler setFailed() before it could reach the rerun step.
+            //
+            // We include:
+            //   - 'failure'     — normal compile/link error
+            //   - 'cancelled'   — GH 5h30m timeout OR manual cancel OR
+            //                     concurrency superseded by a newer push
+            //   - 'timed_out'   — explicit per-step timeout-minutes hit
+            //   - null          — jobs whose status is still being
+            //                     reconciled when we query; safer to
+            //                     include than to exclude
+            const failed = jobs.filter(j =>
+              j.conclusion === 'failure' ||
+              j.conclusion === 'cancelled' ||
+              j.conclusion === 'timed_out' ||
+              j.conclusion === null
+            );
+
+            // Last-ditch fallback: if no job matched (shouldn't happen
+            // because our `if:` guard only fires on non-success), fall
+            // back to the first job. Better to classify something than
+            // bail out — bailing out just leaves us stuck.
+            let target;
+            if (failed.length > 0) {
+              target = failed[0];
+            } else if (jobs.length > 0) {
+              core.warning(
+                `No job with failure/cancelled/timed_out conclusion, but ` +
+                `the parent run concluded as '${wr.conclusion}'. ` +
+                `Falling back to first job: ${jobs[0].name}`
+              );
+              target = jobs[0];
+            } else {
+              core.setFailed(
+                `No jobs at all in run ${runId}. Cannot classify — ` +
+                `nothing to rerun. Check parent workflow manually.`
+              );
               return;
             }
 
             // Expose for downstream steps.
-            core.setOutput('run_id',   runId);
-            core.setOutput('job_id',   failed[0].id);
-            core.setOutput('job_name', failed[0].name);
-            core.setOutput('head_sha', sha);
-            core.setOutput('branch',   branch);
-            core.setOutput('attempt',  attempt);
-            core.setOutput('html_url', url);
+            core.setOutput('run_id',      runId);
+            core.setOutput('job_id',      target.id);
+            core.setOutput('job_name',    target.name);
+            core.setOutput('job_conclusion', target.conclusion || 'unknown');
+            core.setOutput('run_conclusion', wr.conclusion || 'unknown');
+            core.setOutput('head_sha',    sha);
+            core.setOutput('branch',      branch);
+            core.setOutput('attempt',     attempt);
+            core.setOutput('html_url',    url);
 
             // Friendly log that shows up in the handler's own run page.
             await core.summary
               .addHeading(`Handling failed run #${runId}`)
-              .addRaw(`Job: **${failed[0].name}** (id \`${failed[0].id}\`)`).addBreak()
+              .addRaw(`Job: **${target.name}** (id \`${target.id}\`)`).addBreak()
+              .addRaw(`Job conclusion: **${target.conclusion || 'null'}**`).addBreak()
+              .addRaw(`Run conclusion: **${wr.conclusion || 'null'}**`).addBreak()
               .addRaw(`Commit: \`${sha}\``).addBreak()
               .addRaw(`Attempt: **${attempt}**`).addBreak()
               .addLink('Open failed run', url).addBreak()
@@ -206,19 +244,30 @@ jobs:
           # defined above. `gh` picks it up from GH_TOKEN.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JOB_ID:   ${{ steps.run.outputs.job_id }}
-        # `set -e` makes the shell exit on first error — safer than the
-        # default where a failed command silently continues.
-        # `set -o pipefail` makes pipelines fail if ANY command fails,
-        # not just the last one.
+        # Tolerance: if log retrieval fails (e.g. the job was cancelled
+        # before emitting logs), we still want to continue so the
+        # classifier can treat this as a generic transient failure and
+        # trigger a retry. `set -e` would otherwise nuke the whole
+        # handler and leave us stuck — exactly the failure mode we're
+        # trying to eliminate.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Fetching log for job ${JOB_ID}"
-          gh api \
-            "/repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs" \
-            -H "Accept: application/vnd.github+json" \
-            > log.txt
-          # Report the log size so we can sanity-check in the UI.
-          echo "Log size: $(wc -c < log.txt) bytes"
+          if gh api \
+               "/repos/${{ github.repository }}/actions/jobs/${JOB_ID}/logs" \
+               -H "Accept: application/vnd.github+json" \
+               > log.txt 2>log.err; then
+            echo "Log size: $(wc -c < log.txt) bytes"
+          else
+            echo "WARN: Could not fetch job log (see error below)."
+            sed 's/^/    /' log.err || true
+            # Seed log.txt with a synthetic marker so the classifier has
+            # something to match on. We choose a string that's in the
+            # transient-patterns list, so the run auto-retries. This is
+            # the right behaviour: if we can't even fetch the log, the
+            # infra is flaky, not the code.
+            echo "Job was cancelled (no log available — handler fetch failed)" > log.txt
+          fi
 
       # ----------------------------------------------------------------
       # Step 3: Classify the failure.
@@ -229,8 +278,40 @@ jobs:
       # ----------------------------------------------------------------
       - name: Classify failure
         id: classify
+        env:
+          RUN_CONCLUSION: ${{ steps.run.outputs.run_conclusion }}
+          JOB_CONCLUSION: ${{ steps.run.outputs.job_conclusion }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+
+          # --------------------------------------------------------------
+          # Short-circuit: cancellations and timeouts are ALWAYS transient.
+          # --------------------------------------------------------------
+          # GitHub Actions cancels a job for two reasons that matter to us:
+          #   1. The 5h30m (timeout-minutes: 330) wall-clock fires — this
+          #      is the norm for partial Chromium compiles. With sccache
+          #      persisting across runs, the next attempt picks up where
+          #      this one left off and finishes the remaining ~10-20%.
+          #   2. concurrency: cancel-in-progress superseded this run with
+          #      a newer commit. In that case a new build is already
+          #      running, so our retry is harmless (it just no-ops).
+          #
+          # Either way: retry unconditionally. No need to scan the log
+          # for patterns — we already know it's transient.
+          # --------------------------------------------------------------
+          if [ "$RUN_CONCLUSION" = "cancelled" ] || [ "$RUN_CONCLUSION" = "timed_out" ] \
+          || [ "$JOB_CONCLUSION" = "cancelled" ] || [ "$JOB_CONCLUSION" = "timed_out" ]; then
+            echo "Cancellation/timeout detected (run=$RUN_CONCLUSION job=$JOB_CONCLUSION) → transient."
+            echo "is_transient=true" >> "$GITHUB_OUTPUT"
+            echo "matched_pattern=cancellation-or-timeout" >> "$GITHUB_OUTPUT"
+            echo "signature=Job cancelled or timed out (run=$RUN_CONCLUSION job=$JOB_CONCLUSION)" >> "$GITHUB_OUTPUT"
+            # Still try to pull a last ninja marker from the log (for
+            # issue context if retries are later exhausted).
+            LAST_NINJA_LN="$(grep -oE '\[[0-9]+/[0-9]+\]' log.txt 2>/dev/null | tail -1 || true)"
+            [ -n "$LAST_NINJA_LN" ] || LAST_NINJA_LN='none'
+            echo "last_ninja=$LAST_NINJA_LN" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           # --------------------------------------------------------------
           # Transient signature list. Each entry is a grep -E regex.
@@ -353,21 +434,80 @@ jobs:
       # succeeded. It uses the same commit (head_sha), no code change.
       # ----------------------------------------------------------------
       - name: Re-run failed jobs (transient)
+        # We bumped the attempt cap from 3 → 10. Rationale: with the new
+        # actions/cache-backed sccache (see build-mac.yml), each retry
+        # picks up where the last left off, so the build is GUARANTEED
+        # to converge within a handful of retries. 10 is belt-and-suspenders
+        # to avoid a stuck loop if something goes pathologically wrong.
         if: >-
           steps.classify.outputs.is_transient == 'true' &&
-          fromJSON(steps.run.outputs.attempt) < 3
+          fromJSON(steps.run.outputs.attempt) < 10
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID:   ${{ steps.run.outputs.run_id }}
+          GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID:         ${{ steps.run.outputs.run_id }}
+          RUN_CONCLUSION: ${{ steps.run.outputs.run_conclusion }}
+        # `set -uo pipefail` (NOT `set -e`) — so if the REST call fails we
+        # can fall back to dispatching a fresh run instead of bailing.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Transient failure on attempt ${{ steps.run.outputs.attempt }}."
           echo "Matched pattern: ${{ steps.classify.outputs.matched_pattern }}"
-          echo "Re-running failed jobs..."
-          gh api \
-            --method POST \
-            "/repos/${{ github.repository }}/actions/runs/${RUN_ID}/rerun-failed-jobs"
-          echo "Rerun requested OK."
+          echo "Run conclusion: $RUN_CONCLUSION"
+
+          # -----------------------------------------------------------
+          # Pick the right rerun endpoint based on the parent's state.
+          # -----------------------------------------------------------
+          # /rerun-failed-jobs → only reruns jobs with conclusion=failure.
+          #                      Perfect for compile errors retried mid-
+          #                      stream; useless for cancellations (the
+          #                      endpoint returns 403 saying "no failed
+          #                      jobs to rerun").
+          # /rerun            → reruns the whole workflow unconditionally.
+          #                      Works for cancellations and timeouts.
+          # -----------------------------------------------------------
+          case "$RUN_CONCLUSION" in
+            cancelled|timed_out)
+              ENDPOINT="rerun"
+              ;;
+            *)
+              ENDPOINT="rerun-failed-jobs"
+              ;;
+          esac
+          echo "Using endpoint: /actions/runs/${RUN_ID}/${ENDPOINT}"
+
+          RC=0
+          gh api --method POST \
+            "/repos/${{ github.repository }}/actions/runs/${RUN_ID}/${ENDPOINT}" \
+            > rerun.out 2> rerun.err || RC=$?
+          if [ "$RC" -eq 0 ]; then
+            echo "Rerun requested OK via ${ENDPOINT}."
+            exit 0
+          fi
+
+          echo "WARN: ${ENDPOINT} failed (exit $RC). stderr:"
+          sed 's/^/    /' rerun.err || true
+
+          # -----------------------------------------------------------
+          # Fallback: dispatch a brand new run of the parent workflow.
+          # -----------------------------------------------------------
+          # /actions/workflows/{workflow_file}/dispatches triggers the
+          # workflow fresh on the default branch. This is our last-resort
+          # path when rerun endpoints are unavailable (e.g. the original
+          # run is too old, in a weird state, or the API surface changed).
+          # Unlike /rerun, this creates a NEW run_id so the attempt
+          # counter starts over — but that's OK, because the compile
+          # cache will let it finish fast anyway.
+          # -----------------------------------------------------------
+          echo "Falling back to workflow_dispatch on build-mac.yml..."
+          gh api --method POST \
+            "/repos/${{ github.repository }}/actions/workflows/build-mac.yml/dispatches" \
+            -f ref=main \
+            > dispatch.out 2> dispatch.err || {
+              echo "ERROR: workflow_dispatch also failed. Bailing."
+              sed 's/^/    /' dispatch.err || true
+              exit 1
+            }
+          echo "workflow_dispatch fallback succeeded — new run should appear shortly."
 
       # ----------------------------------------------------------------
       # Step 4b: CODE ERROR (or retry exhausted) → open/update an issue.
@@ -378,7 +518,7 @@ jobs:
       - name: Create or update tracking issue
         if: >-
           steps.classify.outputs.is_transient == 'false' ||
-          fromJSON(steps.run.outputs.attempt) >= 3
+          fromJSON(steps.run.outputs.attempt) >= 10
         uses: actions/github-script@v7
         env:
           SIG:        ${{ steps.classify.outputs.signature }}
