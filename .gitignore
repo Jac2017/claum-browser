@@ -22,3 +22,12 @@ claum/resources/**/_bundle_*
 # Node / npm if you use them for extension dev
 node_modules/
 *.log
+
+# ----------------------------------------------------------------------
+# GitHub personal access token used by Claude sessions for push auth.
+# NEVER commit this. The token sits alongside the repo so any Claude
+# session (including scheduled watchers in other session ids) can read
+# it at a known shared path.
+# ----------------------------------------------------------------------
+.gh_token
+*.gh_token
