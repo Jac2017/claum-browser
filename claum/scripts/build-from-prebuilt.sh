@@ -439,8 +439,24 @@ xattr -cr "$DST_APP"
 dot_clean -m "$DST_APP" 2>/dev/null || true
 log "  cleared xattrs from bundle"
 
-log_step "Re-signing Claum.app (ad-hoc)"
-codesign --force --deep \
+log_step "Re-signing Claum.app (ad-hoc, parent only)"
+# ----------------------------------------------------------------------
+# IMPORTANT: do NOT use --deep here.
+# ----------------------------------------------------------------------
+# Build #3 shipped a Claum.dmg whose parent bundle launched but whose
+# main() called abort() immediately. Suspected cause: --deep re-signs
+# every nested bundle (~5 Helper.apps + Chromium Framework) with the
+# parent's entitlements and runtime flags, which clobbers each helper's
+# own per-bundle entitlements (e.g. helpers have specific Hardened
+# Runtime exceptions like allow-unsigned-executable-memory that the
+# parent does not).
+#
+# We only modified Contents/Info.plist and added files under
+# Contents/Resources/. Those changes invalidate ONLY the parent's
+# seal. The nested helpers and frameworks were never touched, so
+# their upstream signatures are still valid. Re-sign just the parent.
+# ----------------------------------------------------------------------
+codesign --force \
   --sign - \
   --preserve-metadata=entitlements,requirements,flags,runtime \
   "$DST_APP"
