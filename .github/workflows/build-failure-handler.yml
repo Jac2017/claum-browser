@@ -434,14 +434,20 @@ jobs:
       # succeeded. It uses the same commit (head_sha), no code change.
       # ----------------------------------------------------------------
       - name: Re-run failed jobs (transient)
-        # We bumped the attempt cap from 3 → 10. Rationale: with the new
-        # actions/cache-backed sccache (see build-mac.yml), each retry
-        # picks up where the last left off, so the build is GUARANTEED
-        # to converge within a handful of retries. 10 is belt-and-suspenders
-        # to avoid a stuck loop if something goes pathologically wrong.
+        # Cap progression: 3 → 10 → 30.
+        #   - 3 was too low — couldn't survive ordinary 5h30m timeouts.
+        #   - 10 hit the wall on build #42 (commit b12140c). Each retry
+        #     was making incremental progress via sccache, so giving up
+        #     at 10 was the wrong call: we threw away ~50 hours of compute.
+        #   - 30 is the new cap. If sccache truly works, a cold Chromium
+        #     build needs maybe 4-5 attempts. 30 leaves enormous slack
+        #     for a partial cache or new code that re-compiles a chunk.
+        #     If we burn 30 attempts and still don't finish, there IS a
+        #     real problem worth a human looking at — at that point the
+        #     escalation issue is the right outcome.
         if: >-
           steps.classify.outputs.is_transient == 'true' &&
-          fromJSON(steps.run.outputs.attempt) < 10
+          fromJSON(steps.run.outputs.attempt) < 30
         env:
           GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
           RUN_ID:         ${{ steps.run.outputs.run_id }}
@@ -518,7 +524,7 @@ jobs:
       - name: Create or update tracking issue
         if: >-
           steps.classify.outputs.is_transient == 'false' ||
-          fromJSON(steps.run.outputs.attempt) >= 10
+          fromJSON(steps.run.outputs.attempt) >= 30
         uses: actions/github-script@v7
         env:
           SIG:        ${{ steps.classify.outputs.signature }}

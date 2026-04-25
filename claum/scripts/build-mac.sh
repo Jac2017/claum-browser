@@ -818,14 +818,35 @@ if [ -n "${CLAUM_USE_SCCACHE:-}" ] && command -v sccache >/dev/null 2>&1; then
   rm -f "$SCCACHE_PROBE_LOG"
 
   if [ "$SCCACHE_OK" = "1" ]; then
-    CC_WRAPPER_ARG='cc_wrapper="sccache"'
-    log_ok "sccache wired up — $(sccache --version)"
+    # ---------------------------------------------------------------
+    # Build #42's stats showed sccache only saw 12 compile requests
+    # in 5h30m — meaning ninja's clang invocations were NOT going
+    # through sccache. Two likely culprits, both fixed below:
+    #
+    #   1. cc_wrapper="sccache" relies on PATH lookup. Chromium's
+    #      build sometimes runs subprocesses with a sanitised PATH
+    #      that doesn't include $RUNNER_TOOL_CACHE/sccache/0.x/. Use
+    #      the ABSOLUTE PATH so PATH state doesn't matter.
+    #   2. cc_wrapper is only honored by the build when GN believes
+    #      the compiler is clang. Chromium DOES default to clang on
+    #      mac, but we set is_clang=true explicitly to guarantee it.
+    #
+    # Also: GN style guide canonicalises arg formatting as
+    # `name = "value"` (with spaces). gn doesn't actually require
+    # the spaces, but matching the style makes greppable diffs in
+    # the build dir's args.gn file consistent.
+    # ---------------------------------------------------------------
+    SCCACHE_BIN="$(command -v sccache)"
+    log_ok "sccache resolved to: $SCCACHE_BIN"
+    log_ok "sccache version: $(sccache --version)"
+    CC_WRAPPER_ARG="cc_wrapper = \"$SCCACHE_BIN\"
+  is_clang = true"
     SCCACHE_LTO_OFF='is_official_build=false
     use_thin_lto=false'
   else
     log_warn "sccache health check failed — building WITHOUT cache wrapper."
     log_warn "  Subsequent ninja errors will be your real failures, not cache outages."
-    CC_WRAPPER_ARG=''
+    CC_WRAPPER_ARG='is_clang = true'
     # Even with no sccache, keep is_official_build=false: LTO is still a
     # bad idea for our slow incremental retries (we'd lose the link
     # phase's whole work to any single source file change). The whole
@@ -834,7 +855,7 @@ if [ -n "${CLAUM_USE_SCCACHE:-}" ] && command -v sccache >/dev/null 2>&1; then
     use_thin_lto=false'
   fi
 else
-  CC_WRAPPER_ARG=''
+  CC_WRAPPER_ARG='is_clang = true'
   SCCACHE_LTO_OFF='is_official_build=true             # enable optimizations + LTO'
 fi
 

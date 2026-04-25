@@ -400,19 +400,64 @@ jobs:
       # `if: always()` runs this step even if the Run Claum build step
       # failed or the job was cancelled by timeout. That lets us see the
       # cache hit rate even on partial runs (to confirm sccache is working).
-      - name: Show sccache stats
+      - name: Show sccache stats and prepare cache for save
         if: always()
         run: |
+          # Don't `set -e` — every command here is best-effort cleanup.
+          set -uo pipefail
+
           echo "=== sccache final stats ==="
           sccache --show-stats || true
-          # Flush + stop the server so every compiled object is on disk
-          # when the next step saves the cache dir. If the server is
-          # still writing when we try to tar up ~/.sccache-disk we get
-          # partial / corrupt entries — stop it first.
+
+          # ----------------------------------------------------------
+          # Flush + stop the server before the actions/cache save step
+          # tries to tar up ~/.sccache-disk. Build #42's save failed
+          # with `gtar exit 1`, almost certainly because gtar tried to
+          # archive files that the still-running sccache server was
+          # writing to. Belt-and-suspenders shutdown:
+          # ----------------------------------------------------------
+          echo ""
+          echo "=== Stopping sccache server ==="
           sccache --stop-server || true
+
+          # Give it a moment to actually exit, then SIGKILL anything
+          # that's left.
+          for i in 1 2 3 4 5; do
+            if pgrep -x sccache >/dev/null 2>&1; then
+              echo "  sccache still running — sending SIGKILL (try $i)"
+              pkill -9 -x sccache 2>/dev/null || true
+              sleep 1
+            else
+              echo "  sccache server fully stopped"
+              break
+            fi
+          done
+
+          # ----------------------------------------------------------
+          # Remove anything tar can't archive: Unix domain sockets,
+          # FIFOs, and broken symlinks. sccache shouldn't normally
+          # leave these in $SCCACHE_DIR but we've seen `gtar exit 1`
+          # under cancellation, so be defensive.
+          # ----------------------------------------------------------
+          echo ""
+          echo "=== Cleaning unsavable file types from cache ==="
+          find "$HOME/.sccache-disk" -type s -delete 2>/dev/null || true
+          find "$HOME/.sccache-disk" -type p -delete 2>/dev/null || true
+          # Broken symlinks → -xtype l (link whose target doesn't exist)
+          find "$HOME/.sccache-disk" -xtype l -delete 2>/dev/null || true
+
+          # ----------------------------------------------------------
+          # Make sure the runner user owns everything (safe even though
+          # the runner shouldn't be running anything as root here).
+          # ----------------------------------------------------------
+          sudo chown -R "$(whoami)" "$HOME/.sccache-disk" 2>/dev/null || true
+
           echo ""
           echo "=== sccache disk cache size ==="
           du -sh "$HOME/.sccache-disk" 2>/dev/null || echo "(empty)"
+          echo ""
+          echo "=== file count ==="
+          find "$HOME/.sccache-disk" -type f 2>/dev/null | wc -l || true
 
       # ------------------------------------------------------------------
       # Persist the sccache disk cache back to actions/cache.
