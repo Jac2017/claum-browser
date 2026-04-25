@@ -439,27 +439,80 @@ xattr -cr "$DST_APP"
 dot_clean -m "$DST_APP" 2>/dev/null || true
 log "  cleared xattrs from bundle"
 
-log_step "Re-signing Claum.app (ad-hoc, parent only)"
+log_step "Re-signing Claum.app (ad-hoc, leaf-first, no Hardened Runtime)"
 # ----------------------------------------------------------------------
-# IMPORTANT: do NOT use --deep here.
+# Why this approach.
 # ----------------------------------------------------------------------
-# Build #3 shipped a Claum.dmg whose parent bundle launched but whose
-# main() called abort() immediately. Suspected cause: --deep re-signs
-# every nested bundle (~5 Helper.apps + Chromium Framework) with the
-# parent's entitlements and runtime flags, which clobbers each helper's
-# own per-bundle entitlements (e.g. helpers have specific Hardened
-# Runtime exceptions like allow-unsigned-executable-memory that the
-# parent does not).
+# Earlier attempts taught us:
 #
-# We only modified Contents/Info.plist and added files under
-# Contents/Resources/. Those changes invalidate ONLY the parent's
-# seal. The nested helpers and frameworks were never touched, so
-# their upstream signatures are still valid. Re-sign just the parent.
+#   Build #1: no codesign at all  → "is damaged" + xattr issues
+#   Build #2: codesign --deep --preserve-metadata=runtime
+#             → app launched but main() aborted; framework/parent had
+#               different ad-hoc signatures, library validation under
+#               Hardened Runtime rejected the framework load with:
+#                 "different Team IDs"
+#   Build #3: codesign --force (no --deep, parent only)
+#             → same dlopen failure: framework still had upstream's
+#               signature, parent had ours -> mismatched Team IDs
+#
+# The fundamental problem: Hardened Runtime + library validation
+# require the parent binary and every dylib it loads to share an
+# identity (matching Team ID). Two different ad-hoc signatures count
+# as "different" identities.
+#
+# The fix has two parts:
+#   1) Strip every existing signature from the whole bundle so we
+#      start from a clean state.
+#   2) Sign every nested binary/.dylib/.framework/.app leaf-first with
+#      the SAME ad-hoc identity, WITHOUT the Hardened Runtime flag.
+#      Without --options runtime, library validation isn't enforced
+#      on dylib loads, so even tiny inconsistencies stop being fatal.
+#
+# Trade-off: the resulting Claum.app is NOT Hardened-Runtime hardened.
+# That's acceptable for a dev/internal build. Once we have a real
+# Apple Developer ID we'd re-enable Hardened Runtime + notarization
+# (and at that point all signatures match a real Team ID anyway).
 # ----------------------------------------------------------------------
-codesign --force \
-  --sign - \
-  --preserve-metadata=entitlements,requirements,flags,runtime \
-  "$DST_APP"
+
+# Step 1: strip existing signatures from every nested signable item.
+# `find ... -print0 | while ... read -d ''` handles paths with spaces.
+log "Stripping existing signatures from nested bundles..."
+strip_count=0
+while IFS= read -r -d '' item; do
+  codesign --remove-signature "$item" 2>/dev/null && strip_count=$((strip_count + 1)) || true
+done < <(find "$DST_APP" \( -name "*.dylib" -o -name "*.framework" -o -name "*.app" \) -print0 2>/dev/null)
+log "  stripped $strip_count nested items"
+codesign --remove-signature "$DST_APP" 2>/dev/null || true
+
+# Step 2a: sign all dylibs first (deepest-first via -depth).
+log "Signing nested .dylib files..."
+dylib_count=0
+while IFS= read -r -d '' f; do
+  codesign --force --sign - "$f" 2>/dev/null && dylib_count=$((dylib_count + 1)) || true
+done < <(find "$DST_APP" -name "*.dylib" -print0 2>/dev/null)
+log "  signed $dylib_count dylibs"
+
+# Step 2b: sign nested .app bundles (helpers), depth-first.
+log "Signing nested .app bundles (helpers)..."
+app_count=0
+while IFS= read -r -d '' f; do
+  # Skip the outer Claum.app — we sign that last.
+  [ "$f" = "$DST_APP" ] && continue
+  codesign --force --sign - "$f" 2>/dev/null && app_count=$((app_count + 1)) || true
+done < <(find "$DST_APP" -name "*.app" -depth -print0 2>/dev/null)
+log "  signed $app_count helper apps"
+
+# Step 2c: sign frameworks, depth-first.
+log "Signing nested .framework bundles..."
+fw_count=0
+while IFS= read -r -d '' f; do
+  codesign --force --sign - "$f" 2>/dev/null && fw_count=$((fw_count + 1)) || true
+done < <(find "$DST_APP" -name "*.framework" -depth -print0 2>/dev/null)
+log "  signed $fw_count frameworks"
+
+# Step 2d: finally sign the parent .app last.
+log "Signing the parent Claum.app..."
+codesign --force --sign - "$DST_APP"
 log "Verifying signature:"
 codesign --verify --deep --strict --verbose=2 "$DST_APP" 2>&1 | sed 's/^/    /' || {
   log_err "codesign verification failed."
