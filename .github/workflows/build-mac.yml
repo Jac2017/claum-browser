@@ -297,13 +297,28 @@ jobs:
           # ------------------------------------------------------------
           # Configure sccache to use LOCAL DISK (not GHA / Azure).
           # ------------------------------------------------------------
-          # Explicitly blank the GHA-enabled env vars. The sccache-action
-          # likes to set these automatically — we need them OFF so sccache
-          # uses disk instead. An empty string disables them; we can't
-          # `unset` via $GITHUB_ENV, but `VAR=` (empty) works equivalently.
-          echo "SCCACHE_GHA_ENABLED="                        >> "$GITHUB_ENV"
-          echo "ACTIONS_CACHE_URL="                          >> "$GITHUB_ENV"
-          echo "ACTIONS_RUNTIME_TOKEN="                      >> "$GITHUB_ENV"
+          # The sccache-action sets SCCACHE_GHA_ENABLED=on automatically
+          # because that's its main use case. We need to FORCE IT OFF so
+          # sccache picks the disk backend (SCCACHE_DIR) instead.
+          #
+          # CRITICAL: sccache only accepts these exact strings:
+          #   'true', 'on', '1'   → enable GHA backend
+          #   'false', 'off', '0' → disable
+          # Anything else (including the empty string!) makes sccache
+          # crash at startup with:
+          #   "SCCACHE_GHA_ENABLED must be 'true', 'on', '1', 'false',
+          #    'off' or '0'"
+          # That's the bug that made #38–#40 all save 0-byte caches:
+          # sccache never started, so nothing was ever cached on disk.
+          echo "SCCACHE_GHA_ENABLED=false"                   >> "$GITHUB_ENV"
+
+          # NOTE: do NOT blank ACTIONS_CACHE_URL or ACTIONS_RUNTIME_TOKEN
+          # here — actions/cache (the workflow step that saves our disk
+          # cache) needs both of those env vars to talk to GitHub's cache
+          # service. We previously blanked them to "make extra sure"
+          # sccache wouldn't reach for the GHA backend, but with
+          # SCCACHE_GHA_ENABLED=false set explicitly that's redundant
+          # AND harmful — without those vars actions/cache fails silently.
 
           # Point sccache at the disk cache we just restored (or created).
           echo "SCCACHE_DIR=$HOME/.sccache-disk"             >> "$GITHUB_ENV"
