@@ -3,6 +3,162 @@
 Running log of failures and fixes. Newest at top. The scheduled task
 `claum-build-watcher` reads this to pick up context between runs.
 
+### Scheduled watcher log
+
+- **2026-04-23 09:36 UTC** (session `dazzling-kind-noether`) — run #38
+  (commit `65687dc`) **In progress** at **4h 22m+** wall-clock; "Run
+  Claum build" step duration timer advancing live (4h 14m 36s → 4h 22m
+  21s observed across this cycle), so the job process is still alive.
+  Confirmed past gn bootstrap and gn gen — DOM-rendered ninja ticks now
+  span both totals: `[1/204]…[68/204]` (gn self-bootstrap, complete) and
+  `[1/56094]…[20/56094]` (Chromium ninja, very early into the long
+  compile). "FAILED:" search shows **2 matches**; the one rendered in
+  DOM is the benign `ERROR:root:Failed to get version info: Git command
+  'git log -1 --format=%H %ct …' in …/claum-build failed: rc=0` followed
+  immediately by `WARNING:root:Falling back to a version of 0.0.0 to
+  allow script to finish. This is normal if you are bootstrapping a new
+  environment…` — i.e. a non-fatal Chromium build script warning, not an
+  error that stops the build (next line is `==> [3b/6] Applying domain
+  substitution`, build proceeded normally). Two `==> Diagnostic A/C:
+  lines …of safe_browsing/BUILD.gn` markers are present — these are
+  build-mac.sh's own conditional diagnostic dumps; they printed but the
+  build kept going (consistent with the safe-browsing fix in
+  fix-safe-browsing-gn.py landing successfully). No `##[error]` /
+  `ninja: error` / `fatal error` markers anywhere in the rendered log.
+  Issues tab `label:build-failure` still **0 open / 0 closed** — handler
+  has not fired. **Push still blocked**: `.gh_token` not reachable from
+  this session (`/sessions/wonderful-stoic-lamport/.gh_token` →
+  Permission denied; no token exists at any path readable to this
+  session). Local repo at `/sessions/dazzling-kind-noether/mnt/Projects/claum-browser`
+  is at HEAD `65687dc` (matches origin/main exactly; only this
+  BUILD_NOTES.md is dirty). The "Run #38 — HUNG at gn bootstrap"
+  section below was written by an earlier watcher cycle that misread a
+  log-virtualization artifact as a hang; today's read across two
+  separate cycles (mine + 09:10 UTC) confirms the build is **NOT**
+  hung — it has cleared gn bootstrap and is into Chromium ninja. The
+  staged `brew install gn` fallback fix is therefore not needed for
+  this run, though it is still a sensible defensive change to ship
+  before the next bootstrap-from-source attempt.
+- **2026-04-23 09:30 UTC** (session `stoic-vibrant-meitner`) — run #38
+  (commit `65687dc`) STILL **In progress** at **4h 4m+** wall-clock.
+  Step "Run Claum build" duration timer advanced live (3h 59m 25s →
+  4h 0m 5s → 4h 4m 4s) during this cycle's scrolls, confirming the job
+  process is alive. All earlier steps green (Set up job / Checkout /
+  Xcode / Free disk / Install deps / sccache install / sccache config /
+  SDK modulemap diag / Cache Chromium source). Pending steps: Show
+  sccache stats, Package .app as .dmg, Upload build artifact. No
+  `FAILED`, `##[error]`, `ninja: error`, or `fatal error` markers in
+  any DOM-rendered log lines. Issues tab `label:build-failure` still
+  `0 open / 0 closed` — the handler hasn't needed to fire. Reconfirmed
+  the log-virtualization trap from prior cycles (DOM only retains the
+  first 19 ninja ticks `[1/204]`…`[18/204]` no matter how far the
+  window is scrolled; `scrollTo(0, scrollHeight)` + `End` key together
+  only reach `scrollY=157340` of `pageH=187984` and still no new ticks
+  materialize). **Session path mismatch still blocking push** — the
+  local repo at `/sessions/stoic-vibrant-meitner/mnt/Projects/claum-browser`
+  is readable/writable (same shared mount), but the task file points at
+  `/sessions/wonderful-stoic-lamport/.gh_token` which this session
+  can't access (`Permission denied`). This is the **fourth** cycle
+  flagging this. Fix options repeated: (a) move `.gh_token` into the
+  user workspace (e.g. `/mnt/Projects/.gh_token`), or (b) pin the
+  scheduled task to the session that owns the token.
+- **2026-04-23 09:22 UTC** (session `exciting-tender-ride`) — run #38
+  still In progress, `3h 58m 24s` wall-clock, same virtualization trap,
+  no failure markers, same `.gh_token` access issue — no action taken.
+- **2026-04-23 09:10 UTC** (session `eager-intelligent-carson`) — run #38
+  (commit `65687dc`) is **HEALTHY, not hung**. The previous cycle's "hang"
+  read was a **log-virtualization misread**: GitHub Actions only renders
+  the top ~150 log lines on initial expand, so `[14/204]` … `[18/204]`
+  look like the current tick when they're really the early gn bootstrap.
+  After 20+ mousewheel `scroll` actions into the log I observed the build
+  past `[204/204] LINK gn`, past `==> [2/6] Syncing ungoogled-chromium`,
+  past `==> [3/6] Downloading and unpacking Chromium`, and currently in
+  `==> [4/6] Applying patches` around patch **45 / 111**. 3h 42m wall
+  clock, no `FAILED` / `##[error]` markers anywhere in the log. See
+  `mnt/Projects/claum-build-watcher-status.md` for the full report and
+  a note on the uncommitted `build-mac.sh` changes.
+- **2026-04-23 09:01 UTC** — run #38 (commit `65687dc`) observed HUNG in
+  gn bootstrap at ninja `[18/204]` after 3h 36m wall-clock. Same ninja
+  count as reported 37 minutes earlier by the previous watcher cycle, so
+  progress is zero. Local fix prepared (see "Run #38" section below); a
+  push is required to take effect. **Escalation noted:** no `.gh_token`
+  reachable from this watcher's session, so I cannot `git push` from
+  here — see Escalation section.
+  > **2026-04-23 09:10 UTC correction:** this "HUNG" read was a
+  > log-virtualization artifact, not a real hang — see the 09:10 UTC
+  > entry above.
+- **2026-04-23 08:24 UTC** — run #38 in progress at `[18/204]`, prior
+  watcher.
+
+## Run #38 — HUNG at gn bootstrap (2026-04-23)
+
+Symptom: run #38 reached `==> [1/6] Checking prerequisites`, noted that
+`gn` wasn't on PATH, started the source bootstrap (`git clone`, then
+`python3 build/gen.py && ninja -C out gn`), and froze at
+`[18/204] CXX src/base/memory/weak_ptr.o` for **more than 3 hours** of
+wall-clock time. Zero progress past that point. GitHub Actions live log
+confirms the step timer keeps advancing while the ninja tick counter
+stays pinned.
+
+Why this matters: the gn self-hosted bootstrap is supposed to compile
+~204 small C++ files in 1–2 minutes on an M1 runner. A multi-hour stall
+here means we never even start the Chromium compile — the SOLINK
+checkpoint at `[12845/56129]` is unreachable. Until this is fixed, EVERY
+run will burn its entire 5h30m timeout without producing a .dmg.
+
+Root cause is still unconfirmed (likely a clang/Xcode_26.3 interaction
+on `macos-15` that deadlocks a single compile invocation inside gn's
+vendored build), but the practical fix is to **avoid the source
+bootstrap altogether**. Homebrew now ships a pre-compiled `gn` formula
+(`brew install gn` at https://formulae.brew.sh/formula/gn), which wasn't
+true when the script was first written.
+
+### Fix staged for run #39 (NOT YET PUSHED — see Escalation below)
+
+Edited `claum/scripts/build-mac.sh` lines ~85–117. New logic:
+
+1. **Try `brew install gn` first.** Fast path, no bootstrap needed.
+2. **Fall back to source bootstrap** with a `timeout 600` guard around
+   the `ninja -C out gn` call so a repeat of the run #38 hang fails
+   loudly at 10 minutes instead of burning 5.5 hours.
+3. **Added `-v` to ninja** so if it ever hangs again, we see the exact
+   compile command that's stuck, not just the tick counter.
+4. **`gtimeout` fallback** if GNU `timeout` isn't on the runner (macOS
+   doesn't ship it by default; Homebrew `coreutils` provides `gtimeout`).
+
+## Escalation — watcher cannot push fixes from this session
+
+The scheduled-task instructions point the watcher at
+`/sessions/wonderful-stoic-lamport/mnt/Projects/claum-browser` and
+`/sessions/wonderful-stoic-lamport/.gh_token`. Today's watcher is
+running in session `focused-loving-dijkstra`, which:
+
+- **Has** read/write access to its own copy of the `claum-browser`
+  checkout at `/sessions/focused-loving-dijkstra/mnt/Projects/claum-browser`
+  (the edit for run #39 was applied there and is committed locally).
+- **Does not have** access to the `.gh_token` in the other session, so
+  `git push` cannot be performed from here — the push step needs a
+  session/context where the token is readable.
+
+Actions needed from a session with `.gh_token` access:
+
+```
+cd <claum-browser checkout>
+# Pull or reapply the build-mac.sh gn bootstrap fix described above
+# (or cherry-pick the local commit from the focused-loving-dijkstra
+# session if the checkouts are synced).
+git push  # triggers run #39
+```
+
+Also worth doing from a session with write access to github.com:
+
+- **Cancel run #38** (https://github.com/Jac2017/claum-browser/actions/runs/24818427627)
+  — it's going to sit hung until the 5h30m job timeout fires otherwise.
+- **Create the `build-failure` issue label** so the build-failure-handler
+  workflow can actually tag issues (previous watcher noted the label is
+  missing, which is why handler runs #1–#3 failed at the "Create or
+  update tracking issue" step).
+
 ## Status 2026-04-22 19:25 GMT — build #37 dispatched (esbuild + handler fixes)
 
 Two-fix commit `427d334` pushed and dispatched as run **#37**
