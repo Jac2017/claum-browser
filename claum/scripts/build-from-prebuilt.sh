@@ -395,7 +395,25 @@ fi
 # `--deep` recurses into all the nested helper bundles (Renderer Helper,
 # GPU Helper, etc.) — Chromium has ~5 of them. `--force` overwrites any
 # existing signature. `--preserve-metadata=...` keeps entitlements intact.
+#
+# CAVEAT — extended attributes break codesign.
 # ----------------------------------------------------------------------------
+# When the .app is copied off a mounted .dmg, macOS attaches "extended
+# attributes" (xattrs) to many of the files: com.apple.FinderInfo, the
+# quarantine flag, sometimes even resource forks. codesign refuses to
+# operate on a bundle containing these and bails with:
+#     "resource fork, Finder information, or similar detritus not allowed"
+# (Build #1 of this workflow died exactly here at line 86 of the log.)
+#
+# `xattr -cr` recursively clears ALL extended attributes from the bundle.
+# `dot_clean` also strips the AppleDouble files (._*) that sometimes show
+# up alongside files on FAT/HFS volumes.
+# ----------------------------------------------------------------------------
+log_step "Stripping extended attributes before signing"
+xattr -cr "$DST_APP"
+dot_clean -m "$DST_APP" 2>/dev/null || true
+log "  cleared xattrs from bundle"
+
 log_step "Re-signing Claum.app (ad-hoc)"
 codesign --force --deep \
   --sign - \
