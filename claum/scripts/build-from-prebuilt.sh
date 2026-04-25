@@ -255,8 +255,33 @@ plutil -replace CFBundleName -string "$PRODUCT_FULLNAME" "$PLIST"
 log "Setting CFBundleDisplayName = $PRODUCT_FULLNAME"
 plutil -replace CFBundleDisplayName -string "$PRODUCT_FULLNAME" "$PLIST"
 
-log "Setting CFBundleIdentifier  = $MAC_BUNDLE_ID"
-plutil -replace CFBundleIdentifier -string "$MAC_BUNDLE_ID" "$PLIST"
+# ----------------------------------------------------------------------
+# IMPORTANT: do NOT change CFBundleIdentifier in this v0 path.
+# ----------------------------------------------------------------------
+# Build #2 of this workflow shipped a .dmg whose Info.plist had
+# CFBundleIdentifier=com.claum.Claum, while the nested helper bundles
+# (Chromium Helper.app, Chromium Helper (GPU).app, ...) still had their
+# upstream identifiers like org.ungoogled-software.Chromium.helper.GPU.
+#
+# Chromium expects all helpers to share a common parent-identifier
+# prefix. When the main app tries to spawn a renderer subprocess, the
+# OS rejects the helper because its identifier doesn't match what the
+# parent expects -- and the main app has no graceful fallback, so it
+# crashes on first launch with the dreaded:
+#     "Claum quit unexpectedly."
+#
+# Keeping the upstream identifier system-wide means everything stays
+# self-consistent. The user still sees "Claum" everywhere because
+# CFBundleName / CFBundleDisplayName drive the user-visible name --
+# CFBundleIdentifier is only used by macOS internals and code-signing.
+#
+# If we later want Claum to own its own identifier, the right approach
+# is: walk every nested .app inside the framework's Helpers/ dir and
+# update each helper's CFBundleIdentifier to match the new prefix.
+# That's a separate iteration; this v0 just keeps upstream's identifier.
+# ----------------------------------------------------------------------
+UPSTREAM_BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$PLIST" 2>/dev/null || echo unknown)"
+log "Keeping CFBundleIdentifier  = $UPSTREAM_BUNDLE_ID (upstream)"
 
 log "Setting NSHumanReadableCopyright"
 plutil -replace NSHumanReadableCopyright -string "$COPYRIGHT" "$PLIST"
