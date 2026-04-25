@@ -1,0 +1,146 @@
+# ============================================================================
+# Claum — Build from prebuilt ungoogled-chromium (Option B spike)
+# ----------------------------------------------------------------------------
+# Instead of compiling Chromium from source (which takes 4-6h and fights
+# GitHub Actions' 5h30m wall every time), this workflow:
+#
+#   1. Downloads the latest ungoogled-chromium .dmg for macOS arm64
+#   2. Mounts it, copies out Chromium.app
+#   3. Patches the bundle with Claum branding + master_preferences + extensions
+#   4. Re-signs (ad-hoc) so macOS will launch it
+#   5. Repackages as Claum-arm64.dmg and uploads as a workflow artifact
+#
+# Total runtime: 2-5 minutes (vs 4-6h for build-mac.yml).
+# Cost on GH Actions free tier: trivial.
+#
+# This workflow lives ONLY on the prebuilt-patch branch for now. Once we've
+# proven it produces a working Claum.dmg, we decide whether to:
+#   (a) Merge to main as the primary build pipeline, or
+#   (b) Keep it as a fast-path alongside build-mac.yml for "patches only" builds.
+# ============================================================================
+
+name: Build Claum (prebuilt patch)
+
+on:
+  # Run on pushes to this branch so we get a build for every commit.
+  push:
+    branches:
+      - prebuilt-patch
+    paths-ignore:
+      - 'BUILD_NOTES.md'
+      - 'README.md'
+      - '**/*.md'
+
+  # Manual trigger for re-running without a code change.
+  workflow_dispatch:
+    inputs:
+      default_search:
+        description: "Default search engine for new profiles"
+        default: "bing"
+        type: choice
+        options: [bing, duckduckgo, google, startpage]
+      upstream_version:
+        description: "Pin a specific upstream tag (blank = latest)"
+        default: ""
+        type: string
+
+# Concurrency: same as build-mac.yml — newer pushes cancel older in-flight
+# runs of THIS workflow only (different group from the from-source build).
+concurrency:
+  group: build-prebuilt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macos-15 because we need hdiutil/codesign/plutil — all macOS-only.
+    # ANY mac runner works (we don't actually need Xcode SDK 15+ here),
+    # but matching build-mac.yml keeps things consistent.
+    runs-on: macos-15
+
+    # Generous cap given the script should finish in ~5 min, but the
+    # download could be slow on a bad day.
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Claum repo
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------
+      # Install jq — the script uses it to parse the GitHub API JSON
+      # response. macOS runners come with curl and the macOS-builtin
+      # tools (hdiutil, plutil, codesign) but jq is from Homebrew.
+      # ----------------------------------------------------------------
+      - name: Install jq
+        run: |
+          # `brew list jq` exits non-zero if jq isn't installed — using
+          # || true so we don't fail; then conditionally install.
+          if ! command -v jq >/dev/null 2>&1; then
+            brew install jq
+          fi
+          jq --version
+
+      # ----------------------------------------------------------------
+      # Cache the downloaded upstream .dmg between runs. The file is
+      # ~150-200 MB and tied to the upstream version, which doesn't
+      # change every commit. Cache key includes the upstream tag if
+      # the user pinned one; otherwise we use a date-based key so the
+      # cache rolls over once a day.
+      # ----------------------------------------------------------------
+      - name: Cache upstream .dmg
+        uses: actions/cache@v4
+        with:
+          path: build-prebuilt/cache
+          # If the user pinned a version, use it directly. Otherwise key
+          # by today's date so we get a fresh download each day (when
+          # upstream typically pushes new builds).
+          key: ungoogled-dmg-${{ inputs.upstream_version || format('latest-{0}', github.run_id) }}
+          restore-keys: |
+            ungoogled-dmg-
+
+      # ----------------------------------------------------------------
+      # Run the patch script.
+      # ----------------------------------------------------------------
+      # GITHUB_TOKEN is automatically passed by Actions — the script
+      # uses it to authenticate to the GitHub REST API and avoid the
+      # 60-req/hour anonymous rate limit.
+      # ----------------------------------------------------------------
+      - name: Build Claum.dmg from prebuilt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # WORK_DIR points at a path the cache step covers, so we can
+          # benefit from the cached upstream .dmg.
+          WORK_DIR: ${{ github.workspace }}/build-prebuilt
+        run: |
+          chmod +x claum/scripts/build-from-prebuilt.sh
+          ./claum/scripts/build-from-prebuilt.sh \
+            --arch           "arm64" \
+            --default-search "${{ inputs.default_search || 'bing' }}" \
+            ${{ inputs.upstream_version && format('--upstream-version "{0}"', inputs.upstream_version) || '' }}
+
+      # ----------------------------------------------------------------
+      # Sanity-check the output before uploading. If the .dmg doesn't
+      # exist, fail loudly here instead of silently uploading nothing.
+      # ----------------------------------------------------------------
+      - name: Verify output .dmg
+        run: |
+          DMG="build-prebuilt/Claum-arm64.dmg"
+          if [ ! -f "$DMG" ]; then
+            echo "ERROR: expected DMG missing at $DMG"
+            ls -la build-prebuilt/ || true
+            exit 1
+          fi
+          echo "DMG size: $(du -h "$DMG" | awk '{print $1}')"
+          # `hdiutil verify` reads the dmg's checksum to confirm it's
+          # not truncated/corrupt.
+          hdiutil verify "$DMG"
+
+      # ----------------------------------------------------------------
+      # Upload the .dmg as a downloadable artifact. retention-days: 30
+      # means the artifact stays attached to the run for a month.
+      # ----------------------------------------------------------------
+      - name: Upload Claum.dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claum-macOS-arm64-prebuilt
+          path: build-prebuilt/Claum-arm64.dmg
+          retention-days: 30
