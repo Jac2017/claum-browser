@@ -47,11 +47,26 @@ concurrency:
 
 jobs:
   build:
-    # macos-15 = Apple Silicon M1 with Xcode 16.3+ (has newer MacOSX SDK with
-    # the DarwinFoundation1.modulemap file that Chromium 146 references).
-    # Was macos-14, which ships Xcode 16.2 and triggers the modulemap bug.
-    runs-on: macos-15
-    timeout-minutes: 330   # 5 hr 30 min — just under GitHub's 6 hr cap
+    # ----------------------------------------------------------------
+    # Self-hosted runner on Matt's Mac mini (Apple Silicon).
+    # ----------------------------------------------------------------
+    # We pivoted off `runs-on: macos-15` (GitHub-hosted) because the
+    # 5h30m hard timeout on GitHub-hosted runners couldn't fit a cold
+    # Chromium build and we burned ~50 hours of compute getting nowhere
+    # despite sccache. The Mac mini has no time limit.
+    #
+    # The labels here MUST match what the runner registered with:
+    #   - `self-hosted`  (default for any self-hosted runner)
+    #   - `macOS`        (default for macOS runners)
+    #   - `ARM64`        (default for Apple Silicon runners)
+    # GitHub will route the job to ANY runner that has all of these
+    # labels. Right now there's only one, so it goes there.
+    # ----------------------------------------------------------------
+    runs-on: [self-hosted, macOS, ARM64]
+    # Generous safety cap so a wedged build can't pin Matt's Mac mini
+    # forever. 12h is well above a normal 4-6h cold build and 1-2h
+    # for an incremental rebuild.
+    timeout-minutes: 720
     steps:
       - name: Check out Claum repo
         uses: actions/checkout@v4
@@ -154,7 +169,14 @@ jobs:
       # "active" Xcode we preserve here is the Xcode 16 we just selected —
       # not the runner's original default (which is typically Xcode 15.x).
       # ------------------------------------------------------------------
+      # ------------------------------------------------------------------
+      # CAUTION: this step deletes other Xcode versions and Android SDK.
+      # That's safe on a GitHub-hosted runner (ephemeral VM with stuff
+      # we don't need) but DESTRUCTIVE on a personal Mac. Skip on
+      # self-hosted.
+      # ------------------------------------------------------------------
       - name: Free up disk space on runner
+        if: runner.environment == 'github-hosted'
         run: |
           echo "Disk space BEFORE cleanup:"
           df -h /
