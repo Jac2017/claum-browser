@@ -5,6 +5,53 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 16:30 UTC** (session `relaxed-laughing-planck`) — run
+  **#44** attempt **#9** (commit `71ebc55` "Switch build-mac.yml to
+  self-hosted runner (Matt's Mac mini)", job `73088747577`) is **In
+  progress** and **healthy** on the new self-hosted runner. The
+  workflow now runs on Matt's Mac mini (commit pushed since the last
+  watcher cycle), so the GitHub-hosted-macOS retry treadmill is
+  retired. Earlier attempts #1–#8 of run #44 were all auto-cancelled
+  with the standard "Canceling since a higher priority waiting request
+  for build-mac-refs/heads/main exists" message — that's GitHub's
+  concurrency group cancelling each prior queued run as the next
+  push/handler-retry came in, not a real failure. Attempt #9 is the
+  first one the self-hosted runner actually picked up.
+  **Steps complete (durations green):** Set up job 3s, Check out repo
+  2s, Select Xcode 0s, Free up disk 0s, Install build dependencies 3s.
+  **Currently running:** `Restore sccache disk cache` — restoring
+  ~1.07 GB cache (`sccache-mac-arm64-v3-24935598886-5` cache hit) at
+  ~18 MB/s, last sample **402 MB / 1077 MB ≈ 37.4%** received. ETA on
+  finishing this restore step: ~37 s more at observed rate. After
+  that the remaining steps queued are: Install sccache, Configure
+  sccache, Diagnostic SDK modulemap layout, Cache Chromium source,
+  **Run Claum build** (the long ninja step), Show sccache stats,
+  Save sccache disk cache, Package .app as .dmg, Upload build
+  artifact.
+  **No errors anywhere on the page**: 0 `FAILED:` / 0 `error:` /
+  0 `ninja: error` markers; only the standard Node 20 deprecation
+  warning. Issues tab `?q=label:build-failure` shows **0 open / 0
+  closed** — handler hasn't filed anything for this run because nothing
+  has actually failed (cancellations are filtered, per the recent
+  `Fix handler to catch timeout/cancelled + sccache local disk cache`
+  commit). Old run **#43** (commit `ed6fefc`) is now superseded;
+  its visible "In progress" row was a stale display — clicking through
+  shows the underlying job actually got cancelled in 24s when the new
+  push came in. **No fix needed this cycle** — the self-hosted runner
+  switch appears to be working, sccache is hitting, and the build is
+  setting up cleanly. Watcher is just observing.
+
+  ⚠ **Watcher constraint this cycle:** the GitHub PAT
+  (`/sessions/wonderful-stoic-lamport/.gh_token` per the task file) is
+  not present in this session's filesystem (session paths are
+  per-run and ephemeral; the previous session's `.gh_token` is no
+  longer reachable from `relaxed-laughing-planck`). I have therefore
+  written this BUILD_NOTES update locally but **could not `git push`**
+  the commit to origin this cycle. Next cycle's watcher should either
+  (a) inherit a token in its own session, (b) push from a context
+  where credentials are cached, or (c) the user can stage the token
+  again at a session-stable path.
+
 - **2026-04-26 16:15 UTC** (session `focused-tender-gates`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
   progress** at **~1h 24m** since the `Run Claum build` step started
