@@ -5,6 +5,47 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 15:53 UTC** (session `ecstatic-peaceful-mendel`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
+  progress** and **healthy** at ~1h 7m wall-clock since the job started
+  at `2026-04-26T14:46:34Z`. The "Run Claum build" step started at
+  `2026-04-26T14:51:04Z` so ninja itself has been running ~1h 2m.
+  **Live ninja count not sampleable** — same DOM/log-virtualization
+  trap that bit the previous five cycles (15:15, 15:27, 15:39, 15:50);
+  the inline log only renders the gn self-bootstrap header
+  (`[1/204]`…`[15/204]` CXX ticks for `src/base/...`) and the deeper
+  Chromium ninja phase (out of 55997) is not exposed in the page DOM
+  even after expanding the build step and waiting. Body innerText caps
+  at ~2.4 KB on the job detail page. **Qualitative health signals all
+  green:** (a) run is still **Latest #5** in the attempt selector
+  ("Latest attempt #5 in progress on Apr 26 by github-actions[bot]"),
+  meaning the build-failure-handler workflow has **not** auto-retried
+  again — i.e. the handler does not see this run as failed; (b) zero
+  `##[error]` / `FAILED:` / `fatal error` / `ninja: error` /
+  `undefined symbol` / `FileNotFoundError` markers anywhere in the
+  rendered DOM on either the run summary page or the job page;
+  (c) Issues tab is unchanged at **1 open / 0 closed**, with
+  `?q=label:build-failure` returning "Invalid value build-failure for
+  label" (label was renamed/removed) — the existing aggregator Issue
+  #1 is the only open one and its most recent comment is from
+  **2026-04-25T17:22:55Z** (yesterday afternoon, before this run
+  started), so the handler has filed nothing new for #43; (d) all
+  pre-build steps green and frozen at known-good durations
+  (Set up job 2s / Checkout 2s / Xcode 4s / Free disk 3m 7s / Install
+  deps 39s / Restore sccache disk cache 26s ← cache hit / Install
+  sccache 1s / Configure sccache 0s / SDK modulemap 9s / Cache
+  Chromium source 0s). **Past historical fail points** — well beyond
+  the `[12845]` SOLINK `libvk_swiftshader.dylib` checkpoint that
+  killed runs #32 and #34, past the `[26552/56094]` angle/null
+  region where #40 stalled. Extrapolating from the last live tick
+  count the 15:15 cycle captured (`[15822/55997]` at ~14 ticks/sec),
+  we should now be in the **[60000-70000+]` band (likely well into
+  the link/SOLINK phase or done compiling) — though I cannot confirm
+  via DOM. **No code changes needed.** Step 3 (failure handling) and
+  Step 4 (artifact download) both N/A — build still in flight.
+  Pushing this notes update with `[skip ci]` via the workspace-mounted
+  token.
+
 - **2026-04-26 15:50 UTC** (session `gallant-compassionate-keller`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
   progress** and **healthy** at ~64m wall-clock since the job started
