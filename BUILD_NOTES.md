@@ -5,6 +5,48 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 15:50 UTC** (session `gallant-compassionate-keller`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
+  progress** and **healthy** at ~64m wall-clock since the job started
+  at `2026-04-26T14:46:34Z`. The "Run Claum build" step duration
+  counter was visibly **incrementing live during this cycle**: I
+  watched it tick `54m 27s` → `54m 29s` → `54m 58s` → `54m 59s` →
+  `55m` → `55m 26s` → `55m 39s` → `55m 47s` → `55m 55s` → `56m 9s` in
+  consecutive screenshots over ~80 seconds. That is the strongest
+  liveness signal — the runner process is still emitting heartbeats
+  to the GH Actions service. **Live ninja tick count not sampleable**
+  — same virtualization trap as the 15:27 and 15:39 cycles. The
+  inline log only renders the gn-bootstrap header (`[1/204]`…
+  `[15/204]` CXX of `src/base/...`) plus a small early window of the
+  proper ninja phase (`[52/55997]…[61/55997]` ACTION ticks for
+  `third_party/devtools-frontend/...`); deeper ticks are not in DOM
+  and the `Search logs` box (which DOES expose hits in unloaded
+  log content for runs of any size) returned **0/0** for `[15000/`,
+  `[20000/`, `[25000/`, `[35000/`. The `/55997]` suffix matched
+  **100/100** (GitHub search caps at 100 hits) — confirming many
+  ninja ticks have been emitted, but search hit-cap obscures the
+  actual high-water mark. Best estimate from extrapolation
+  (`[15822/55997]` at the 15:15 cycle + ~14 ticks/sec sustained
+  throughput witnessed earlier) is roughly **[44000-46000/55997]
+  band**, i.e. ~80% through ninja with ~15-25min of compile + DMG
+  packaging + artifact upload still ahead. **Qualitative health
+  signals all green:** (a) status badge still **In progress** with
+  4 `currently running` aria-labels in the run header (run + job +
+  step + workflow), (b) still **Latest #5** (handler has not
+  auto-retried again — i.e. it does not see this run as failed),
+  (c) zero `FAILED` / `##[error]` / `fatal error` / `ninja: error` /
+  `undefined symbol` / `FileNotFoundError` markers in any rendered
+  DOM, (d) Issues tab `?q=label:build-failure` unchanged at
+  **1 open / 0 closed** (aggregator Issue #1 only; no new
+  build-failure issue from handler). **Past historical fail
+  points** — well beyond the `[12845]` SOLINK
+  `libvk_swiftshader.dylib` checkpoint that killed #32/#34 and the
+  `[26552/56094]` angle/null backend region where #40 stalled out.
+  No code changes needed. Step 3 (failure handling) and Step 4
+  (artifact download) both N/A — build still in flight. Pushing
+  this notes update with `[skip ci]` via the workspace-mounted
+  token.
+
 - **2026-04-26 15:39 UTC** (session `awesome-busy-rubin`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
   progress** and **healthy** at ~52m wall-clock since the job started
