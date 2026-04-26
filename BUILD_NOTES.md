@@ -5,6 +5,41 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 15:15 UTC** (session `pensive-gifted-goodall`) — run **#43**
+  (commit `ed6fefc` — "Wire sccache into ninja, fix gtar save error,
+  raise retry cap"; this run is **attempt 5**, re-dispatched by the
+  `github-actions[bot]` build-failure-handler) — **In progress** and
+  **healthy**. All pre-build steps green (Set up job 2s / Checkout 2s /
+  Xcode 4s / Free disk 3m 7s / Install deps 39s / **Restore sccache disk
+  cache 26s** ← cache hit, big deal / Install sccache 1s / Configure
+  sccache 0s / SDK modulemap 9s / Cache Chromium source 0s). Job started
+  at `2026-04-26T14:46:34Z`, so ~29m elapsed at sample time. Ninja log
+  is rendering live in DOM (no virtualization issues this cycle): first
+  visible ninja tick `[13890/55997]`, sampled twice ~50s apart and
+  observed advancing **[15115/55997] -> [15822/55997]** — about
+  **14 ticks/second**, currently compiling
+  `services/network/public/mojom/...`. **We are well past the [12845]
+  SOLINK `libvk_swiftshader.dylib` checkpoint** that killed runs #32 and
+  #34, and past `third_party/angle/...` which #40 stalled at
+  ([26552/56094] cancelled). 0 `FAILED` / `fatal error` / `##[error]` /
+  `undefined symbol` markers anywhere in DOM. **Other workflows seen on
+  this scan:** the team has shipped a parallel `Build Claum (prebuilt
+  patch)` workflow on branch `prebuilt-patch` (latest run #7 commit
+  `a317c9b` "drop library-validation flag" — 58s, completed), plus a
+  new `Claum autopilot` workflow which is the watchdog-of-watchdogs and
+  fires every few minutes. **Issue #1 (`build-failure` label)**: the
+  handler is still aggregating "Job cancelled or timed out" hits under
+  this single issue (signature dedupes correctly); recent hits there
+  are runs #39/#40/#41 — all cancelled (likely because newer commits
+  superseded them while the handler was still on attempt N). **Token
+  access fixed this cycle** — `.gh_token` is now at
+  `/mnt/Projects/claum-browser/.gh_token` (i.e. inside the user's
+  selected workspace folder, reachable from any session); resolves the
+  4-cycle escalation. **Action taken:** appended this status line and
+  pushing the BUILD_NOTES update with `[skip ci]`. Step 3 (failure
+  handling) and Step 4 (artifact download) both N/A this cycle — run is
+  in progress and progressing.
+
 - **2026-04-23 09:36 UTC** (session `dazzling-kind-noether`) — run #38
   (commit `65687dc`) **In progress** at **4h 22m+** wall-clock; "Run
   Claum build" step duration timer advancing live (4h 14m 36s → 4h 22m
