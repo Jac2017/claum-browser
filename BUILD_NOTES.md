@@ -5,6 +5,35 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 17:24 UTC** (session `lucid-friendly-gates`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress and looking
+  great**. Latest ninja tick read off the live job page: **`[13280/55997]
+  CXX obj/net/net/net_log_util.o`** at `17:23:32 GMT` — i.e. we just
+  **CLEARED the historic SOLINK checkpoint** at `[12845]
+  libvk_swiftshader.dylib` (where runs #32 and #34 both died) **without
+  any failure**. That is the single biggest piece of news this cycle.
+
+  **Pace check:** previous watcher cycle (17:20 UTC) recorded
+  `[11049/55997]`. This cycle (17:24 UTC, ~4 min later) reads
+  `[13280/55997]` → **+2,231 ticks in ~4 min ≈ ~9 ticks/sec**, exact
+  same healthy pace as before. We are now compiling the `net/` library
+  (HTTP/network stack) — that means we're done with Dawn/Tint
+  (WebGPU/shader translator) and well past the SwiftShader SOLINK.
+
+  **Failure markers in the rendered log:** **0** — no `FAILED:`,
+  `##[error]`, `ninja: error`, `fatal error`, `undefined symbol`, or
+  `FileNotFoundError` anywhere in the visible 1,050+ rendered log
+  lines. Build-failure-handler has not opened any new issue
+  (Issues tab still shows just the pre-existing `1` open issue from
+  earlier — no new auto-opened build-failure issue this cycle).
+
+  **No code intervention needed this cycle.** Run is healthy; just
+  appending this log entry and committing with `[skip ci]`. Decision
+  rule: leave it alone, let ninja keep ticking. Next cycle should
+  show us further into `net/`, then `content/`, then `chrome/` (the
+  big slow ones). The next high-risk known-unknown is the final
+  `LINK Chromium\ Framework` step very near the end.
+
 - **2026-04-26 17:20 UTC** (session `eager-epic-meitner`) —
   run **#47** (commit `7e7ea71` "build-mac.yml: install Xcode Metal
   Toolchain (run #46 fix)", job `73090451041`) is still **In progress**
