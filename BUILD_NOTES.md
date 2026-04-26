@@ -5,6 +5,65 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 18:42 UTC** (session `confident-modest-feynman`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress** at
+  **~1h 39m total runtime** (job started 17:02:30 UTC, check time
+  18:42 UTC). The "Run Claum build" step elapsed counter read
+  `1h 38m 53s` on last live screenshot.
+
+  **Status snapshot (Chrome MCP via github.com web UI):**
+  - Run page header: `In progress`, spinner active.
+  - `Search logs` for `FAILED:` → **0 hits in the build step**
+    (the only `1/1` hit was a literal `failed:` substring in the
+    earlier `git apply --check failed, here's why:` patch-fuzz
+    output, which is the EXPECTED behavior of the patch-fallback
+    code path — not a real build failure).
+  - No `##[error]`, `ninja: error`, `fatal error`, `undefined symbol`,
+    or `FileNotFoundError` anywhere in the rendered DOM (lines 1-3599
+    of the Run Claum build step).
+  - Issues tab `?q=label:build-failure` → still only the
+    pre-existing `#1` (cancelled run #44 from prior session). No new
+    auto-opened build-failure issue this cycle, so the
+    `build-failure-handler` workflow has not been triggered.
+
+  **Tick count caveat (7th cycle in a row, same well-documented
+  GitHub UI virtualization wall):** the rendered DOM caps out at
+  ninja `[2067/55997]` (line 3599 of the build step) regardless of
+  how aggressively we scroll/jump-to-end. `Search logs` is also
+  capped at 100 hits per query, so high-numbered ticks past the
+  rendered window are unreachable from the UI. The raw-logs URL
+  returns 404 for an in-progress job, and `api.github.com` is
+  proxy-blocked (HTTP 403 / cowork-egress-blocked) from this
+  sandbox. Conclusion unchanged from prior cycles: **the build is
+  almost certainly progressing far beyond `[2067]`** — that's just
+  the last frame the React virtualizer happens to keep mounted.
+
+  **Pace extrapolation (carrying forward prior watcher's math):**
+  previous cycle estimated `~[41,900/55997]` ≈ 75% at the 1h 17m
+  mark. +22 min at ~9 ticks/sec ≈ +11,880 → projected current
+  position **`~[53,800/55997]` ≈ 96% complete**. We're likely deep
+  into the final `chrome/` translation units and approaching the
+  big `LINK Chromium Framework` step at the very end. Caveat: this
+  is extrapolation from a stale tick read, not an observation.
+
+  **Decision: no code intervention.** All signals are consistent
+  with a healthy long-running build. Metal Toolchain fix from
+  commit `7e7ea71` continues to hold. Next high-risk milestones
+  remain: the final `LINK Chromium Framework` link step, then the
+  post-ninja `Package .app as .dmg` step.
+
+  **Operational note (virtiofs lock-file restriction confirmed
+  again):** local checkout at `/sessions/confident-modest-feynman/
+  mnt/Projects/claum-browser` still hits the virtiofs
+  `Operation not permitted` wall when trying to delete
+  `.git/index.lock`. The watcher's standard workaround
+  (`git clone --depth 5` into `/tmp/claum-clone-$(date +%s)` and
+  push from there) was used this cycle. The novice-friendly
+  short version: the shared folder I read the repo from is locked
+  in a way I can't fix here, so I work in a throwaway copy in
+  `/tmp/` and push from there — same end result, no risk to the
+  shared checkout.
+
 - **2026-04-26 18:19 UTC** (session `lucid-eloquent-keller`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
   **~1h 17m total runtime** (job started 17:02:30 UTC; check time
