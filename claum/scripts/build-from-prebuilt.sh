@@ -469,17 +469,44 @@ log_step "Re-signing Claum.app (ad-hoc, leaf-first, preserving entitlements)"
 #   4. No --deep: --deep is unreliable for nested order-of-operations.
 # ----------------------------------------------------------------------
 
-# Helper: sign one item with consistent flags. We tolerate failures
-# (some items may already be unsigned platform shims; not worth aborting).
+# Helper: sign one item, preserving ONLY entitlements.
+# ----------------------------------------------------------------------
+# Why only entitlements (not flags/runtime/requirements):
+#
+#   `flags`     — preserves CS_* code-signing flags including
+#                 `library-validation`. With library-validation set,
+#                 macOS requires loaded dylibs to have matching Team
+#                 IDs. Ad-hoc signatures have NO Team ID, so this flag
+#                 makes ANY ad-hoc dylib load fail with:
+#                     "different Team IDs"
+#                 We want library-validation OFF for ad-hoc builds.
+#
+#   `runtime`   — preserves the Hardened Runtime flag. With Hardened
+#                 Runtime, library validation is auto-enforced UNLESS
+#                 the binary has the disable-library-validation
+#                 entitlement. Even when entitlements are preserved,
+#                 the interaction can be flaky for re-signed binaries.
+#                 Easier: drop the Hardened Runtime flag entirely.
+#
+#   `requirements` — preserves the original "designated requirement"
+#                    string. For upstream-signed code that string may
+#                    encode the original signer's Team ID, which
+#                    obviously doesn't match our ad-hoc signature.
+#                    Drop it; codesign will derive a fresh one.
+#
+#   `entitlements` — KEEP this. Without it, the parent can't register
+#                    its Mach IPC service and child processes die at
+#                    bootstrap_look_up: "Unknown service name".
+# ----------------------------------------------------------------------
 sign_one() {
   local target="$1"
   if codesign --force --sign - \
-              --preserve-metadata=entitlements,requirements,flags,runtime \
+              --preserve-metadata=entitlements \
               "$target" 2>/dev/null; then
     return 0
   fi
-  # Fallback: some items have no original signature to preserve metadata
-  # from. Sign with no flags in that case so they at least get sealed.
+  # Fallback: some items have no original entitlements to preserve.
+  # Sign with no flags in that case so they at least get sealed.
   codesign --force --sign - "$target" 2>/dev/null || true
 }
 
