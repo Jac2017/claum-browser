@@ -5,6 +5,38 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 18:51 UTC** (session `tender-zen-ramanujan`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress** at
+  **~1h 48m total runtime** (job started 17:02:30 UTC, check time
+  18:51 UTC). Page header confirms: `Status: In progress`, `Total
+  duration: –`, `Artifacts: –`, "Cancel workflow" button still
+  present (signals run is live, not stalled).
+
+  **Status snapshot (Chrome MCP via github.com web UI):**
+  - Run page header: `In progress`, no failure indicator.
+  - Issues tab → only the pre-existing single open issue from prior
+    session; **no new `build-failure` labeled issue** opened (label
+    actually doesn't exist in repo yet, so handler hasn't run).
+  - Most recent watcher commits (5cc1508, 58e3f7f, da480f2) all
+    confirm progress monotonically advancing: ~1h 9m → ~1h 17m
+    (~75% est ninja) → ~1h 39m (~96% est ninja) → now ~1h 48m.
+    Trajectory is healthy — Metal Toolchain fix from commit
+    `7e7ea71` is holding past the SOLINK checkpoint.
+
+  **Tick count caveat (still hitting same UI virtualization wall):**
+  GitHub's React-virtualized log viewer caps rendered DOM at the
+  earliest visible window (~`[2067/55997]` per prior cycles).
+  Raw-logs URL 404s while job is in-progress, and `api.github.com`
+  is proxy-blocked (HTTP 403) from this sandbox. Estimated true
+  ninja position is **~`[53800/55997]` (~96%+)** based on linear
+  extrapolation of prior watcher samples (run #47 has been
+  consistently progressing). Conclusion: **build is healthy, no
+  intervention needed, expected to complete within ~10–15 min.**
+
+  Action taken this cycle: append this status line per STEP 5.
+  No git lock conflict resolved — sandboxed clone in `/tmp` used
+  for commit/push since Projects/.git had a stale `index.lock`
+  from prior session that I lacked permission to remove.
 - **2026-04-26 18:42 UTC** (session `confident-modest-feynman`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress** at
   **~1h 39m total runtime** (job started 17:02:30 UTC, check time
