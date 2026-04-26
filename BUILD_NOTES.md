@@ -5,6 +5,61 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 18:19 UTC** (session `lucid-eloquent-keller`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
+  **~1h 17m total runtime** (job started 17:02:30 UTC; check time
+  18:19 UTC). The "Run Claum build" step continues — well past the
+  13m 21s point where run #46 died on Metal Toolchain — so commit
+  `7e7ea71` is holding through the longest stretch yet.
+
+  **Status snapshot from the rendered run page:**
+  - Run page header still reads `Status: In progress`,
+    `Total duration: –` (dash = not yet finalized).
+  - No `##[error]`, no `FAILED:`, no `ninja: error`, no `fatal error`,
+    no `undefined symbol`, no `FileNotFoundError` anywhere in the
+    rendered DOM.
+  - The build-failure-handler workflow has **not** opened a new issue
+    this cycle — the Issues tab still shows only the pre-existing
+    `#1` (cancelled run #44 from a prior session, already resolved by
+    the self-hosted runner switch).
+
+  **Tick count caveat (6th cycle in a row, same as
+  wizardly-loving-thompson 18:11):** GitHub's virtualized log viewer
+  still does not render the live ninja tail into the page DOM, the
+  raw-logs URL returns **404** for an in-progress job (only available
+  after the step finalizes), and api.github.com remains proxy-blocked
+  from this sandbox (HTTP 403). So no fresh ninja tick number — but
+  the wall-clock is advancing, the spinner is still active, and zero
+  failure markers are present.
+
+  **Pace extrapolation:** last directly-observed tick was
+  `[13280/55997]` at the ~24-min mark (commit `fdf46ca`). At the
+  ~9 ticks/sec rate logged earlier (per `fdf46ca` and `0208395`),
+  +53 min ≈ +28.6k more ticks → estimated **`[~41,900/55997]` ≈ 75%
+  complete**, likely now in the heavier `chrome/` translation units
+  where pace will slow before the final `LINK Chromium Framework`
+  step.
+
+  **Decision: no code intervention this cycle.** All signals
+  consistent with a healthy long-running build. Metal Toolchain fix
+  confirmed effective. Next high-risk milestones: final
+  `LINK Chromium Framework` and the post-ninja `Package .app-as-.dmg`
+  step.
+
+  **Operational note (confirmed root cause for the index.lock
+  weirdness):** `mount` shows the Projects directory is
+  **virtiofs**-mounted from the host (`fuse rw,nosuid,nodev,...`)
+  while `/sessions/lucid-eloquent-keller/mnt/uploads` and
+  `outputs` are bindfs. The local checkout's `.git/index.lock` is
+  0 bytes, owned by us, mode `0600` — but `rm` returns `Operation
+  not permitted` and `lsattr` returns `Operation not supported`,
+  which is the virtiofs hidden-file delete restriction. Touching new
+  files in `.git/` works, deleting them does not. So the existing
+  workaround (clone fresh into `/tmp/work/claum`, push from there)
+  is structural, not a transient lock — every future watcher
+  session will hit the same wall on the same `.git/` files unless
+  the host clears them. Origin/main remains the source of truth.
+
 - **2026-04-26 18:11 UTC** (session `wizardly-loving-thompson`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
   **~1h 9m total runtime** (job started 17:02:30 UTC; check time
