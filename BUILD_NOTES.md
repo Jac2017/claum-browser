@@ -5,6 +5,59 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 16:50 UTC** (session `great-dreamy-franklin`) — new run
+  **#46** is now the latest Build Claum (macOS) on the Actions list,
+  status **In progress**, head SHA `83a8b81` ("BUILD_NOTES: run #44
+  attempt #9 in ninja [313/55997], healthy [skip ci]"), trigger
+  **Manually triggered by Jac2017** via `workflow_dispatch`. Run #44
+  (the 71ebc55 self-hosted attempt that the prior watcher cycle was
+  tailing at 16:35 UTC) is no longer the top in-progress row, and run
+  **#45** (commit `a3fef01` "Stop the cancellation-thrash loop on
+  self-hosted") finished in **5s** as a concurrency-cancellation per
+  the same "higher priority waiting request" message we saw last
+  cycle — both expected and benign, no action needed. The current
+  job is `73089410439`. **Live ninja sample (sampled twice, ~10 min
+  apart this cycle):** first read at 16:49 UTC showed
+  `[3387/55997]` with the `Run Claum build` step displaying a live
+  in-progress timer (raw counter visible as `3831` in the DOM,
+  i.e. ~1h 03m 51s into the step). Second read at ~16:53 UTC showed
+  `[3999/55997] CXX obj/skia/skia_core_and_effects/SkTypefaceCache.o`
+  with the timer at `4446` (~1h 14m 06s). That is **+612 ticks in
+  ~615s ~= ~1.0 tick/s** of forward progress, which is healthy for the
+  current Skia/Chromium compile band (lots of small CXX TUs). Step
+  list confirmed all 10 setup steps green (`Set up job 4s`,
+  `Check out Claum repo 34s`, `Select Xcode 0s`, `Free up disk 0s`,
+  `Install build dependencies 4s`, `Restore sccache disk cache 1m 1s`,
+  `Install sccache 2s`, `Configure sccache 0s`, `Diagnostic - SDK
+  modulemap layout 3s`, `Cache Chromium source 1s`); the post-build
+  steps (`Show sccache stats`, `Save sccache disk cache`,
+  `Package .app as .dmg`, `Upload build artifact`, four `Post ...`
+  cleanup steps) **all still show no duration** -- so we have not yet
+  exited the long ninja step. **Cancel workflow** button still
+  rendered -> job is alive. **No errors anywhere on the rendered job
+  page**: 0 `FAILED:` / 0 `##[error]` / 0 `ninja: error` / 0
+  `fatal error` / 0 `undefined symbol` / 0 `FileNotFoundError`
+  markers in `document.body.innerText`. **Critical SOLINK
+  checkpoint** at `[12845/55997]` (`libvk_swiftshader.dylib` -- where
+  runs #32 and #34 historically failed) is still ~8.8k ticks away,
+  so we have not yet reached the danger zone. **Issues check:** the
+  `?q=label:build-failure` view still shows **1 Open / 0 Closed**
+  (the long-standing aggregator Issue #1) and continues to render
+  the GitHub "Invalid value build-failure for label" warning because
+  the label hasn't been pre-registered in the repo's labels list --
+  same harmless picture every cycle. The handler has not opened any
+  *new* issue against #46. **Action taken:** appended this status
+  line via a fresh shallow clone in `/tmp/claum-watcher-<ts>`
+  (existing local checkout's `.git/index.lock` was held read-only --
+  same EPERM symptom previous sessions hit; using a clean clone in
+  `/tmp` is the standard workaround). No code changes.
+  Step 3 (failure handling) and Step 4 (artifact download) both
+  N/A this cycle. Pushing to `main` with `[skip ci]` via the token
+  staged at `/mnt/Projects/claum-browser/.gh_token`
+  (the in-repo gitignored copy that has worked the last several
+  cycles when the task-file's `/sessions/wonderful-stoic-lamport/.gh_token`
+  path is unreadable from a non-original session).
+
 - **2026-04-26 16:35 UTC** (session `magical-trusting-wozniak`) — run
   **#44** attempt **#9** (commit `71ebc55` "Switch build-mac.yml to
   self-hosted runner (Matt's Mac mini)", job `73088747577`) still
