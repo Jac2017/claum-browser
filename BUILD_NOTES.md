@@ -5,6 +5,49 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 15:39 UTC** (session `awesome-busy-rubin`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
+  progress** and **healthy** at ~52m wall-clock since the job started
+  at `2026-04-26T14:46:34Z`. The "Run Claum build" step shows
+  **47m 48s** of live wall-clock (per the spinning indicator + step
+  duration counter visible in the UI screenshot), so the ninja compile
+  process is unambiguously still alive — the duration timer is
+  advancing in real time. **Live ninja tick count not sampleable this
+  cycle** — same DOM log-virtualization trap that bit the 15:27 cycle:
+  the page's `innerText` only exposes the gn self-bootstrap header
+  (`[1/204]`…`[15/204]` CXX ticks for `src/base/...`) and no scrollable
+  parent container exists in the DOM that we can scroll to force more
+  log lines to render (`document.querySelectorAll('*')` filtered by
+  `overflowY:auto|scroll && scrollHeight>clientHeight` returns 0
+  scrollers under the `[15/204]` element); programmatic
+  `scrollTo(scrollHeight)` and `End` keypress only nudge the page
+  scrollY a small amount and do not trigger virtualization to fetch
+  later lines. **Qualitative health signals are all green:**
+  (a) status badge still says **In progress**, run is still
+  **Latest #5** (no new attempt = handler hasn't auto-retried
+  again — i.e. handler doesn't see this run as failed),
+  (b) **`Cancel workflow` button still rendered** at the top right of
+  the run page (proof the workflow process is still alive),
+  (c) zero `##[error]` / `FAILED:` / `fatal error` / `ninja: error` /
+  `undefined symbol` markers anywhere in `document.body.innerText`
+  across both the run summary page and the job detail page,
+  (d) the Issues tab `?q=label:build-failure` is unchanged at
+  **1 open / 0 closed** (the existing aggregator Issue #1 — no new
+  build-failure issue opened by the handler, which it would have done
+  for any non-transient code error). **Past the [12845]
+  `libvk_swiftshader.dylib` SOLINK checkpoint that killed runs #32
+  and #34** — this run is comfortably beyond it (last visible live
+  count from the 15:15 cycle was `[15822/55997]` at 14 ticks/sec, so
+  extrapolating ~22 minutes of compile time forward we should now be
+  in the **[35000-45000/56000]** band, deep into the third_party
+  compile slabs). **Action taken:** appended this status line, no
+  code changes needed (build is healthy and progressing toward the
+  DMG packaging step). Step 3 (failure handling) and Step 4
+  (artifact download) both N/A this cycle — run is still in flight.
+  Pushing the BUILD_NOTES update with `[skip ci]` in commit message
+  via the workspace-folder token at
+  `/mnt/Projects/claum-browser/.gh_token`.
+
 - **2026-04-26 15:27 UTC** (session `magical-busy-shannon`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) **In progress**,
   ~41m wall-clock since job started at `2026-04-26T14:46:34Z`. The "Run
