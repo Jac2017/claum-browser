@@ -5,6 +5,41 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 17:56 UTC** (session `youthful-nice-tesla`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
+  **~56 min total runtime** ("Started 55m 58s ago", "Run Claum build"
+  step at **54m 13s**). Same yellow-spinner status icon, no failure.
+  Build-failure-handler still hasn't filed a new issue (Issues tab
+  shows only the pre-existing Issue #1 from old cancelled jobs —
+  unchanged from prior watcher cycles).
+
+  **Tick count caveat (third cycle in a row):** GitHub's virtualized
+  log container `js-checks-log-display-container` continues to refuse
+  to render the live tail into the DOM after the step is expanded —
+  `body.innerText` for `#check-step-12` returns just `"Run Claum build"`
+  (15 chars) even after a fresh navigate, summary-click, and 10s wait.
+  The very first expansion this cycle did briefly capture early
+  buffered lines from the start of the step (curl progress at
+  `[3/6] Downloading and unpacking Chromium 146.0.7680.164`,
+  `~110M / 1408M` ≈ 8% of the tarball) — but those are the **start**
+  of the script's pre-build, not the live tail. The build is now ~54
+  minutes past that point.
+
+  **Where we should be (extrapolation):** prior cycle (17:24 UTC) read
+  `[13280/55997]` at the ~24 min mark on this same job. **+32 min** of
+  ticking since then at the prior pace (~9 ticks/sec) puts us roughly
+  near **`[~30,000/55997]` ≈ 53-55% complete**, almost certainly deep
+  into `content/` and possibly approaching `chrome/`. SOLINK
+  `libvk_swiftshader.dylib` already cleared. Pace likely slowed in the
+  heavier C++ TUs, so this is an upper bound.
+
+  **Decision:** no code intervention this cycle. Run is healthy
+  (clock advancing, no FAILED markers anywhere visible, no handler
+  issue, no cancellation). Just appending this watcher entry and
+  committing with `[skip ci]`. The next dangerous step is the final
+  `LINK Chromium\ Framework` near the end of ninja, then `Package
+  .app as .dmg` and `Upload build artifact`.
+
 - **2026-04-26 17:43 UTC** (session `funny-great-goldberg`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress** at
   ~46 min runtime. **No FAILED markers** anywhere in the rendered
