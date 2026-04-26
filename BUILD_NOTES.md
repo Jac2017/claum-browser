@@ -5,6 +5,65 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 17:05 UTC** (session `blissful-compassionate-hypatia`) —
+  run **#47** (commit `7e7ea71` "build-mac.yml: install Xcode Metal
+  Toolchain (run #46 fix)", job `73090451041`) is **In progress** and
+  **healthy**, ~5 min into wall-clock and firmly into ninja. The
+  Metal Toolchain fix from the previous cycle landed on origin/main
+  and is the active commit.
+
+  **Step-by-step duration on the self-hosted runner (Matt's Mac mini):**
+    - Set up job — 7s
+    - Check out Claum repo — 36s
+    - Select Xcode with macOS SDK 15+ — 0s (cached)
+    - **Ensure Metal Toolchain is installed — 44s** ← *the new step
+      the previous cycle added*. 44s is the "already-installed
+      fastpath" duration (just runs `xcrun metal --version` and
+      exits 0), confirming the toolchain was either downloaded on a
+      prior partial run or was already present. Either way, the
+      `xcrun metal` invocation that broke run #46 is no longer
+      missing. **Fix verified working.**
+    - Free up disk space on runner — 0s
+    - Install build dependencies — 4s (homebrew packages cached)
+    - Restore sccache disk cache — 8s
+    - Install sccache — 1s · Configure sccache — 0s
+    - Diagnostic - SDK modulemap layout — 4s
+    - Cache Chromium source — 0s (cache hit)
+    - **Run Claum build — in progress**
+
+  **Live ninja sample:** `[2950/55997] CXX
+  obj/skia/skia_core_and_effects/SkCornerPathEffect.o`. Total ticks
+  rendered in DOM: 2950 (sampled across the visible window). We're
+  inside the skia core/effects compile batch — early ninja, well
+  before the run-#46 failure point at `[6716/55997]` (the ANGLE
+  metal-shader compile that needed the Metal Toolchain). The
+  critical SOLINK checkpoint at `[12845/55997]
+  libvk_swiftshader.dylib` is still ~10k ticks away.
+
+  **Failure markers:** **0** across the rendered job log — `FAILED:`,
+  `##[error]`, `ninja: error`, `fatal error`, `undefined symbol`,
+  `FileNotFoundError` are all absent. The only `==>` diagnostic line
+  in view is `Diagnostic C: lines 700-760 of safe_browsing/BUILD.gn`
+  which is normal preamble output, not an error.
+
+  **Issues check:** `label:build-failure` still **1 open / 0 closed**
+  — same aggregator Issue #1 ("Job cancelled or timed out") as the
+  last two cycles. **No new issue** filed against runs #45, #46, or
+  #47, which is consistent with: #45 was a 5s concurrency-cancel
+  (handler filters those out); #46 already had its diagnosis
+  fixed-forward; #47 hasn't failed.
+
+  **Action this cycle:** none on source. The previous session pushed
+  `7e7ea71` with the Metal Toolchain step, the build is past that
+  step on the live run, no failure to fix. Just appending this
+  watcher entry and pushing it with `[skip ci]` so the next cycle
+  has fresh state.
+
+  **Next checkpoint to watch for in the next cycle:** ninja tick
+  count at or past `[6716/55997]` (the previous fail point) and ideally
+  approaching `[12845/55997]` (SOLINK). Anything > ~7000 confirms the
+  Metal Toolchain fix is good for the long haul.
+
 - **2026-04-26 16:55 UTC** (session `busy-cool-bardeen`) — runs
   **#44** and **#46** both **failed**, but for different reasons.
   Posting status + the fix I just pushed.
