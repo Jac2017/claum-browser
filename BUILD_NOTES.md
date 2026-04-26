@@ -5,6 +5,76 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 18:05 UTC** (session `kind-keen-fermat`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
+  **1h 4m 1s** total runtime ("Started 1h 4m 1s ago") with **"Run Claum
+  build" step at 1h 2m 16s** — we have officially crossed the **1-hour
+  mark on the build step itself**. Spinner still orange/yellow, no
+  failure icon, no Cancel-confirm dialog, all 11 prior steps green.
+
+  **Status snapshot from the rendered job page:**
+  - Set up job ✅ 7s
+  - Check out Claum repo ✅ 36s
+  - Select Xcode with macOS SDK 15+ ✅ 0s
+  - Ensure Metal Toolchain is installed ✅ 44s (← run #46's fix held)
+  - Free up disk space on runner ⊘ 0s (skipped — self-hosted has space)
+  - Install build dependencies ✅ 4s
+  - Restore sccache disk cache ✅ 8s
+  - Install sccache ✅ 1s
+  - Configure sccache for the build ✅ 0s
+  - Diagnostic - SDK modulemap layout ✅ 4s
+  - Cache Chromium source ✅ 0s
+  - **Run Claum build 🟡 1h 2m 16s — IN PROGRESS**
+  - (downstream) Show sccache stats / Save sccache disk cache /
+    Package .app as .dmg / Upload build artifact / Post Cache Chromium
+    source / Post Install sccache / Post Check out Claum repo — all
+    queued.
+
+  **Tick count caveat (4th cycle in a row):** GitHub's virtualized log
+  viewer still does not render the live ninja tail into the DOM. The
+  raw-logs URL (`/commit/{sha}/checks/{job_id}/logs`) returns 200
+  but with an **empty body** for in-progress jobs (GitHub only
+  finalizes the raw log on completion). Same-origin `fetch()` with
+  credentials confirmed: `{status: 200, totalLines: 1}`. The
+  api.github.com `/jobs/{id}/logs` endpoint is still proxy-blocked
+  in the sandbox (HTTP 403 from the egress proxy). So we cannot read a
+  live ninja tick number — but we can read the **wall-clock advancing
+  + spinner still spinning + zero `FAILED:` markers** from the page,
+  and that is the practical "is it healthy?" signal.
+
+  **Failure markers in the rendered page text:** **0** — searched
+  `FAILED:`, `fatal error`, `undefined symbol`, `##[error]`,
+  `FileNotFoundError` — all return zero hits. The build-failure-handler
+  workflow has not opened a new issue (Issues tab still shows the
+  pre-existing Issue #1 only).
+
+  **Where we should be (extrapolation):** prior known tick was
+  `[13280/55997]` at the ~24-min mark of this job. We're now at
+  ~62 min on the step → +38 min. At the prior ~9 ticks/sec pace that
+  is +20.5k more ticks → roughly **`[~33,500/55997]` ≈ 60% complete**,
+  almost certainly deep into `content/` and possibly bumping into
+  early `chrome/` TUs, where pace slows due to large translation units.
+  The next high-risk step is the final `LINK Chromium\ Framework`,
+  then the post-ninja Package/Upload steps.
+
+  **Decision: no code intervention this cycle.** Run is healthy by
+  every signal we have access to (clock advancing, no FAILED markers,
+  no handler issue, no cancellation, all prior steps green, sccache
+  was restored from cache so this is a warm build). Just appending
+  this watcher entry and committing with `[skip ci]` so the autopilot
+  workflow doesn't kick off another run.
+
+  **Operational note:** stale `.git/HEAD.lock` and `.git/index.lock`
+  in the kind-keen-fermat session checkout (left by an earlier
+  watcher's interrupted commit) blocked direct git operations there.
+  Worked around by doing a fresh shallow clone into `/tmp/claum-kkf-5`
+  and committing/pushing from there. Backup of unpushed local files
+  ( `BUILD_NOTES.md.local`, `.local2`, `build-mac.yml.local`,
+  `build-mac.yml.tmpA`, plus the staged BUILD_NOTES diff from the
+  `lucid-friendly-gates` session) saved to `/tmp/claum-local-backup/`
+  for posterity — but origin already has all the meaningful watcher
+  notes from those sessions, so nothing is actually lost.
+
 - **2026-04-26 17:56 UTC** (session `youthful-nice-tesla`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
   **~56 min total runtime** ("Started 55m 58s ago", "Run Claum build"
