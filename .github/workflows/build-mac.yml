@@ -37,13 +37,22 @@ on:
       - 'docs/**'
       - '**/*.md'
 
-# Only one build of this workflow runs at a time per ref. If a new commit
-# lands while a build is in progress, the in-flight build is cancelled
-# (because its fix was stale). This saves lots of runner minutes during
-# the iterate-fix-push loop.
+# ----------------------------------------------------------------------
+# Concurrency: queue, do NOT cancel.
+# ----------------------------------------------------------------------
+# We previously had cancel-in-progress: true to save GitHub-hosted
+# runner minutes during iterate-fix-push. On self-hosted that's
+# actively harmful: the build legitimately takes 4-6 hours, and any
+# subsequent dispatch (handler /rerun, autopilot, another push) would
+# kill an in-flight build mid-compile and waste hours of CPU.
+#
+# With cancel-in-progress: false, queued runs wait for the current
+# one to finish. On a single self-hosted runner that means strict
+# serialisation -- exactly what we want.
+# ----------------------------------------------------------------------
 concurrency:
   group: build-mac-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

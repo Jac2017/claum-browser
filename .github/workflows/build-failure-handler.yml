@@ -49,9 +49,18 @@ name: Build failure handler
 # fine for us — we only build on `main`.
 # ----------------------------------------------------------------------------
 on:
-  workflow_run:
-    workflows: ["Build Claum (macOS)"]
-    types: [completed]
+  # ---------------------------------------------------------------------
+  # workflow_run trigger temporarily disabled while we run on the
+  # self-hosted runner. Without cancel-in-progress (also disabled on
+  # build-mac.yml), there's no rapid loop to break, but the handler
+  # would still auto-/rerun every cancelled build -- which clogs the
+  # queue. Manual dispatch only for now; re-enable once we move back
+  # to ephemeral runners.
+  # ---------------------------------------------------------------------
+  # workflow_run:
+  #   workflows: ["Build Claum (macOS)"]
+  #   types: [completed]
+  workflow_dispatch:
 
 # ----------------------------------------------------------------------------
 # Permissions: by default GITHUB_TOKEN is "read-only" for workflow_run

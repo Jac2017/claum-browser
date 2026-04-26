@@ -51,15 +51,17 @@ on:
     - cron: '*/30 * * * *'
 
   # ------------------------------------------------------------------------
-  # Reactive wake-up: fires immediately after EITHER of the other Claum
-  # workflows completes. That's how we notice a handler failure within
-  # seconds instead of waiting up to 30 min for the next cron tick.
+  # NOTE: workflow_run reactive trigger removed.
   # ------------------------------------------------------------------------
-  workflow_run:
-    workflows:
-      - "Build Claum (macOS)"
-      - "Build failure handler"
-    types: [completed]
+  # On the self-hosted runner the build legitimately takes 4-6 hours;
+  # any reactive dispatch fires within seconds of a cancellation and
+  # creates a thundering-herd loop where the autopilot's own dispatches
+  # cancel each other (concurrency: cancel-in-progress, since-fixed).
+  # The cron schedule above is a sufficient backstop -- if a build
+  # genuinely needs intervention, autopilot will pick it up within
+  # 30 min on the next tick. Re-enable workflow_run once we move back
+  # to ephemeral runners.
+  # ------------------------------------------------------------------------
 
   # ------------------------------------------------------------------------
   # Manual trigger: useful for kicking the tires without waiting.
