@@ -5,10 +5,62 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
-- **2026-04-26 16:30 UTC** (session `relaxed-laughing-planck`) — run
+- **2026-04-26 16:35 UTC** (session `magical-trusting-wozniak`) — run
   **#44** attempt **#9** (commit `71ebc55` "Switch build-mac.yml to
-  self-hosted runner (Matt's Mac mini)", job `73088747577`) is **In
-  progress** and **healthy** on the new self-hosted runner. The
+  self-hosted runner (Matt's Mac mini)", job `73088747577`) still
+  **In progress** and **healthy**, now firmly into the long ninja
+  step. Latest ninja sample on the live job page: **`[313/55997] CXX
+  obj/third_party/protobuf/protobuf_lite/coded_stream.o`** — about
+  +313 ticks since the previous cycle's watcher saw the build still
+  inside `Restore sccache disk cache` at 16:30 UTC. So setup
+  finished, ninja kicked off, and the first protobuf/abseil/devtools
+  TUs are compiling. Job started `2026-04-26T09:28:57-07:00` (per
+  `<relative-time datetime>` on the job page) → ~6m 20s elapsed
+  wall-clock at this reading. **Stage**: still in `==> [6/6] Running
+  gn gen and ninja` (the final long step in `build-mac.sh`). **No
+  errors**: 0 `FAILED:` / 0 `##[error]` / 0 `ninja: error` /
+  0 `fatal error` / 0 `undefined symbol` markers in the rendered job
+  log; the only red text on screen is `git apply --check failed,
+  here's why: error: corrupt patch at line N` repeated for several
+  ungoogled patches — that's expected (patches that don't apply
+  cleanly fall back to `--3way` later in the script and have always
+  shown this on every build), not a real failure. **Critical
+  SOLINK checkpoint** (`[12845/55997] libvk_swiftshader.dylib`) is
+  still ~12.5k ticks away → not blocking yet.
+
+  **New event since last cycle — run #45 created and cancelled in
+  5 s.** Build Claum (macOS) **#45** (run id `24961463138`, commit
+  `a3fef01` "Stop the cancellation-thrash loop on self-hosted")
+  appears in the run list with status **Cancelled**, total duration
+  **5s**, and a single annotation reading *"Canceling since a higher
+  priority waiting request for build-mac-refs/heads/main exists."*
+  Interpretation: when commit `a3fef01` got pushed, GitHub queued #45
+  on the self-hosted runner. The self-hosted runner was already busy
+  with #44 attempt #9. Then a *third* request landed in the queue
+  (most likely from the `claum-autopilot` workflow — runs #156 and
+  #157 of "Claum autopilot" both completed within seconds of #45's
+  creation, and the autopilot historically dispatches `build-mac` via
+  `workflow_dispatch`). With the running #44's *original* yaml
+  (`71ebc55`) still using `cancel-in-progress: true`, the queue
+  picked the newest waiting request and cancelled the older waiting
+  one (#45). #44 attempt #9 is fine because it's not waiting — it's
+  in progress. **Action: none.** The thrash-loop fix in `a3fef01`
+  will only take effect on whichever run is the *first* to start
+  under the new yaml, i.e. once #44 finishes (or is cancelled) and a
+  fresh push happens. For now the live run remains #44/#9 and we
+  keep watching.
+
+  **Issues check:** the build-failure aggregator Issue **#1** ("[build]
+  Job cancelled or timed out") is **still open**, unchanged — same
+  set of bot comments piling up against runs #38–#41. No *new* issue
+  filed against #44, which is consistent with the handler now
+  filtering out cancelled-runner failures (no new failure signature
+  hit for #44 because attempts #1–#8 are concurrency-cancellations,
+  not build errors). If #44/#9 ultimately succeeds, the next cycle
+  should close Issue #1 with a "fixed by self-hosted runner switch"
+  note. **No fix needed this cycle**, push BUILD_NOTES update.
+
+ The
   workflow now runs on Matt's Mac mini (commit pushed since the last
   watcher cycle), so the GitHub-hosted-macOS retry treadmill is
   retired. Earlier attempts #1–#8 of run #44 were all auto-cancelled
@@ -41,16 +93,36 @@ Running log of failures and fixes. Newest at top. The scheduled task
   switch appears to be working, sccache is hitting, and the build is
   setting up cleanly. Watcher is just observing.
 
-  ⚠ **Watcher constraint this cycle:** the GitHub PAT
-  (`/sessions/wonderful-stoic-lamport/.gh_token` per the task file) is
-  not present in this session's filesystem (session paths are
-  per-run and ephemeral; the previous session's `.gh_token` is no
-  longer reachable from `relaxed-laughing-planck`). I have therefore
-  written this BUILD_NOTES update locally but **could not `git push`**
-  the commit to origin this cycle. Next cycle's watcher should either
-  (a) inherit a token in its own session, (b) push from a context
-  where credentials are cached, or (c) the user can stage the token
-  again at a session-stable path.
+  **Token-path note (correction-of-correction):** the watcher task
+  file lists the PAT at `/sessions/wonderful-stoic-lamport/.gh_token`,
+  which is the **previous** session's path and is not readable from
+  this session. The token is, however, also staged at
+  `/sessions/relaxed-laughing-planck/mnt/Projects/claum-browser/.gh_token`
+  (in-repo, gitignored) and was usable from there. Push of this notes
+  update succeeded via that path. Future cycles: the task file should
+  probably reference a session-stable path (e.g. inside the repo
+  mount) rather than the per-session `/sessions/<name>/.gh_token`.
+
+  **Run #44 timing detail (post-fetch):** after `git fetch origin`,
+  origin/main is at `a3fef01` "Stop the cancellation-thrash loop on
+  self-hosted" — that commit IS already pushed (had been done in a
+  prior session). However GitHub Actions still shows the latest
+  Build Claum (macOS) run as **#44 / commit `71ebc55`** in the runs
+  list, with attempt #9 currently in flight on the self-hosted Mac
+  mini. Likely explanation: `a3fef01` only edits workflow YAML
+  (`build-mac.yml`, `claum-autopilot.yml`,
+  `build-failure-handler.yml`); the `on: push` trigger on
+  `build-mac.yml` would normally have started run #45 when a3fef01
+  landed, but the file changes themselves probably matched no
+  `paths`/`paths-ignore` filter that mattered, AND/OR the new
+  `cancel-in-progress: false` means the current attempt #9 is now
+  shielded from being killed by a queued #45. Either way the live
+  attempt #9 is the one to watch — its workflow YAML is from
+  `71ebc55` (cancel-in-progress: true), so it COULD still be killed
+  if the failure handler re-dispatches; but the handler's
+  `workflow_run` trigger was removed in `a3fef01` and the autopilot's
+  was too, so as long as nothing re-pushes main while attempt #9 is
+  running, it should run to completion.
 
 - **2026-04-26 16:15 UTC** (session `focused-tender-gates`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
