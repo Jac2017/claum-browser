@@ -5,6 +5,56 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 16:15 UTC** (session `focused-tender-gates`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
+  progress** at **~1h 24m** since the `Run Claum build` step started
+  (`14:51:04Z` per the page `<relative-time>` element; total job
+  started `14:46:34Z` → ~1h 28m wall-clock). Marginal +4m advance vs.
+  the prior watcher cycle's reading at 16:11 UTC, otherwise the picture
+  is **identical and healthy**. **Liveness signals all green:**
+  (a) `Cancel workflow` button still rendered (job alive); (b) status
+  badge **In progress**; (c) attempt selector still **Latest #5** (no
+  new auto-retry by `build-failure-handler` → it doesn't see #43 as
+  failed); (d) zero `##[error]` / `FAILED:` / `fatal error` /
+  `ninja: error` / `undefined symbol` / `FileNotFoundError` markers
+  anywhere in DOM on either run or job page; (e) Issues tab
+  `?q=label:build-failure` still **1 open / 0 closed** (aggregator
+  Issue #1 unchanged); (f) all 10 pre-`Run Claum build` steps green
+  with completion durations rendered (Set up job 2s / Checkout 2s /
+  Xcode 4s / Free disk 3m 7s / Install deps 39s / Restore sccache 26s
+  / Install sccache 1s / Configure sccache 0s / SDK modulemap 9s /
+  Cache Chromium 0s); (g) post-ninja steps (`Show sccache stats and
+  prepare cache for save`, `Save sccache disk cache`, `Package .app
+  as .dmg`, `Upload build artifact`) still show **no duration** = not
+  yet started, which is consistent with ninja still running.
+  **Ninja count still not sampleable** — same GitHub Actions log
+  virtualization trap as every cycle since 15:15 UTC: every step
+  renders the "This step has been truncated due to its large size.
+  View the raw logs from the menu once the workflow run has
+  completed." sentinel; the deep ninja log only becomes available via
+  the raw archive after the run finishes. Last directly-observed
+  ninja position (cycle at 15:15 UTC) was `[15822/55997]` advancing at
+  ~14 ticks/s; extrapolating linearly ~60m later we should be in the
+  **[40000-50000/56000]** band, but the previous cycle's
+  16:10–16:20 UTC ninja-finish prediction looks **slightly
+  optimistic** — we're 24 min past the start of that window with no
+  step transition yet. Still well under the 5h 30m job timeout
+  (current step elapsed 1h 24m; budget remaining ≥ 4h). Past the
+  `[12845]` SOLINK `libvk_swiftshader.dylib` checkpoint that killed
+  #32/#34 and well past the `third_party/angle/...` band where #40
+  cancelled at `[26552/56094]`. **Other workflow noise:** `Claum
+  autopilot` is the only workflow firing inline (latest scheduled run
+  visible at the top of the Actions list); the parallel `Build Claum
+  (prebuilt patch)` workflow ran 58s in its last invocation and has
+  not fired again. **Action taken:** appended this status line via
+  fresh shallow clone in `/tmp/claum-watcher` (the existing local
+  checkout in `/mnt/Projects/claum-browser` had EPERM on
+  `unlink` for `BUILD_NOTES.md` so I worked from a clean clone in the
+  sandbox `/tmp` instead). No code changes — build is healthy.
+  Step 3 (failure handling) and Step 4 (artifact download) both N/A
+  this cycle. Pushing to `main` with `[skip ci]` via the token from
+  `/mnt/Projects/claum-browser/.gh_token`.
+
 - **2026-04-26 16:11 UTC** (session `gracious-magical-albattani`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
   progress** at ~1h 20m wall-clock since the build step started
