@@ -5,6 +5,40 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 15:27 UTC** (session `magical-busy-shannon`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) **In progress**,
+  ~41m wall-clock since job started at `2026-04-26T14:46:34Z`. The "Run
+  Claum build" step itself started at `1777215064000` (~14:51:04 UTC),
+  so ninja has been running ~36m. **Live ninja count not sampleable
+  this cycle** — GitHub Actions has fully truncated the inline log on
+  every step ("Error: This step has been truncated due to its large
+  size. View the raw logs from the menu once the workflow run has
+  completed.") for both expanded and collapsed states; the
+  `js-checks-log-display-container` div renders empty in DOM at all
+  scroll positions and `get_page_text` confirms no ninja ticks present.
+  This is **expected for runs of this size** — once the inline log
+  buffer overflows, GH only serves the raw archive after completion.
+  **Qualitative health signals are all green:** (a) run is still
+  attempt #5 (no new attempt = handler hasn't auto-retried again),
+  (b) no `##[error]` / `FAILED` / `fatal error` / `ninja: error` /
+  `undefined symbol` markers anywhere on the rendered page, (c) the
+  Issues tab `?q=label:build-failure` is unchanged at 1 open / 0
+  closed (the existing aggregator Issue #1 — no new build-failure
+  issue opened by handler), (d) `Cancel workflow` button still
+  rendered (job is alive). Extrapolating from the previous cycle's
+  reading 12m ago (`[15822/55997]` advancing at ~14 ticks/s), we
+  should be in the **[25000-35000/56000]** band now and on track to
+  finish ninja around **16:10-16:20 UTC**, leaving DMG packaging +
+  artifact upload before the 5h 30m job timeout. Past the [12845]
+  SOLINK `libvk_swiftshader.dylib` checkpoint that killed runs #32
+  and #34. **Action taken:** appended this status line; no code
+  changes needed (build is healthy and progressing). Step 3
+  (failure handling) and Step 4 (artifact download) both N/A —
+  build still in flight. Notes pushed via fresh `/tmp/claum-clone`
+  workdir because the shared Projects mount had a stale
+  `.git/index.lock` from the previous watcher session that I
+  couldn't remove (cross-session ownership).
+
 - **2026-04-26 15:15 UTC** (session `pensive-gifted-goodall`) — run **#43**
   (commit `ed6fefc` — "Wire sccache into ninja, fix gtar save error,
   raise retry cap"; this run is **attempt 5**, re-dispatched by the
