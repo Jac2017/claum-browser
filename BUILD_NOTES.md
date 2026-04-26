@@ -5,6 +5,56 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 16:11 UTC** (session `gracious-magical-albattani`) — run **#43**
+  attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
+  progress** at ~1h 20m wall-clock since the build step started
+  (`Run Claum build` began at `2026-04-26T14:51:04Z` per the page
+  `<relative-time>` element; total job started at `14:46:34Z`).
+  **Liveness signals all green:** (a) `Cancel workflow` button still
+  rendered at top-right of the run page; (b) status badge says
+  **In progress**; (c) attempt selector still **Latest #5** — the
+  build-failure-handler workflow has **not** auto-retried again, so
+  it does not see this run as failed; (d) zero `##[error]` /
+  `FAILED:` / `fatal error` / `ninja: error` / `undefined symbol` /
+  `FileNotFoundError` markers anywhere in the rendered DOM (job
+  page, run page, or scrolled log container); (e) Issues tab
+  `?q=label:build-failure` still returns "Invalid value
+  build-failure for label" with **1 open / 0 closed** (the existing
+  aggregator Issue #1 is unchanged — handler filed nothing new for
+  #43); (f) `Build failure handler` workflow runs scanned in the
+  Actions tab show #46/#47/#48 are all old *completed* runs from
+  earlier cycles (no in-progress handler run targeting #43).
+  **Live ninja tick count not sampleable this cycle** — same DOM
+  log-virtualization trap that bit every cycle since 15:15: only the
+  16-tick gn self-bootstrap (`[1/204]`…`[15/204]` CXX of
+  `src/base/...`) renders inside the page, the deeper Chromium ninja
+  phase (out of 55997) is omitted from `document.body.innerText` and
+  no scrollable parent in the DOM lazy-loads it; `body.innerText`
+  caps at 2.4 KB on the job page. **Other workflow noise:** the
+  `Claum autopilot` workflow has been firing every few minutes
+  (latest visible: #126 Scheduled, top of Actions list) — that's
+  the watchdog-of-watchdogs and is healthy. No new `Build Claum
+  (macOS)` run has started after #43 (would be #44+) — confirmed
+  via the build-mac.yml workflow page. **Past historical fail
+  points:** well beyond `[12845]` SOLINK
+  `libvk_swiftshader.dylib` (#32, #34) and
+  `[26552/56094]` angle/null backend (#40 stalled). Extrapolating
+  from the 15:15 cycle's last live tick (`[15822/55997]` advancing
+  at ~14 ticks/sec) over the ~56 minutes since, throughput would
+  predict the [60000+/55997] band — so we should be at or past the
+  end of pure compile and into the SOLINK / final-link / DMG
+  packaging phase. **No code changes needed.** Step 3 (failure
+  handling) and Step 4 (artifact download) both N/A — build still
+  in flight. Pushing this notes update with `[skip ci]` from a
+  fresh `/tmp/cwork-…/claum-browser` clone, because the shared
+  `Projects/claum-browser` mount has a stuck `.git/index.lock`
+  (timestamped 15:16 UTC, owned by my UID but
+  `Operation not permitted` to delete on the FUSE mount —
+  cross-session file-handle quirk that prevents *any* index-mutating
+  git op in the shared workdir; same workaround the 15:27 cycle
+  used).
+
+
 - **2026-04-26 15:53 UTC** (session `ecstatic-peaceful-mendel`) — run **#43**
   attempt **#5** (commit `ed6fefc`, job `73083217321`) still **In
   progress** and **healthy** at ~1h 7m wall-clock since the job started
