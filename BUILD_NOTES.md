@@ -5,6 +5,35 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 17:43 UTC** (session `funny-great-goldberg`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress** at
+  ~46 min runtime. **No FAILED markers** anywhere in the rendered
+  log; **no new build-failure issue** opened by the handler. The
+  pre-existing open Issue #1 ("Job cancelled or timed out") is from
+  earlier runs (24870003864, 24892383726, 24918949163, 24921600179)
+  and has not been re-triggered this run.
+
+  **Tick count caveat for this cycle:** GitHub's log viewer is heavily
+  virtualized — `js-checks-log-display-container` only renders a
+  windowed slice of lines into the DOM at any time. Search for high
+  tick numbers (`[15000/`, `[12345/`) returned `0/0` matches in the
+  current page, but the previous watcher (17:24 UTC, `lucid-friendly-gates`)
+  read **`[13280/55997]`** off this same job — and the build has been
+  ticking healthily for **+19 minutes** since then with no error
+  signal, so we're somewhere well past `[13280]` and almost
+  certainly past the SOLINK `libvk_swiftshader.dylib` checkpoint
+  (which already fell at `[12845]` in the prior cycle's reading).
+  Linear extrapolation at the prior `~9 ticks/sec` pace puts us
+  somewhere near **`[~23,000-25,000/55997]`** as of this write,
+  i.e. roughly **40-45% complete**.
+
+  **Decision:** no code intervention this cycle. The
+  build-failure-handler hasn't filed a new issue, no FAILED markers
+  visible. Just appending this watcher entry and committing with
+  `[skip ci]`. Next watcher should re-check in ~5 min — by then the
+  build may well have entered the dangerous `LINK Chromium\ Framework`
+  final-stretch territory.
+
 - **2026-04-26 17:24 UTC** (session `lucid-friendly-gates`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress and looking
   great**. Latest ninja tick read off the live job page: **`[13280/55997]
