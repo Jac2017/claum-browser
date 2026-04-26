@@ -5,6 +5,75 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 17:20 UTC** (session `eager-epic-meitner`) —
+  run **#47** (commit `7e7ea71` "build-mac.yml: install Xcode Metal
+  Toolchain (run #46 fix)", job `73090451041`) is still **In progress**
+  and **very healthy**. Critical progress update: ninja tick has
+  advanced from `[2950/55997]` (last cycle, 17:05 UTC) to
+  `[11049/55997]` over ~15 minutes, i.e. **+8,099 ticks in 15 min ≈
+  ~9 ticks/sec**. That's an excellent pace for the current band of
+  small CXX TUs. Two sequential reads taken ~5 min apart this cycle:
+  first read showed `[10691/55997]` (last line: dav1d/wedge.o, AV1
+  decoder), second read showed `[11049/55997]` (last line:
+  dawn/tint/glsl writer raise binary_polyfill.o, WebGPU shader
+  compiler) — i.e. **+358 ticks in ~5 min ≈ ~1.2 ticks/sec** on this
+  finer-grained sample, also healthy.
+
+  **Where we are in the build:** crossed past run #46's failure
+  point at `[6716/55997]` (the ANGLE Metal-shader compile that
+  needed the Metal Toolchain) **without any errors**, confirming
+  the Xcode Metal Toolchain workflow step (`44s` already-installed
+  fastpath, see commit `7e7ea71`) is working as intended on Matt's
+  Mac mini self-hosted runner. We are now compiling Dawn/Tint
+  (the WebGPU shader translator), having just left dav1d (AV1
+  software decoder). The critical SOLINK checkpoint at
+  `[12845/55997] libvk_swiftshader.dylib` (where runs #32 and #34
+  historically failed) is now only **~1,800 ticks away**, ≈3-4 min
+  at the current ~9 ticks/sec rate, so we should hit it well
+  before the next watcher cycle — that will be the big test.
+
+  **Failure markers across the rendered job log:** **0** —
+  `FAILED:`, `##[error]`, `ninja: error`, `fatal error`,
+  `undefined symbol`, `FileNotFoundError` are all absent. Cancel
+  button visibility was not detected this cycle (page-state quirk;
+  the post-build steps `Show sccache stats` / `Save sccache disk
+  cache` / `Package .app as .dmg` / `Upload build artifact` /
+  three `Post …` cleanup steps all show **no duration**, which
+  unambiguously tells us the long ninja step is still running and
+  has not yet handed off — that's the authoritative signal here,
+  not the button DOM).
+
+  **Step durations confirmed unchanged from last cycle** (run is
+  the same one — the long-running `Run Claum build` step has just
+  ticked further ninja output): `Set up job 7s` / `Check out Claum
+  repo 36s` / `Select Xcode with macOS SDK 15+ 0s` / `Ensure Metal
+  Toolchain is installed 44s` / `Free up disk space on runner 0s`
+  / `Install build dependencies 4s` / `Restore sccache disk cache
+  8s` / `Install sccache 1s` / `Configure sccache 0s` / `Diagnostic
+  - SDK modulemap layout 4s` / `Cache Chromium source 0s` / `Run
+  Claum build` (in progress, no duration shown yet).
+
+  **Issues check:** `label:build-failure` filter still surfaces
+  the long-standing aggregator **Issue #1** ("Job cancelled or
+  timed out") only — **0 new** issues filed against run #47. Repo
+  Issues count in the header reads `1` total, matching prior
+  cycles. The build-failure-handler workflow has not had to fire
+  on this run.
+
+  **Action this cycle:** none on source — build is healthy and
+  past the prior failure point. Just appending this watcher log
+  entry, committing it with `[skip ci]`, and pushing. The Metal
+  Toolchain fix from `7e7ea71` is **fully verified in flight** as
+  of this cycle.
+
+  **Next checkpoint to watch for in the next cycle:** ninja tick
+  count at or past `[12845/55997] libvk_swiftshader.dylib`. If
+  the run has cleared SOLINK, we are out of the historical
+  danger zone and the chance of finishing the build climbs
+  significantly. If the run has failed at SOLINK, expect a
+  vk-swiftshader / vulkan symbol error and a build-failure issue
+  from the handler.
+
 - **2026-04-26 17:05 UTC** (session `blissful-compassionate-hypatia`) —
   run **#47** (commit `7e7ea71` "build-mac.yml: install Xcode Metal
   Toolchain (run #46 fix)", job `73090451041`) is **In progress** and
