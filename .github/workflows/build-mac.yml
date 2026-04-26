@@ -169,6 +169,50 @@ jobs:
           ls "$BEST_XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
 
       # ------------------------------------------------------------------
+      # Ensure the Metal Toolchain is installed (Xcode 16+ specific).
+      # ------------------------------------------------------------------
+      # Why this step exists:
+      # In Xcode 16, Apple split the Metal compiler ("metal" / "metal-ar")
+      # out into a separately-downloadable "Metal Toolchain" component.
+      # A fresh Xcode install does NOT include it. Chromium / ANGLE needs
+      # `xcrun metal` to compile its Metal shaders (.metal -> .air files),
+      # so without the toolchain the build fails at:
+      #   FAILED: gen/angle/mtl_internal_shaders_autogen.air
+      #   error: cannot execute tool 'metal' due to missing Metal Toolchain
+      # This was the cause of run #46 failing at ninja [6716/55997].
+      #
+      # The fix: run `xcodebuild -downloadComponent MetalToolchain`. This
+      # is idempotent — if the toolchain is already installed it just
+      # prints "Already up-to-date" and exits 0. So it's safe to run on
+      # every build; on a fresh runner it downloads (~1-2 GB), on a
+      # warm runner it's effectively a no-op (a few seconds).
+      #
+      # `continue-on-error: false` (the default) means a download failure
+      # WILL fail the job — we want loud failure, not a mysterious build
+      # error 10 minutes later. The retry logic in build-failure-handler
+      # will pick it up if the download was just transient.
+      # ------------------------------------------------------------------
+      - name: Ensure Metal Toolchain is installed
+        run: |
+          echo "==> Checking if 'xcrun metal' is currently usable:"
+          # Try a tiny no-op: ask `xcrun metal` to print its version. If the
+          # toolchain is installed this prints something like "Apple metal
+          # version 32.x" and exits 0. If it's missing, xcrun returns the
+          # exact error we saw in run #46 and exits non-zero.
+          if xcrun metal --version >/dev/null 2>&1; then
+            echo "Metal toolchain is already installed — skipping download."
+            xcrun metal --version
+          else
+            echo "Metal toolchain is NOT installed. Downloading via xcodebuild..."
+            # The `-downloadComponent` flag was added in Xcode 16. It pulls
+            # the component from Apple's CDN into the active Xcode. No sudo
+            # needed; the component installs into the developer dir.
+            xcodebuild -downloadComponent MetalToolchain
+            echo "==> Verifying the download succeeded:"
+            xcrun metal --version
+          fi
+
+      # ------------------------------------------------------------------
       # GitHub's macOS runners come preloaded with multiple Xcode versions,
       # tons of iOS simulators, the Android SDK, etc. We only need ONE
       # Xcode and the Apple Silicon simulators are irrelevant to us.

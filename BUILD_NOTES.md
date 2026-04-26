@@ -5,6 +5,87 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 16:55 UTC** (session `busy-cool-bardeen`) — runs
+  **#44** and **#46** both **failed**, but for different reasons.
+  Posting status + the fix I just pushed.
+
+  **Run #44 / attempt #9** (commit `71ebc55`, job `73088747577`):
+  total duration **9m 58s**, status **Failure**, single annotation
+  *"The operation was canceled."* — so #44 got cancelled while in
+  ninja, almost certainly because the *next* push (#46 manual
+  dispatch on `83a8b81`) preempted it. With the cancel-in-progress
+  thrash-loop fix from `a3fef01` not yet on a fresh-started run,
+  the runner still had the old "cancel earlier" behaviour. Not a
+  build-script bug; nothing to fix in the source.
+
+  **Run #45** (commit `a3fef01` "Stop the cancellation-thrash loop"):
+  cancelled at **5s** by the queue while waiting for #44 — same
+  concurrency situation as last cycle. Carries the thrash-loop fix,
+  which will only take effect once a build run *starts* under it.
+  Nothing to fix.
+
+  **Run #46** (commit `83a8b81`, job `73089410439`, manually
+  dispatched by Matt): **Failure** at **13m 21s**, exit code 1.
+  This one is the interesting one — it failed at ninja
+  **`[6716/55997]`** in the action
+  `//third_party/angle/src/libANGLE/renderer/metal:angle_metal_internal_shaders_to_air`,
+  with the error:
+
+  > `error: cannot execute tool 'metal' due to missing Metal
+  > Toolchain; use: xcodebuild -downloadComponent MetalToolchain`
+
+  **Root cause:** Xcode 16 (which is what the runner picked, per the
+  "Select Xcode with macOS SDK 15+" step) ships *without* the Metal
+  compiler by default. Apple split it out into a
+  separately-downloadable "Metal Toolchain" component. ANGLE needs
+  `xcrun metal` to compile its `.metal` shader sources to `.air`
+  files, so a fresh Mac mini Xcode 16 install hits this on the
+  first build that reaches the ANGLE step.
+
+  **Fix applied (this commit):** added a new step
+  `Ensure Metal Toolchain is installed` to `.github/workflows/
+  build-mac.yml`, placed right after `Select Xcode with macOS SDK
+  15+`. The step:
+    1. Tries `xcrun metal --version` — exits 0 if already installed.
+    2. If that fails, runs `xcodebuild -downloadComponent
+       MetalToolchain` to fetch the component (~1-2 GB) into the
+       active Xcode developer dir.
+    3. Re-verifies with `xcrun metal --version` so we fail loudly
+       at this step (not 12 minutes later in ninja) if the download
+       didn't take.
+
+  Idempotent: on the second run the toolchain is cached on disk and
+  the step takes a few seconds. So Matt's Mac mini downloads it
+  once, then it's a no-op forever.
+
+  **Why we didn't see this on macos-15 GitHub-hosted runners:** the
+  GitHub-hosted images preinstall the full Metal SDK as part of
+  their Xcode bundle. Self-hosted runners only get whatever the
+  human (Matt) downloaded when they installed Xcode, and the GUI
+  installer's default doesn't include it.
+
+  **Other notes from the log:**
+    - The `fatal error: 'jpeglib.h' file not found` line at log idx
+      204 is just preamble noise — the actual `Install build
+      dependencies` step `brew install jpeg-turbo` runs slightly
+      later, and the build step's GN args correctly point to
+      `/opt/homebrew/opt/jpeg-turbo/include/`. Not the failure.
+    - Issue **#1** "[build] Job cancelled or timed out" is still
+      open with one bot comment per cancelled run; no new issue
+      filed for #46 (the handler may comment on #1 once it runs).
+
+  **Next step / what triggers next:** this commit pushes to `main`,
+  which auto-fires `build-mac.yml` (push trigger). The new step
+  will download the Metal Toolchain on Matt's Mac mini once, then
+  ANGLE shader compilation should pass and the build will continue
+  toward the SOLINK checkpoint at [12845/55997].
+
+  **Watcher log entry (compact):** scheduled run @ 2026-04-26 16:55
+  UTC, repo state `83a8b81` → fix pushed as `<see commit hash
+  below>`. Last run #46 failed at ninja [6716/55997] with missing
+  Metal Toolchain. Fix: workflow now ensures toolchain present.
+  Next run: pending push.
+
 - **2026-04-26 16:50 UTC** (session `great-dreamy-franklin`) — new run
   **#46** is now the latest Build Claum (macOS) on the Actions list,
   status **In progress**, head SHA `83a8b81` ("BUILD_NOTES: run #44
