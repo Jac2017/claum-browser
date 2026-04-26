@@ -5,6 +5,67 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-26 18:11 UTC** (session `wizardly-loving-thompson`) — run **#47**
+  (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
+  **~1h 9m total runtime** (job started 17:02:30 UTC; check time
+  18:11:48 UTC). The "Run Claum build" step has been active for the
+  full ~68 min stretch — well past the **13m 21s mark where run #46
+  failed on the Metal Toolchain issue**, so commit `7e7ea71`'s fix is
+  holding solid.
+
+  **Status snapshot from the rendered job page:**
+  - Set up job ✅ 7s
+  - Check out Claum repo ✅ 36s
+  - Select Xcode with macOS SDK 15+ ✅ 0s
+  - Ensure Metal Toolchain is installed ✅ 44s
+  - Free up disk space on runner ⊘ 0s (skipped — self-hosted)
+  - Install build dependencies ✅ 4s
+  - Restore sccache disk cache ✅ 8s (warm cache restored)
+  - Install sccache ✅ 1s
+  - Configure sccache ✅ 0s
+  - Diagnostic - SDK modulemap layout ✅ 4s
+  - Cache Chromium source ✅ 0s
+  - **Run Claum build 🟡 IN PROGRESS** (since 17:02:30 UTC)
+  - downstream steps queued (Show sccache stats / Save sccache /
+    Package .dmg / Upload artifact / Post-cleanup)
+
+  **Tick count caveat (5th cycle in a row, same as kind-keen-fermat
+  18:05):** GitHub's virtualized log viewer still does not render the
+  live ninja tail into the DOM, and the raw-logs URL returns **404**
+  for in-progress jobs (only finalized after step completion).
+  api.github.com remains proxy-blocked (HTTP 403 from egress proxy).
+  So we cannot read a live ninja tick number — but the wall-clock is
+  advancing, spinner still active, zero failure markers found.
+
+  **Failure markers in rendered page text:** **0** — no `FAILED:`,
+  `##[error]`, `ninja: error`, `fatal error`, `undefined symbol`,
+  or `FileNotFoundError`. Build-failure-handler workflow has not
+  opened any new issue this cycle (Issues tab still shows just the
+  pre-existing #1 from the old run #44 cancellation, which was
+  already known and resolved by the self-hosted runner switch).
+
+  **Pace extrapolation:** last directly-observed tick was
+  `[13280/55997]` at the ~24-min mark (fdf46ca). At the consistent
+  ~9 ticks/sec rate (per fdf46ca and 0208395), +44 min ≈ +23.7k more
+  ticks → estimated **`[~37,000/55997]` ≈ 66% complete**, likely
+  deep in `content/` and starting to hit larger `chrome/` translation
+  units where pace will slow.
+
+  **Decision: no code intervention this cycle.** All signals
+  consistent with a healthy long-running build. The Metal Toolchain
+  fix is confirmed effective. Next high-risk milestones are the
+  final `LINK Chromium Framework` step and the post-ninja Package
+  .app-as-.dmg step.
+
+  **Operational note:** as `kind-keen-fermat` documented, the local
+  checkout's `.git/index.lock` is stale (0 bytes, owned by us, but
+  Operation not permitted on rm — likely a FUSE mount quirk with
+  hidden files in `.git/`). Worked around by cloning fresh into
+  `/tmp/cb` and pushing from there. Local repo at
+  `/sessions/wizardly-loving-thompson/mnt/Projects/claum-browser`
+  remains broken for git ops but is not on the critical path —
+  origin/main is the source of truth.
+
 - **2026-04-26 18:05 UTC** (session `kind-keen-fermat`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress**, now at
   **1h 4m 1s** total runtime ("Started 1h 4m 1s ago") with **"Run Claum
