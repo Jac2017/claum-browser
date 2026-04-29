@@ -5,6 +5,67 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:23 UTC** (session `loving-nice-mccarthy`) — Run **#66**
+  (commit `770a885`, run id `25127959621`, job `73646129449`) is still
+  **In progress**, ~26 min total elapsed (build step ~24 min — started
+  18:56:45 UTC, build step kicked off ~18:58:39 UTC). Page still shows
+  the `Cancel workflow` button, no `Re-run` button, and zero
+  `FAILED:` / `##[error]` markers in the rendered DOM.
+
+  **Ninja count this cycle:** *not directly observable*. Same story
+  as the previous two watcher cycles — the live `Run Claum build`
+  step's log container shows *"This step has been truncated due to
+  its large size. View the raw logs from the menu once the workflow
+  run has completed."* GitHub stops streaming individual log lines
+  into the DOM for in-progress steps that exceed its size threshold.
+  Last directly-measured tick was the previous-previous watcher's
+  `[5518/55997]` at ~9 min (commit `36f1a7a`). Linear extrapolation
+  from that data point puts the build somewhere around
+  `[14000-18000]/55997` at ~24 min build-step time — i.e.
+  comfortably past the historical SOLINK checkpoint at `[12845]`,
+  but still well before the safe_browsing crash at `[44760]`.
+
+  **Build-failure handler signal:** the `?q=label:build-failure`
+  filter returns *"Invalid value build-failure for label"* —
+  GitHub does not currently recognize the label on this repo (it
+  may have been removed or never created on this fork). 19 unrelated
+  open issues remain (all referencing stale SHA `396fc6b` from run
+  #47); none new. Handler workflow has not opened a fresh issue
+  for run #66, consistent with the run not yet having failed.
+
+  **Working-tree note (carry-over):** the in-place checkout at
+  `mnt/Projects/claum-browser` is still in the destructive-edit
+  state described by the last two watchers (uncommitted M on
+  `BUILD_NOTES.md`, `claum/scripts/build-mac.sh`,
+  `.github/workflows/build-mac.yml`, plus stale `.git/index.lock`
+  + `.gone-5` siblings). The sandbox bash mount returns
+  `Operation not permitted` on `rm`/`unlink` for these files, even
+  though the owner uid matches. **Workaround used this cycle:**
+  fresh shallow clone in `/tmp/claum-browser-fresh`, edit + commit
+  + push from there. Same approach as `ecstatic-eloquent-hawking`
+  and `jolly-magical-archimedes` before me. Worth noting the
+  worktree-corruption pattern is now consistent across multiple
+  sessions, suggesting the sandbox is in a semi-permanent
+  read-mostly state.
+
+  **Action taken this cycle:** **observation only — no code
+  changes pushed.** Run is still healthy and progressing; the
+  diagnostic-instrumentation commit `770a885` is the current bet
+  and it needs the build to actually reach `[~44760]` before the
+  Diagnostic-D BUILD.gn dump fires. Nothing useful to do until
+  either (a) the run fails near the historical safe_browsing
+  checkpoint and we can read the dumped sources blocks from the
+  raw log, or (b) the run unexpectedly passes that point — in
+  which case the next watcher should celebrate and watch the
+  SOLINK / DMG packaging steps instead.
+
+  **Stopping condition for this cycle:** committed BUILD_NOTES
+  status entry with `[skip ci]`; exiting. Next watcher tick
+  should re-poll the run and, if it has terminated, fetch the
+  raw build log via the run's `.../logs` endpoint (auth'd Chrome
+  session has cookies) to extract the BUILD.gn dump near the
+  FAILED: marker.
+
 - **2026-04-29 19:12 UTC** (session `ecstatic-eloquent-hawking`) — Run **#66**
   (commit `770a885`, run id `25127959621`, job `73646129449`) is
   still **In progress**. Job total elapsed ~15 min; the
