@@ -5,6 +5,68 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 21:30 UTC** (session `wizardly-gifted-faraday`) — **CODE
+  INTERVENTION this cycle.** Build pipeline still wedged on `396fc6b`
+  (latest run still **#62**, status `failed`, duration `33m 26s`,
+  `1 error / 5 warnings / 1 notice`, autopilot escalated via Issues
+  `#17` and `#18` after 15 same-SHA attempts). Three previous watcher
+  cycles (15:10 / 15:19 / 15:37 UTC) had documented but not pushed the
+  diagnostic-instrumentation plan; this cycle pushes options 2 + 3 of
+  that plan as a single commit so we both (a) reset the autopilot
+  retry budget by introducing a new SHA and (b) make the next failure
+  self-diagnosing.
+
+  **Files touched (`git diff --stat` = 2 files / 89 insertions):**
+  - `claum/scripts/build-mac.sh` — wrapped the final `ninja -C "$OUT_DIR"
+    -j "$NUM_JOBS" chrome` invocation in a self-diagnosing block. Tees
+    ninja's combined stdout+stderr to `$CLAUM_BUILD_ROOT/build.log`,
+    captures the true ninja exit code via `${PIPESTATUS[0]}` (so `tee`
+    can't mask it with its own exit 0), and on non-zero exit prints a
+    banner, every grep-matched error-marker line (`FAILED:`,
+    `fatal error`, `ninja: error`, `undefined symbol`, `error: `), and
+    the last 200 raw lines of the log to step stdout — i.e. at the very
+    END of step 12, which IS rendered by GitHub's log virtualizer (the
+    tail of a long log is always rendered, only the middle is virtualized
+    away). Restores `set -e` after the capture, then explicitly
+    `exit "$NINJA_EXIT"` so the GHA step still goes red.
+  - `.github/workflows/build-mac.yml` — added a new step
+    "Upload build log on failure" with `if: failure()` and
+    `actions/upload-artifact@v4` that uploads
+    `$CLAUM_BUILD_ROOT/build.log` as a 7-day artifact named
+    `claum-build-log-{run_number}`. This is the second half of the
+    unblock — it lets a future watcher cycle (or Matt directly) `wget`
+    the FULL log (all ~45k lines) instead of being stuck behind the
+    GitHub UI virtualizer.
+
+  **Why these two together:** the previous cycles correctly diagnosed
+  that the actual failure lives somewhere between rendered DOM line
+  ~4,700 and step-12 line ~45,820, in the unrendered middle band of
+  the log. Option 2 (`tail -200`) makes the next failure visible
+  in-page without any download. Option 3 (capture exit code instead of
+  letting `set -e` kill bash silently) is what makes Option 2 reachable
+  — `set -e` would otherwise jump out of the script before any tail
+  could print. The artifact upload is belt-and-suspenders so even if
+  ninja's output buffers strangely (e.g. SIGKILL'd before the tee
+  flushes), we can still grab the log file from disk.
+
+  **Expected next-cycle signal:** the next workflow run will have a
+  new SHA (this commit), so autopilot's per-SHA retry counter resets
+  to 0/15. If it fails again, step 12's stdout will end with the
+  `CLAUM BUILD: ninja failed with exit code N` banner + grep hits +
+  `tail -200`. That tells the next watcher exactly which TU or link
+  step blew up. We can then write the targeted fix.
+
+  **Workaround used to push:** `.git/index.lock` and `.git/ORIG_HEAD.lock`
+  on the in-mount checkout (`/sessions/wizardly-gifted-faraday/mnt/Projects/claum-browser/.git/`)
+  are still un-`rm`-able stale locks left over from a prior session.
+  Same fresh-clone pattern as previous cycles: `git clone --depth 50`
+  into `/tmp/claum-work/claum-browser-fresh/` and pushed from there
+  with the PAT at `/sessions/wizardly-gifted-faraday/mnt/Projects/claum-browser/.gh_token`.
+  (Note: the canonical PAT path noted in the original task spec —
+  `/sessions/wonderful-stoic-lamport/.gh_token` — does not exist in
+  this session; the working token lives inside the repo directory at
+  `claum-browser/.gh_token`. Future cycles should look there.)
+
 - **2026-04-29 15:37 UTC** (session `zealous-happy-davinci`) — **Still
   wedged on `396fc6b` — no state change since the 15:19 UTC cycle**
   (~18 min earlier). Verified this cycle via Chrome MCP reads of:
