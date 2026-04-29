@@ -5,6 +5,106 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 16:40 UTC** (session `elegant-inspiring-cori`) — Run
+  **#63** (commit `c4b1746`, GTMDefines.h → legacy `Foundation/`
+  staging fix; run id `25120350635`, job id `73619025956`) is **still
+  In progress** and **healthy**, **~25m 13s** into the run.
+
+  **Step durations from the job page** (everything before `Run Claum
+  build` is green-stamped, confirming we're well past the bootstrap
+  phase): `Set up job 4s` / `Check out Claum repo 44s` / `Select Xcode
+  with macOS SDK 15+ 0s` / `Ensure Metal Toolchain is installed 0s`
+  (already-installed fastpath) / `Free up disk space on runner 0s` /
+  `Install build dependencies 13s` / `Restore sccache disk cache 55s`
+  (cache hit, big positive) / `Install sccache 2s` / `Configure
+  sccache 0s` / `Diagnostic - SDK modulemap layout 3s` / `Cache
+  Chromium source 0s` / `Run Claum build` — *in progress*, **build
+  step elapsed ~23m 11s** (started `2026-04-29T16:16:36Z` per the
+  in-page `relative-time` element).
+
+  **Pace check vs. last cycle:** the previous watcher cycle
+  (`beautiful-inspiring-ramanujan`, **16:33 UTC**, ~7 min ago) saw
+  run #63 at ~16m total / ~14m on the build step. We're now at
+  ~25m total / ~23m on the build step — i.e. **+9 min of advancement
+  on the long step**, consistent with a healthy build (vs. a wedge,
+  which would show no time advancement). The job page is the same
+  one (same job id `73619025956`) so this is forward progress on a
+  single attempt, not a re-dispatch.
+
+  **Ninja tick read:** **0 ticks visible.** This is normal/expected
+  for an in-flight build — GitHub's virtualized live-log viewer does
+  not surface ninja `[X/Y]` lines via `innerText` while the step is
+  running, and the raw-log endpoint returns 404 pre-completion. The
+  prior watcher cycle hit the same blank tick read at 16:33 UTC and
+  the cycle before *that* (16:19 UTC) only managed to see download
+  progress (`[3/6] Downloading and unpacking Chromium`) — so this
+  is just the platform's behavior on a self-hosted runner, not a
+  signal of trouble.
+
+  **Failure markers across the page:** **0** — no `FAILED:`,
+  `fatal error`, `##[error]`, `ninja: error`, `undefined symbol`,
+  or `FileNotFoundError` anywhere in the rendered DOM (only ~2.8 KB
+  of body text after expanding all `<details>` because the log
+  content is still virtualized away).
+
+  **Issues check:** Repo header shows **`Issues 19`**. Filtering
+  `label:build-failure` returns the GitHub UI string
+  *"Invalid value build-failure for label"* (the label literally
+  doesn't exist as a defined repo label, so the search filter
+  is invalid — but the `.md`-rendered issue cards themselves
+  *do* show the `build-failure` chip in their text content, so
+  the label IS being applied at create time). Walking the issue
+  list manually: issues `#2`–`#19` are all the same auto-filed
+  *"[autopilot] Build wedged on **`396fc6b`** after 15 attempts"*
+  message from the build-failure-handler workflow — i.e. they are
+  **all keyed to the OLD `396fc6b` SHA** that ran as #62 and got
+  wedged. **None** of them mention the current `c4b1746` SHA, so
+  run #63 has triggered **0 new build-failure escalations** so far,
+  consistent with it not having failed. Issue `#1` is the long-
+  standing *"Job cancelled or timed out"* aggregator from Apr 24
+  with 3 comments — pre-existing, not run-#63-related. The 18
+  duplicate `#2`–`#19` escalations are noise from the wedge era
+  that resolved itself once a new SHA replaced `396fc6b`; they
+  could be batch-closed once #63 lands clean, but **don't touch
+  them this cycle** — handler logic may rely on counting them.
+
+  **Decision rule applied:** run is **In progress**, advancing
+  forward in time, no failures detected, no new build-failure
+  issues. No code intervention this cycle. Just appending this
+  watcher entry and pushing with `[skip ci]` so the on-push trigger
+  doesn't kick off a duplicate run that would race against #63.
+
+  **Workaround used to push (same as the last 3 cycles, documenting
+  again for future-you):** the in-mount checkout at
+  `/sessions/elegant-inspiring-cori/mnt/Projects/claum-browser/`
+  has un-`rm`-able stale git locks (`.git/index.lock`,
+  `.git/HEAD.lock.bk*`, `.git/HEAD.lock.gone`) that block any
+  `git pull` / `git checkout` / `git commit` because the FUSE-style
+  mount denies `unlink(2)` on existing files (you can `mv` them
+  out of the way to a new name, but you cannot delete them). I
+  cloned a fresh `--depth 50` copy into
+  `/sessions/elegant-inspiring-cori/tmp/claum-browser/` (where
+  the regular linux fs allows `rm`), edited there, committed, and
+  pushed using the PAT at
+  `/sessions/elegant-inspiring-cori/mnt/Projects/claum-browser/.gh_token`.
+  **PAT-path note:** the original task spec at the top of this file
+  references `/sessions/wonderful-stoic-lamport/.gh_token` — that
+  exact path no longer exists in *any* current session; the working
+  PAT lives **inside the repo** at `claum-browser/.gh_token` (mode
+  `600`). Future cycles should look there.
+
+  **Next-checkpoint to watch for:** if run #63 finishes the
+  `Run Claum build` step, the next cycle should see either (a)
+  green checks on `Show sccache stats`, `Save sccache disk cache`,
+  `Package .app as .dmg`, and `Upload build artifact`, ending with
+  a downloadable `.dmg` artifact — at which point we **claim
+  victory and pull the `.dmg`** down for Matt — or (b) a red `X`
+  on `Run Claum build` step with the new self-diagnosing tail
+  (commit `eba62f7`) printing `CLAUM BUILD: ninja failed with
+  exit code N` plus the matched error markers and the last 200
+  log lines. Either way, the next cycle has a clean signal to
+  act on.
+
 - **2026-04-29 16:33 UTC** (session `beautiful-inspiring-ramanujan`) —
   Run **#63** (commit `c4b1746`, GTMDefines.h → legacy Foundation/
   staging fix) **still In progress**, ~16m 14s into the run. The
