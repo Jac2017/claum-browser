@@ -5,6 +5,63 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 18:58 UTC** (session `zealous-eloquent-sagan`) — Run **#65**
+  (commit `5310b08`, run id `25125148704`, job `73636024246`)
+  **CONFIRMED FAILED** at ninja **`[44760/55997]`** with the
+  same `password_protection_service_base.cc` and
+  `client_side_detection_service.cc` errors documented in the
+  escalation section below. Identical to runs #62/#63/#64 —
+  this is the 4th cycle observing the same failure point.
+
+  **New ground-truth from raw log diagnostic:** The existing
+  Diagnostic-B output (lines 80-160 of
+  `chrome/browser/safe_browsing/BUILD.gn`) shows that
+  `safe_browsing_mode != 0` is **TRUE** in this build (the
+  `if (safe_browsing_mode != 0) { sources += [...] }` block at
+  line 111 IS being executed — that's how the failing CXX commands
+  ran). So the previous watcher's "Path A: wrap .cc files in
+  `if (safe_browsing_mode != 0)`" recommendation would be a
+  **no-op** — that condition is already true. We need a different
+  fix.
+
+  **Action taken — instrumentation only, NOT a fix:** Pushed
+  `770a885` ("build-mac.sh: dump component safe_browsing
+  BUILD.gn (run #66 instrumentation)"). It adds a Diagnostic D
+  block immediately before `gn gen` that dumps the structure of
+  `components/safe_browsing/core/browser/password_protection/BUILD.gn`
+  and `components/safe_browsing/content/browser/BUILD.gn` —
+  the two BUILD.gn files that own the failing `.o` targets
+  (`password_protection` and `client_side_detection_service`).
+  Run **#66** dispatched on commit `770a885` (run id `25127959621`)
+  is **In progress** as of this entry.
+
+  **Expected outcome:** Run #66 will fail at the same
+  `[44760/55997]` spot, but the workflow log will now contain the
+  raw structure of those two component BUILD.gn files. The next
+  watcher cycle (or a human) can read the dump, identify the
+  exact `sources = [ ... ]` blocks that include the offending .cc
+  files, and write a targeted fix script — likely either
+  (a) remove just the offending entries from the `sources` list,
+  paired with a counter-patch that comments out the consumer code
+  in those .cc files, or
+  (b) re-inject minimal stub declarations that return
+  privacy-preserving defaults (always `false`/none) — matching
+  the spirit of the ungoogled patch without breaking the build.
+
+  **Why instrumentation, not a speculative fix:** previous
+  watchers have correctly noted that a wrong fix costs ~30
+  minutes per cycle. Since the original Path A analysis is
+  invalidated by the new diagnostic data, pushing another
+  speculative patch without ground truth would burn another
+  cycle. A diagnostic-only commit is guaranteed to advance our
+  knowledge with zero risk of regression — the build was already
+  failing.
+
+  **Stopping condition:** This watcher cycle stops here. Run #66
+  must complete before the next cycle can use the new diagnostic
+  output.
+
+
 - **2026-04-29 18:21 UTC** (session `upbeat-eloquent-babbage`) — Run
   **#65** (commit `5310b08`, run id `25125148704`, job
   `73636024246`) is **In progress**, ~25 min elapsed, ninja
