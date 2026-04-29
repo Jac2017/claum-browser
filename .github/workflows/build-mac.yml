@@ -571,6 +571,29 @@ jobs:
                          -ov -format UDZO \
                          "Claum-${ARCH}.dmg"
 
+      # ------------------------------------------------------------------
+      # Failure-only: upload the full ninja build log as an artifact.
+      # ------------------------------------------------------------------
+      # Added 2026-04-29 alongside the self-diagnosing ninja wrapper in
+      # claum/scripts/build-mac.sh. When ninja fails, the GitHub UI's log
+      # virtualizer only renders ~4,700 lines, but Chromium's ninja output
+      # is ~45,000+ lines. The wrapper prints a tail to step stdout AND
+      # writes the full thing to $CLAUM_BUILD_ROOT/build.log; this step
+      # uploads that file as a 14-day artifact so we can `wget` it locally
+      # and grep through it without the UI in the way.
+      - name: Upload build log on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: claum-build-log-${{ github.run_number }}
+          path: ${{ env.CLAUM_BUILD_ROOT }}/build.log
+          # Short retention because the file can be large (>50MB) and we
+          # only need it long enough for the next watcher cycle to grep.
+          retention-days: 7
+          # Don't fail the workflow if the log doesn't exist (e.g. failure
+          # happened before ninja even started).
+          if-no-files-found: warn
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         # `if: success()` ensures we only upload if the .dmg actually exists.

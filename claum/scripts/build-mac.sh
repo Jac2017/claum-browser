@@ -1005,7 +1005,72 @@ gn gen "$OUT_DIR" --args="$GN_ARGS"
 # Build the main browser target.
 NUM_JOBS="${NUM_JOBS:-$(sysctl -n hw.logicalcpu)}"
 log_ok "Starting ninja with $NUM_JOBS parallel jobs"
-ninja -C "$OUT_DIR" -j "$NUM_JOBS" chrome
+
+# ----------------------------------------------------------------------------
+# Self-diagnosing ninja wrapper (added 2026-04-29 — runs #53–#62 wedge fix).
+# ----------------------------------------------------------------------------
+# Background: runs #53–#62 all failed with "Process completed with exit code 1"
+# and NO recognizable error string anywhere in the GitHub Actions log UI.
+# That's because GitHub's React log virtualizer renders only ~4,700 DOM lines,
+# but ninja's output for a Chromium build spans ~45,000+ lines, so the actual
+# failure is invisible unless someone downloads the raw log blob.
+#
+# This wrapper does three things:
+#   1. Runs ninja and tees its combined stdout+stderr to $BUILD_LOG_FILE.
+#   2. Captures ninja's true exit code via PIPESTATUS (otherwise `tee`
+#      would mask it because it always returns 0).
+#   3. On non-zero exit, prints a banner + the last 200 lines of the log
+#      AND any lines containing classic error markers (FAILED:, error:,
+#      fatal error, ninja: error, undefined symbol). Both dumps land at the
+#      very end of step 12's stdout, which IS rendered by the GitHub UI
+#      (the virtualizer always renders the tail of a long log).
+#
+# Once we can see the failure here, we can write a real fix.
+# ----------------------------------------------------------------------------
+
+# Where to put the log. $CLAUM_BUILD_ROOT is set up earlier in this script
+# (defaults to ~/claum-build) and is also uploaded as a GitHub Actions
+# artifact on failure (see .github/workflows/build-mac.yml).
+BUILD_LOG_FILE="$CLAUM_BUILD_ROOT/build.log"
+mkdir -p "$(dirname "$BUILD_LOG_FILE")"
+# Truncate any stale log from a previous run so we don't dump the wrong tail.
+: > "$BUILD_LOG_FILE"
+
+# Temporarily disable `set -e` so we can capture ninja's exit code instead
+# of letting bash bail immediately. We restore it right after.
+set +e
+# 2>&1 merges stderr into stdout so a single tee captures both streams.
+# `tee -a` appends so any lines printed to BUILD_LOG_FILE earlier are kept.
+ninja -C "$OUT_DIR" -j "$NUM_JOBS" chrome 2>&1 | tee -a "$BUILD_LOG_FILE"
+# PIPESTATUS is a bash-only array of every command's exit code in the pipe.
+# [0] is `ninja`, [1] is `tee`. We want ninja's, not tee's (which is always 0).
+NINJA_EXIT="${PIPESTATUS[0]}"
+set -e
+
+if [ "$NINJA_EXIT" -ne 0 ]; then
+  # Big banner so it's easy to spot in the GHA log even when scanning quickly.
+  echo ""
+  echo "================================================================"
+  echo "  CLAUM BUILD: ninja failed with exit code $NINJA_EXIT"
+  echo "  Dumping the last 200 lines of build.log + grepped error markers"
+  echo "  Full log path on the runner: $BUILD_LOG_FILE"
+  echo "  (also uploaded as the 'build-log' workflow artifact)"
+  echo "================================================================"
+  echo ""
+
+  echo "---- error-marker lines (grep) ----"
+  # `|| true` so grep returning 1 (no matches) doesn't kill the script.
+  grep -nE "FAILED:|fatal error|ninja: error|undefined symbol|error: "     "$BUILD_LOG_FILE" | tail -50 || true
+  echo "---- end error-marker lines ----"
+  echo ""
+
+  echo "---- last 200 lines of build.log ----"
+  tail -200 "$BUILD_LOG_FILE" || true
+  echo "---- end last 200 lines ----"
+
+  # Re-raise the original failure so the GitHub Actions step is still red.
+  exit "$NINJA_EXIT"
+fi
 
 # -------- Done --------------------------------------------------------------
 APP_PATH="$CLAUM_BUILD_ROOT/build/src/$OUT_DIR/Claum.app"
