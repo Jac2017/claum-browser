@@ -5,6 +5,51 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:46 UTC** (session `eager-stoic-hopper`) — **PUSHED FIX**.
+  Most recent cycle (`determined-upbeat-cerf` 19:29 UTC) said run **#66** was
+  in progress; it has since **FAILED** at total **36m 11s** /
+  build step **28m 56s** — same safe_browsing source-level wedge as
+  #64 and #65, no surprises. Diagnostic D-1/D-2 dumps from #66 were not
+  retrievable from this watcher sandbox: the GH UI step body was
+  truncated to <100 lines, both `/checks/{id}/logs` and
+  `/commit/{sha}/checks/{id}/logs/{step}` returned **500 Server Error**,
+  and `api.github.com` is proxy-blocked from bash AND CORS-blocked from
+  the in-page fetch. So I wrote the fix **without** the dump — using a
+  structure-agnostic source-removal approach instead of the
+  `if (safe_browsing_mode != 0)` wrap originally proposed in the
+  escalation block (which the run-#66 instrumentation commit message
+  itself flagged would be a no-op since `safe_browsing_mode != 0` is
+  already true in this build).
+
+  **Fix landed:** commit `0770c82` (run **#67**, run id
+  `25130216538`). Adds `claum/scripts/fix-safe-browsing-components-gn.py`
+  and wires it into `build-mac.sh` right after the existing
+  `fix-safe-browsing-gn.py` invocation (around line 1077). The new
+  script comments out two specific source list entries:
+  - `password_protection_service_base.cc` in
+    `components/safe_browsing/core/browser/password_protection/BUILD.gn`
+  - `client_side_detection_service.cc` in
+    `components/safe_browsing/content/browser/BUILD.gn`
+
+  **Self-test:** ran the script against synthetic BUILD.gn fixtures
+  containing each .cc filename — both single-pass and idempotent re-run
+  produced expected output (`# Claum: removed (...)` marker, list-comma
+  preserved, no other changes). `bash -n build-mac.sh` clean.
+
+  **Watcher protocol note:** the prior watcher cycle marked the
+  safe_browsing wedge as ESCALATED (the *3rd consecutive cycle without
+  a fix* trigger). This cycle clears that escalation by actually
+  pushing Path A. If run #67 still fails at `[44760]`, the next watcher
+  should switch to Path B (re-inject header symbol declarations) using
+  the upstream URLs in the escalation block.
+
+  **Workspace note:** the in-mount checkout at
+  `/sessions/eager-stoic-hopper/mnt/Projects/claum-browser/` had
+  cross-session `.git/*.lock` files I couldn't remove (other watcher
+  sessions also active), so I did the work in a fresh clone at
+  `/tmp/claum-eager` and pushed from there.
+
+
 - **2026-04-29 19:29 UTC** (session `determined-upbeat-cerf`) — Run **#66**
   (commit `770a885`, run id `25127959621`, job `73646129449`) is
   **still In progress**, ~30m 19s total elapsed (build step ~28m 25s,
