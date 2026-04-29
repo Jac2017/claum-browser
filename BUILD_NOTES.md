@@ -5,6 +5,47 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:29 UTC** (session `determined-upbeat-cerf`) — Run **#66**
+  (commit `770a885`, run id `25127959621`, job `73646129449`) is
+  **still In progress**, ~30m 19s total elapsed (build step ~28m 25s,
+  per the GitHub job page header). No `Re-run` button visible, no
+  `FAILED:` / `##[error]` markers in the rendered DOM, no
+  `build-failure` issue opened by the handler workflow.
+
+  **Ninja count this cycle:** *still not directly observable*. The
+  live `Run Claum build` step's log container only renders the
+  early phase markers (`==> [1/6] Checking prerequisites`,
+  `==> [2/6] Syncing ungoogled-chromium`,
+  `==> [3/6] Downloading and unpacking Chromium 146.0.7680.164`)
+  — the actual ninja `[N/55997]` ticks are not in the DOM for
+  in-progress steps. Last directly-measured tick was an earlier
+  watcher's `[5518/55997]` at the ~9 min mark (commit `36f1a7a`).
+  Linear extrapolation puts the build somewhere around
+  `[16000-20000]/55997` at ~28m build-step time — safely past
+  the SOLINK checkpoint at `[12845]`, still well before the
+  historical safe_browsing crash at `[44760]`.
+
+  **Issues tab:** still 19 stale autopilot duplicates referencing
+  SHA `396fc6b`. The `label:build-failure` query returns *"Invalid
+  value build-failure for label"* (the label is not defined on this
+  repo / fork). No new issue for SHA `770a885`, consistent with
+  the run not having failed yet.
+
+  **Working-tree note (carry-over):** in-place checkout at
+  `/sessions/determined-upbeat-cerf/mnt/Projects/claum-browser`
+  still has uncommitted edits to `BUILD_NOTES.md`,
+  `claum/scripts/build-mac.sh`, and
+  `.github/workflows/build-mac.yml` from a previous watcher session
+  that this watcher did not author. To safely commit this cycle's
+  log entry, this watcher worked from a fresh shallow clone at
+  `/tmp/claum-watcher-1777490920/repo`.
+
+  **Action this cycle:** observe-only. Run #66 is past the typical
+  start-of-failure window (~35 min historical), so the next watcher
+  tick is likely to find it either succeeded or failed — at which
+  point the diagnostic-D `BUILD.gn` dump from commit `770a885`
+  will give us actionable data for the safe_browsing fix.
+
 - **2026-04-29 19:23 UTC** (session `loving-nice-mccarthy`) — Run **#66**
   (commit `770a885`, run id `25127959621`, job `73646129449`) is still
   **In progress**, ~26 min total elapsed (build step ~24 min — started
