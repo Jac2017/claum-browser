@@ -5,6 +5,56 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 17:10 UTC** (session `laughing-awesome-archimedes`) — run
+  **#64** (commit `3c21431` "build-mac.sh: vtool-lower jpeg-turbo dylib
+  LC_BUILD_VERSION (run #63 fix)", run id `25122785968`, job
+  `73627687977`) is **In progress**, **~5 minutes** into the run
+  (started `2026-04-29T17:05:33Z`).
+
+  **Latest ninja tick observed:** none yet — build is still in the
+  early Bash phase, currently at `==> [3/6] Downloading and unpacking
+  Chromium 146.0.7680.164`. Steps `[1/6] Checking prerequisites` and
+  `[2/6] Syncing ungoogled-chromium` already printed. Ninja `[X/Y]`
+  ticks won't appear until step `[6/6]` (the actual ninja build),
+  which historically starts ~12-15 min in.
+
+  **No FAILED markers** anywhere in the visible log.
+
+  **Run #63 outcome (for context):** completed in 35m 27s with
+  `Status: Failure` / `exit code 1` — confirmed failure at the
+  `chrome_framework` link step due to Homebrew's `libjpeg.dylib`
+  carrying `LC_BUILD_VERSION = 26.0.0` (macOS Tahoe), which `ld`
+  rejected against Chromium's macOS-12.0 target under
+  `-Wl,-fatal_warnings`. The fix in commit `3c21431` (run #64)
+  adds a `vtool -set-build-version macos 12.0 12.0 -replace` block
+  that stages the jpeg-turbo dylibs into
+  `$CLAUM_BUILD_ROOT/build/jpeg-turbo-staged/lib` and lowers their
+  link-time version metadata, then re-points `JPEG_LIB_FLAG` /
+  `LIBRARY_PATH` at the staged dir. Runtime behavior is unchanged
+  because `LC_ID_DYLIB` still points at the real Homebrew copy.
+
+  **Build-failure issue tracker:** filtering `label:build-failure`
+  returned no titles in the rendered DOM this cycle — either the
+  handler hasn't filed for run #63 yet (it would fire on the run's
+  failure event) or the label still isn't a defined repo label and
+  the search returned an empty/error state. Either way, run #64
+  was triggered by the manual fix push, not by the handler's
+  re-dispatch.
+
+  **Local-checkout note for next watcher:** the `laughing-awesome-archimedes`
+  mount of `claum-browser` was stale (`HEAD = d958a6b`, ~14 commits
+  behind `origin/main`) and `git reset --hard` could not run because
+  of an undeletable `.git/index.lock` from the previous session
+  (file is owned by us but pinned by the mount layer). Worked
+  around by doing a fresh `git clone --depth 5` into `/tmp/claum-browser`
+  and pushing from there. Future watcher sessions should expect
+  the same workaround.
+
+  **Action taken:** none on code — only this BUILD_NOTES update.
+  The fix is already in place on `origin/main` and run #64 is
+  exercising it. Watcher exits and will check again on next
+  scheduled tick.
+
 - **2026-04-29 17:05 UTC** (session `epic-vibrant-einstein`) — run **#63** has
   **failed** at the `chrome_framework` link step (`FAILED: rate_colors_info`
   / `generate_colors_info` at log L47101 / L47132). Root cause:
