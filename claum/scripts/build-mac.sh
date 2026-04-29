@@ -1074,6 +1074,26 @@ python3 "$CLAUM_REPO_DIR/claum/scripts/fix-safe-browsing-gn.py" \
         "$CLAUM_BUILD_ROOT/build/src"
 
 # ---------------------------------------------------------------------------
+# Fix #2 — components/safe_browsing/{password_protection,content/browser}/BUILD.gn
+# ---------------------------------------------------------------------------
+# Runs #64 and #65 failed at ninja [44760/55997] when CXX-compiling
+# password_protection_service_base.cc and client_side_detection_service.cc.
+# Those .cc files reference identifiers (PHISHING_REUSE,
+# IsEnhancedProtectionEnabled, prefs::kSafeBrowsingEnabled, etc.) that
+# ungoogled-chromium's 0001-fix-building-without-safebrowsing.patch strips
+# from the matching headers without removing the .cc files from sources.
+#
+# This script comments out the offending .cc files so ninja stops trying
+# to compile them. Idempotent — safe to re-run on re-extraction.
+# See claum/scripts/fix-safe-browsing-components-gn.py for the full
+# write-up + reasoning of why we do source removal instead of an
+# `if (safe_browsing_mode != 0)` wrap.
+# ---------------------------------------------------------------------------
+log_step "Fixing components/safe_browsing/*/BUILD.gn (Path A — drop dangling .cc)"
+python3 "$CLAUM_REPO_DIR/claum/scripts/fix-safe-browsing-components-gn.py" \
+        "$CLAUM_BUILD_ROOT/build/src"
+
+# ---------------------------------------------------------------------------
 # DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
 # see exactly what state it's in. We dump:
 #   * lines 1-30   — the file header + `source_set("safe_browsing") {` opening
