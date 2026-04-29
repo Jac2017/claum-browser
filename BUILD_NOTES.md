@@ -5,6 +5,115 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 15:10 UTC** (session `admiring-epic-turing`) — run
+  **#62** (commit `396fc6b`, job `73311899660`) **still the latest
+  Build Claum (macOS) run** — no newer build dispatched since the
+  14:54 UTC cycle. Autopilot escalation is unchanged (Issues `#2`
+  through `#18` still open, all the same `[autopilot] Build wedged
+  on 396fc6b after 15 attempts` template). Most recent **Claum
+  autopilot** workflow run is `#195` (succeeded — i.e. autopilot
+  IS still polling but is correctly NOT dispatching new builds on
+  the wedged commit). Issues count: `18 open / 0 closed`.
+
+  **NEW DIAGNOSTIC (corrects prior-cycle hypothesis):** I was
+  able to load the raw job-logs blob URL in Chrome MCP this
+  cycle (`5,588,922` chars total on
+  `productionresultssa6.blob.core.windows.net/...job-logs.txt`).
+  The previous cycle reported the raw-log endpoint was
+  unreachable — that turns out to depend on the redirect timing.
+  More importantly: **the GitHub UI's React-virtualizer caps the
+  rendered DOM of step 12 (`Run Claum build`) at ~`4,699` log
+  lines**, while the step's actual line count (per the failure
+  annotation deep-link `#step:12:45820`) is **~`45,820` lines**.
+  The first ~4,700 rendered lines cover only the first ~7 minutes
+  of the 26m31s build step (timestamps `Apr 28 02:36–02:43 GMT`).
+  At rendered line **`4699`** the build is at ninja
+  **`[3149/55997] CXX obj/base/base/...`** — i.e. it had already
+  started compiling, contradicting the prior cycle's hypothesis
+  ("build script failed BEFORE the compile/link phase, somewhere
+  in download / unpack / patch-apply / `gn gen`"). The earlier
+  ~4700 rendered lines DO show ninja CXX compiles for the
+  `base/`, `boringssl/`, `protobuf_lite/`, `dav1d/`, etc. ranges.
+  The **"0 compile requests" sccache stat is therefore an
+  sccache-wrapper attachment bug, NOT evidence that compilation
+  never started** — `cc_wrapper`/`CC=sccache` config plumbing is
+  not actually flowing to the ninja-spawned `clang++` invocations
+  in this run, even though ninja is launching `CXX` actions.
+
+  **Where the actual failure lives — still not directly
+  observed:** somewhere between rendered DOM line `~4700` and
+  step-12 line `~45820`, in the ~41,000 unrendered log lines.
+  GitHub's `Search logs` field (which queries the backend, not
+  the DOM) returns **1/1 hits for `FAILED:`** — and that single
+  hit is at rendered line `1222`, the benign substring inside
+  `ERROR:root:Failed to get version info: Git command 'git log
+  -1 --format=%H %ct --grep=^Change-Id: HEAD' ... failed: rc=0,
+  stdout='' stderr=''` which is paired immediately with
+  `WARNING:root:Falling back to a version of 0.0.0 to allow
+  script to finish.` — i.e. CHROMIUM_VERSION machinery
+  fallbacking, not a build failure. **Other backend searches
+  this cycle:** `##[error]` → 0/0, `fatal error` → 0/0,
+  `ninja: ` (with trailing space) → 0/0, `exit code` → 0/0.
+  So the failure is NOT a recognizable ninja/gn/clang error
+  string — which is consistent with either (a) a process-level
+  termination (SIGKILL from OOM on the self-hosted Mac mini, or
+  network drop disconnecting the runner mid-step), or (b) a
+  failure in a `python` driver that exits without printing
+  anything matching standard error-line patterns.
+
+  **Runner identity confirmed:** the raw log header reads
+  `Runner name: 'Matthews-Mac-mini'`, `Runner group name:
+  'Default'`, `Machine name: 'Matthews-Mac-mini'` — i.e. the
+  job IS running on Matt's self-hosted Mac mini (`runs-on:
+  [self-hosted, macOS, ARM64]` is honored, not a GHA-hosted
+  fallback). The previous cycle's hypothesis (1) about a runner
+  switch is therefore **rejected**.
+
+  **Annotations read directly:** `1 error, 5 warnings, 1
+  notice`. The single error is the unhelpful `Process completed
+  with exit code 1.` annotation — no failing-line context. The 5
+  warnings are 4× brew "already installed" notices
+  (`jpeg-turbo`, `rsync`, `python@3.14`, `ninja`) plus the
+  Node.js 20 deprecation warning (`actions/cache@v4`,
+  `actions/checkout@v4`, `mozilla-actions/sccache-action@v0.0.6`
+  all flagged for migration to Node.js 24 by `2026-09-16`). None
+  of these warnings would produce an exit code 1.
+
+  **Decision: ESCALATE (continued).** This cycle re-confirms the
+  prior cycle's escalation. No code intervention pushed. **Three
+  concrete next steps** for whichever future watcher cycle gets a
+  proper raw-log dump (or for a human Matt sitting at his Mac
+  mini):
+
+  1. **`scp` the raw log off the Mac mini directly** — the
+     full log is on `Matthews-Mac-mini` at
+     `~/actions-runner/_work/_temp/_runner_file_commands/`
+     (or wherever the runner persists step output before
+     uploading to the blob). Reading it locally on the Mac
+     bypasses the GitHub UI virtualizer wall entirely. Look for
+     the LAST timestamped line — that's the failure marker.
+  2. **Add a `tail -200` step before exit** in
+     `claum/scripts/build-mac.sh` so that on `set -e` failure
+     the last 200 lines of `build.log` are echoed back into the
+     GitHub Actions step output (where they WILL be readable in
+     the UI's first 4,699 lines). Belt-and-suspenders pattern.
+  3. **Disable `set -e` temporarily** and instead capture the
+     subprocess exit code into a variable, print last log lines
+     on non-zero, and exit explicitly. Same goal as (2) but
+     bullet-proof against ninja exiting via a path that bypasses
+     bash's `set -e`.
+
+  Steps (2) and (3) require a code push that would itself
+  trigger a build re-attempt — appropriate ONLY when the human
+  decides we're done waiting and ready to spend more runner
+  minutes diagnosing. The autopilot will NOT auto-dispatch from
+  a `[skip ci]` BUILD_NOTES update like this one.
+
+  **Files touched this cycle:** only this `BUILD_NOTES.md` entry
+  (committed via the standard `/tmp/work/claum` clone workaround
+  for the virtiofs `.git/index.lock` permission wall). No code
+  change.
+
 - **2026-04-29 14:54 UTC** (session `vibrant-cool-allen`) — **MAJOR
   STATE CHANGE since last cycle (2026-04-26 18:51 UTC):** the build
   is now WEDGED. Run **#47** finished at some point after 18:51 UTC
