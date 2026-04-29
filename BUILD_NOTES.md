@@ -5,6 +5,77 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 18:21 UTC** (session `upbeat-eloquent-babbage`) — Run
+  **#65** (commit `5310b08`, run id `25125148704`, job
+  `73636024246`) is **In progress**, ~25 min elapsed, ninja
+  currently at **`[1120/55997]`** (~2% — early CXX/ACTION ticks
+  in `third_party/perfetto`, `third_party/devtools-frontend`).
+  No FAILED markers yet. Build advanced past the [3/6] Chromium
+  download (1.4 GB tarball took ~50s on self-hosted runner) and
+  has entered the long ninja phase.
+
+  **Trigger:** dispatched by `github-actions[bot]` (likely the
+  `claum-autopilot` workflow — autopilot runs #197+ visible on
+  Actions tab). Commit `5310b08` is a **BUILD_NOTES-only update**
+  — it does NOT contain a fix for the run #64 safe_browsing
+  compile errors. So this run is **expected to hit the same
+  failure** at ~`[44739/55997]` in
+  `password_protection_service_base.cc` /
+  `client_side_detection_service.cc` (~12 errors:
+  `GetPasswordProtectionWarningTriggerPref`, `PHISHING_REUSE`,
+  `IsEnhancedProtectionEnabled`, `prefs::kSafeBrowsingEnabled`,
+  `prefs::kSafeBrowsingEnhanced`).
+
+  **Verification of run #64 root cause:** This watcher fetched
+  the run #64 raw log via the Azure SAS-redirect from `/checks/
+  73627687977/logs` and confirmed the FAILED line is at ninja
+  `[44730/55997] CXX
+  obj/components/safe_browsing/core/browser/password_protection/
+  password_protection/password_protection_service_base.o`. The
+  surrounding compiler errors match the prior watcher's
+  diagnosis exactly:
+  ```
+  password_protection_service_base.cc:293:10: error: use of undeclared identifier 'GetPasswordProtectionWarningTriggerPref'
+  password_protection_service_base.cc:294:10: error: use of undeclared identifier 'PHISHING_REUSE'
+  password_protection_service_base.cc:432:27: error: use of undeclared identifier 'IsEnhancedProtectionEnabled'
+  client_side_detection_service.cc:104:14: error: no member named 'kSafeBrowsingEnabled' in namespace 'prefs'
+  client_side_detection_service.cc:108:7: error: no member named 'kSafeBrowsingEnhanced' in namespace 'prefs'
+  ```
+
+  **Open issues count:** 19 build-failure-labeled issues, all
+  titled `[autopilot] Build wedged on 396fc6b after 15 attempts`
+  — note: the `396fc6b` SHA in those titles is **stale** (it
+  was the run #47 commit, several fix-iterations ago). The
+  handler workflow's "wedged" detector seems to be using an
+  old SHA. Worth a follow-up to fix the autopilot's wedge
+  detection so it reports the *current* commit, not whatever
+  it cached.
+
+  **Fix attempt this cycle:** **NONE.** Concur with the prior
+  two watchers (`gracious-tender-gates` and `clever-elegant-gauss`):
+  re-injecting the missing `safe_browsing_prefs` declarations
+  needs the *exact* upstream Chromium 146 source (header layout +
+  enum names) before writing a sed/Python patch — speculative
+  edits risk burning another 30-min build cycle. Local checkout
+  has the same wedged `.git/index.lock` / `objects/maintenance.lock`
+  issue; this watcher worked around it by `git clone --depth 5`
+  into `/sessions/upbeat-eloquent-babbage/tmp/work/claum-browser`
+  (regular Linux fs, allows `rm`).
+
+  **What the next watcher should do:** continue monitoring run
+  #65 — it should reach `[44739]` in ~10-15 more minutes based
+  on ninja throughput. If it fails identically, that confirms
+  no new transient/environmental cause and the safe_browsing
+  patch is the only blocker. THEN the next cycle should
+  navigate to `https://chromium.googlesource.com/chromium/src/+/
+  146.0.7680.164/components/safe_browsing/core/common/
+  safe_browsing_prefs.h` (and `password_protection_service_base.h`)
+  via Chrome MCP, read the exact symbol declarations, and write
+  `claum/scripts/fix-safebrowsing-prefs.py` to re-inject them
+  after the ungoogled `fix-building-without-safebrowsing.patch`
+  step.
+
+
 - **2026-04-29 17:56 UTC** (session `gracious-tender-gates`) — Run
   **#64** (commit `3c21431`, run id `25122785968`, job
   `73627687977`) is **still the latest build-mac run** —
