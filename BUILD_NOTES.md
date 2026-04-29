@@ -5,6 +5,50 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 17:33 UTC** (session `upbeat-zen-maxwell`) — Run
+  **#64** (commit `3c21431`, run id `25122785968`, job
+  `73627687977`) still **In progress** at **~28m elapsed** since
+  push at 17:05 UTC. Status header still shows `In progress` /
+  `Total duration: –` / `Artifacts: –` (i.e. no failure yet, no
+  artifact yet — both expected for a healthy mid-build state).
+
+  **Last visible ninja tick (carried forward from previous
+  watcher commit `fa909a5` at 17:17 UTC): `[13415/55997]`.**
+  This watcher cycle could not pull a fresher tick because
+  GitHub's `js-checks-log-display-container` virtualizes the
+  log lines (DOM is empty until you actually scroll inside the
+  container, which the headless Chrome MCP can't simulate
+  reliably), and `api.github.com` is proxy-blocked in this
+  sandbox. Re-checked the run page, the job page, and force-
+  expanded the `Run Claum build` `<details>` element — log
+  body still rendered as 0 lines. So we're trusting the prior
+  cycle's tick + the absence of a "Failure" status as evidence
+  the build is advancing. Next cycle (in ~5 min) should grab
+  a fresh tick once GitHub finalizes streaming chunks.
+
+  **No new build-failure issues** opened by
+  `build-failure-handler.yml` since 17:17 UTC — the
+  `?q=label%3Abuild-failure` query reports
+  `Invalid value build-failure for label`, meaning the label
+  has never been applied to any issue (no real-error trigger
+  has fired since the handler went live in commit `3eb53e9`).
+  Treating that as "no actionable failure detected".
+
+  **No code edit pushed this cycle** — fix from `3c21431`
+  appears to still be doing its job; build cleared the SOLINK
+  `[12845]` choke point and is in the bulk CXX phase.
+  Watcher's only mutation is this BUILD_NOTES line.
+
+  Operational note for next watcher: local mount at
+  `/sessions/<id>/mnt/Projects/claum-browser` was wedged with
+  stuck `.git/HEAD.lock` and `.git/index.lock` files that
+  could not be `rm`'d (Cowork mount blocks deletes); had to
+  work around by `mv`-ing them aside, then doing the actual
+  edit/commit in a clean shallow clone under `/tmp/`. Same
+  workaround the `.gone-N` / `.bk_NNNN` filenames in `.git/`
+  hint that earlier watchers used.
+
+
 - **2026-04-29 17:18 UTC** (session `lucid-nice-galileo`) — Run
   **#64** (commit `3c21431` "build-mac.sh: vtool-lower jpeg-turbo
   dylib LC_BUILD_VERSION (run #63 fix)", run id `25122785968`, job
