@@ -5,6 +5,35 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 20:08 UTC** (session `nifty-trusting-curie`) — run
+  **#67** (commit `0770c82`, run id `25130216538`, job
+  `73654108681`) is still **In progress**. Job started 21m 37s ago
+  (~19:46 UTC); the active step is `Run Claum build` at **19m 27s
+  elapsed**, up from 17m 49s on the previous cycle 4 minutes earlier
+  — so the timer is incrementing in real time and the build is
+  advancing. The Actions live-log React view did **not render any
+  ninja tick lines into the DOM this cycle** (body innerText stays
+  ~1.4 KB even after expanding `Run Claum build` and waiting >20s; a
+  `fetch()` against the logs endpoint timed out the CDP runtime).
+  This is a known render-quirk on very large logs and **not a build
+  failure signal**. Progress signals available without a fresh ninja
+  tick: timer still incrementing, no `Failed`/`Cancelled` icon on
+  any step, none of the post-build steps (`Show sccache stats`,
+  `Save sccache disk cache`, `Package .app as .dmg`, `Upload build
+  artifact`) have begun, status indicator is the spinner. From the
+  prior cycle's [14852/55995] at 9m + ~10 more minutes of compile we
+  expect to be roughly in the [25k–35k/55995] range — unverified, but
+  the next failure point of interest (`[44760]`) is still ahead.
+  Per "progress advancing → record and exit", this watcher exits.
+  **Build-failure handler signal:** the same 19 stale `[autopilot]
+  Build wedged on 396fc6b ...` issues (#1–#19) — no new issue opened
+  for run #67. (Side note: the search shows "Invalid value
+  build-failure for label" because the label apparently isn't
+  registered yet, but the URL still surfaces the autopilot-bot
+  issues, which is what we wanted to check.) Next watcher: pick up
+  ninja count if the live log renders, or check for terminal status
+  (success/failure) since the build will likely finish soon.
+
 - **2026-04-29 19:55 UTC** (session `trusting-relaxed-knuth`) — run
   **#67** (commit `0770c82` "build-mac.sh: drop dangling safe_browsing
   .cc files (Path A, run #67)", run id `25130216538`, job id
