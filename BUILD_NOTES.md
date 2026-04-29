@@ -5,6 +5,53 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:12 UTC** (session `ecstatic-eloquent-hawking`) — Run **#66**
+  (commit `770a885`, run id `25127959621`, job `73646129449`) is
+  still **In progress**. Job total elapsed ~15 min; the
+  `Run Claum build` step has been running ~13 min (started
+  18:58:39 UTC). The page still shows the **Cancel workflow**
+  button and no FAILED markers anywhere — build is alive and
+  advancing. **No fix pushed this cycle.**
+
+  **Ninja count:** Could not extract a fresh `[N/55997]` tick.
+  Every step in the GitHub Actions UI shows the warning
+  *"Error: This step has been truncated due to its large size.
+  View the raw logs from the menu once the workflow run has
+  completed."* — meaning live log lines are not being rendered
+  into the DOM for in-progress runs of this size. Last-known
+  count from the previous watcher cycle was `[5518/55997]` at
+  ~9 min; the build has had ~4 more minutes to advance, so
+  realistic current position is somewhere in the
+  `[6000–9000]/55997` range, still well before the historical
+  SOLINK checkpoint at `[12845]` and the safe_browsing failure
+  at `[44760]`.
+
+  **Issues tab:** still 19 open `build-failure` issues, all
+  duplicates of `Build wedged on 396fc6b after 15 attempts` —
+  the SHA `396fc6b` is stale (run #47-era). The handler workflow
+  has **not** filed a new issue for run #66, consistent with
+  the run not having failed.
+
+  **Working-tree note (carry-over):** the in-place checkout at
+  `mnt/Projects/claum-browser` is still in the destructive-edit
+  state described last cycle (uncommitted deletions in
+  `BUILD_NOTES.md`, `claum/scripts/build-mac.sh`,
+  `.github/workflows/build-mac.yml`, plus `.gone-5` / `.local`
+  sibling files and stale `.git/*.lock` files the sandbox can't
+  `rm`). This cycle continued the previous watcher's pattern:
+  fresh shallow clone at `/tmp/claum-watcher2` (the older
+  `/tmp/claum-watcher` was owned by a previous session's uid
+  and not removable from this one), commit + push from there.
+
+  **Stopping condition:** Run #66 has not yet reached the
+  `[~44760]` checkpoint where the diagnostic D-block in
+  `claum/scripts/build-mac.sh` would dump the components
+  safe_browsing `BUILD.gn`. Cannot evaluate whether the
+  instrumentation captured anything useful until either the run
+  fails near `[~44760]` (best case: dump in log) or pushes past
+  it (build green or fails later somewhere new). **Action: just
+  wait — next watcher tick should re-check.**
+
 - **2026-04-29 19:05 UTC** (session `jolly-magical-archimedes`) — Run **#66**
   (commit `770a885`, run id `25127959621`, job `73646129449`) is
   **In progress**, ~9 min elapsed, ninja currently at
