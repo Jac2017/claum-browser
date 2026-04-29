@@ -5,6 +5,64 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 17:18 UTC** (session `lucid-nice-galileo`) — Run
+  **#64** (commit `3c21431` "build-mac.sh: vtool-lower jpeg-turbo
+  dylib LC_BUILD_VERSION (run #63 fix)", run id `25122785968`, job
+  `73627687977`) is **In progress** and **healthy**. Started
+  `2026-04-29T17:05:26Z`, **~13m elapsed** total.
+
+  **Latest visible ninja tick: `[13415/55997] CXX
+  obj/net/net/network_error_logging_service.o`** — already
+  **past the historical SOLINK `[12845]` checkpoint** that killed
+  runs #32 and #34 (so that whole class of failure is no longer
+  blocking us), and well past the **`[3/6] Downloading and
+  unpacking Chromium`** stage that the previous watcher cycle
+  (`laughing-awesome-archimedes`, 17:10 UTC) saw at ~5m in. Tick
+  density is ~1100 compile lines visible in the live log without
+  any FAILED markers, so the build is genuinely advancing through
+  the bulk-CXX phase.
+
+  **Run #64 is the human dev's (`Jac2017`) response to run #63's
+  failure** — pushed at 17:05 UTC. Previous watcher cycles (16:33
+  / 16:40 / 16:46 UTC, sessions `beautiful-inspiring-ramanujan`,
+  `elegant-inspiring-cori`, `amazing-friendly-gates`) had been
+  watching #63 (`c4b1746`, GTMDefines.h fix) which **eventually
+  failed at total duration `35m 27s`** — the new commit message
+  "vtool-lower jpeg-turbo dylib LC_BUILD_VERSION" suggests #63
+  surfaced a Mach-O `LC_BUILD_VERSION` minimum-OS-mismatch on
+  `libjpeg_turbo.dylib`, which `vtool` (the Apple Mach-O load-
+  command rewriter) is now being used to lower in build-mac.sh.
+
+  **Step status (from the job page):** `Set up job 4s` /
+  `Check out Claum repo 45s` / `Select Xcode with macOS SDK 15+
+  0s` / `Ensure Metal Toolchain 1s` / `Install build deps 4s` /
+  `Restore sccache disk cache 1m 3s` (cache hit — saved ~30+
+  min vs. cold-start) / `Diagnostic - SDK modulemap layout 3s`
+  / `Cache Chromium source 1s` / `Run Claum build` — **in
+  progress, ~10m 30s on the build step itself**.
+
+  **Next checkpoint to watch:** **`[43898/55997]`** — that's
+  where run #62 hit the original `GTMDefines.h` failure. We need
+  to get past *that* tick to know the c4b1746 staging fix held
+  AND that the new `vtool` fix from 3c21431 cleared whatever
+  killed #63. After [43898], the rest of the path is the SOLINK
+  + DMG packaging, which has never been validated end-to-end on
+  this repo. Estimated ~25-30 more minutes of compile time at
+  current pace.
+
+  **Issues / build-failure handler:** still 19 open issues, all
+  pre-existing autopilot escalations against the old `396fc6b`
+  SHA (run #62). No new build-failure-labeled issue for #63 or
+  #64 — confirms the handler workflow either skipped #63 (maybe
+  classified the LC_BUILD_VERSION error as transient) or hasn't
+  fired yet on #64. Per prior cycles, **don't touch those 19
+  issues** — they self-resolve once a successful build lands.
+
+  **Action taken:** none — build is healthy and advancing. Just
+  appending this entry. **No code intervention** because the
+  human dev already pushed the most-likely-correct fix; my
+  intervening would race against their work.
+
 - **2026-04-29 17:10 UTC** (session `laughing-awesome-archimedes`) — run
   **#64** (commit `3c21431` "build-mac.sh: vtool-lower jpeg-turbo dylib
   LC_BUILD_VERSION (run #63 fix)", run id `25122785968`, job
