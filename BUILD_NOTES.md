@@ -5,6 +5,21 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 16:19 UTC** (session `stoic-confident-bardeen`) —
+  Run **#63** (commit `c4b1746`, GTMDefines.h → legacy Foundation/
+  staging fix) is **in progress** and healthy. Currently in step
+  `[3/6] Downloading and unpacking Chromium 146.0.7680.164` —
+  observed ~1067 MB / 1408 MB of the source tarball downloaded
+  (~75%, ~19 MB/s sustained). Build has not yet entered `gn gen`
+  or ninja, so no ninja `[X/Y]` ticks to record this cycle.
+  Build-failure handler hasn't opened any issue (label
+  `build-failure` not present in repo yet — search returned
+  "Invalid value build-failure for label"). No code change
+  needed; the fix from #62→#63 is still being validated. Next
+  watcher tick should see the run past the download phase and
+  into the GN/ninja stage where the SOLINK [12845] checkpoint
+  matters.
+
 - **2026-04-29 16:13 UTC** (session `kind-stoic-cori`) — **CODE INTERVENTION
   this cycle: the GTMDefines.h root cause is identified and patched.**
   Picked up where `wizardly-gifted-faraday` left off (commit `eba62f7`
