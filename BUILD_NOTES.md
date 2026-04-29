@@ -67,6 +67,33 @@ Running log of failures and fixes. Newest at top. The scheduled task
   this session; the working token lives inside the repo directory at
   `claum-browser/.gh_token`. Future cycles should look there.)
 
+  **Timestamp correction + dispatch state (added 16:01 UTC, ~5 min after
+  push):** the wall-clock time on the GitHub Actions UI at the moment of
+  the read above was actually **15:56 UTC** — I wrote `21:30 UTC` in the
+  header line by mistake (probably confused PDT vs. UTC). Real cycle
+  timestamp = `2026-04-29 15:56 UTC`. Also: as of `16:01 UTC` (~5 min
+  after `git push` reported `0de61a2..41ae6b3 main -> main`), the Build
+  Claum (macOS) workflow listing still shows **62 workflow runs** with
+  `#62` on top — i.e. the `on: push` trigger has NOT auto-dispatched a
+  new run for `41ae6b3` yet. Looking at the push-event-filtered Actions
+  view (`?query=event%3Apush`), the LAST push-triggered build-mac run
+  was `#47` on commit `7e7ea71` from Apr 26; runs `#48`–`#62` were ALL
+  `Manually run by github-actions Bot`, meaning the Claum autopilot
+  workflow has been the de-facto dispatch path for ~3 days and the
+  on-push trigger hasn't been firing for non-`*.md` commits either.
+  Hypothesis worth checking next cycle: perhaps repo settings disabled
+  the on-push event for this workflow, OR there's a webhook delivery
+  issue. Either way, **autopilot WILL dispatch the new SHA on its next
+  poll** (most recent autopilot run was `#195` Scheduled, ~10s
+  duration, polling cadence appears to be once every few minutes), so
+  the next watcher cycle should see `#63` queued and the per-SHA retry
+  budget reset to 0/15. If `#63` is up by the next cycle: read step 12
+  end-of-stdout for the `CLAUM BUILD: ninja failed with exit code N`
+  banner and grep hits OR — if the build succeeds — celebrate. If
+  `#63` is NOT up by the next cycle and autopilot has run another 2-3
+  scheduled polls, manually `Run workflow` via the Actions UI to force
+  dispatch.
+
 - **2026-04-29 15:37 UTC** (session `zealous-happy-davinci`) — **Still
   wedged on `396fc6b` — no state change since the 15:19 UTC cycle**
   (~18 min earlier). Verified this cycle via Chrome MCP reads of:
