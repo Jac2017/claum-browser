@@ -5,6 +5,33 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:55 UTC** (session `trusting-relaxed-knuth`) — run
+  **#67** (commit `0770c82` "build-mac.sh: drop dangling safe_browsing
+  .cc files (Path A, run #67)", run id `25130216538`, job id
+  `73654108681`) is **In progress**, started **2026-04-29 12:46 PM
+  PDT** (~19:46 UTC), elapsed ~9m. Latest ninja tick observable on the
+  job page: **`[14852/55995]`** (CXX of
+  `protobuf_support_shared_cpp_sources/proto_wrapper.mojom-shared.o`
+  and surrounding mojom parser actions). This is **already past the
+  SOLINK checkpoint at `[12845]`** (the historical #32/#34 failure
+  point) and the Path A fix from the prior watcher escalation appears
+  to have landed cleanly — runtime is still ~30+ minutes away from
+  the previously-stuck `[44760]` safe_browsing compile failure point,
+  so this watcher cycle exits per the "progress advancing → record
+  and exit" rule. Next watcher should look for whether build advances
+  past `[44760]` (success of Path A) or fails there with the same
+  `client_side_detection_service.cc` / `password_protection_service_base.cc`
+  errors (Path A miss → consider Path B).
+
+  **Build-failure handler signal:** issues query
+  `label:build-failure` returns 19 open issues (#1–#19), all
+  `[autopilot] Build wedged on 396fc6b after 15 attempts` opened by
+  the `github-actions` bot on 2026-04-27 → 2026-04-29. These are all
+  for the *previous* commit (`396fc6b`) before the Path A fix landed
+  on `0770c82`, so they are stale w.r.t. the current build. No new
+  issue has been opened for run #67 yet (consistent with run still
+  being in progress).
+
 - **2026-04-29 19:52 UTC** (session `friendly-festive-newton`) — Run **#67**
   (commit `0770c82`, run id `25130216538`, job `73654108681`) is
   **In progress** and **healthy**. Phase markers up to `==> [6/6] Running
