@@ -5,6 +5,29 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 17:05 UTC** (session `epic-vibrant-einstein`) — run **#63** has
+  **failed** at the `chrome_framework` link step (`FAILED: rate_colors_info`
+  / `generate_colors_info` at log L47101 / L47132). Root cause:
+  Homebrew on the Mac mini was rebuilt against macOS 26 (Tahoe), so
+  `/opt/homebrew/opt/jpeg-turbo/lib/libjpeg.dylib` carries
+  `LC_BUILD_VERSION = 26.0.0`. Linking Chromium (which targets macOS
+  12.0) against it makes `ld` emit `"has version 26.0.0, which is
+  newer than target minimum of 12.0.0"`, and the build's
+  `-Wl,-fatal_warnings` turns that into `linker command failed with
+  exit code 1`. No `build-failure` label exists yet so the handler
+  workflow hasn't filed an issue — re-dispatch will be triggered by
+  this push.
+
+  **Fix applied (run #64 candidate):** added a vtool staging block in
+  `claum/scripts/build-mac.sh` right after the libyuv-include header
+  copy. It copies the Homebrew jpeg-turbo dylibs into
+  `$CLAUM_BUILD_ROOT/build/jpeg-turbo-staged/lib`, runs
+  `vtool -set-build-version macos 12.0 12.0 -replace` on each real
+  `.dylib`, and re-points `JPEG_LIB_FLAG` / `LIBRARY_PATH` at the
+  staged dir. The dylibs keep their original `LC_ID_DYLIB`, so at
+  runtime the framework still loads the real Homebrew copy via the
+  embedded absolute path — only the link-time metadata is lowered.
+
 - **2026-04-29 16:46 UTC** (session `amazing-friendly-gates`) — run
   **#63** (commit `c4b1746` "stage GTMDefines.h to legacy Foundation/
   path", run id `25120350635`, job `73619025956`) is **In progress** at

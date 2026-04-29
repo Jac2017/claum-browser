@@ -797,6 +797,58 @@ if [ -n "$JPEG_TURBO_PREFIX" ] && [ -d "$JPEG_TURBO_PREFIX/include" ]; then
       fi
     done
   fi
+
+  # ---------------------------------------------------------------------
+  # Run #63 fix: stage jpeg-turbo dylibs with a lowered LC_BUILD_VERSION.
+  #
+  # Why: Homebrew on macOS Tahoe (26) ships dylibs whose Mach-O
+  # LC_BUILD_VERSION command says "built for macOS 26.0". When ld
+  # links Chromium (which targets macOS 12.0) against such a dylib
+  # it prints a warning of the form:
+  #     warning: 'libjpeg.dylib' has version 26.0.0, which is newer
+  #     than target minimum of 12.0.0
+  # The Chromium link step uses `-Wl,-fatal_warnings`, so that
+  # warning aborts the link with exit code 1 (this is what killed
+  # run #63 at the chrome_framework link step).
+  #
+  # Fix: copy the dylibs into a build-local staging directory and
+  # rewrite their LC_BUILD_VERSION to macOS 12.0 with `vtool` (ships
+  # with Xcode CLT). Then point -L (and LIBRARY_PATH) at the staged
+  # dir instead of the Homebrew dir. The patched dylibs keep their
+  # original install_name (LC_ID_DYLIB), so at RUNTIME the chrome_
+  # framework binary still loads the real Homebrew dylib via that
+  # absolute path — only the link-time metadata is lowered.
+  # ---------------------------------------------------------------------
+  JPEG_STAGE_DIR="$CLAUM_BUILD_ROOT/build/jpeg-turbo-staged/lib"
+  mkdir -p "$JPEG_STAGE_DIR"
+  if command -v vtool >/dev/null 2>&1; then
+    # Copy preserving symlinks (-RP) so libjpeg.dylib -> libjpeg.0.dylib
+    # relationships survive into the staging dir.
+    cp -RP "$JPEG_TURBO_PREFIX"/lib/libjpeg*.dylib "$JPEG_STAGE_DIR"/ 2>/dev/null || true
+    cp -RP "$JPEG_TURBO_PREFIX"/lib/libturbojpeg*.dylib "$JPEG_STAGE_DIR"/ 2>/dev/null || true
+    # vtool only operates on real files, not symlinks. Find the real
+    # dylibs (`-type f`) and rewrite each one's build version.
+    for dylib in $(find "$JPEG_STAGE_DIR" -maxdepth 1 -type f -name '*.dylib'); do
+      # Make the file writable in case Homebrew set it to 444.
+      chmod u+w "$dylib"
+      # `-set-build-version macos 12.0 12.0` writes minos=12.0, sdk=12.0.
+      # `-replace` swaps in place rather than appending an extra
+      # LC_BUILD_VERSION command.
+      if vtool -set-build-version macos 12.0 12.0 -replace -output "$dylib" "$dylib" 2>/dev/null; then
+        echo "  vtool: lowered LC_BUILD_VERSION to macOS 12.0 on $(basename "$dylib")"
+      else
+        log_warn "vtool failed on $dylib (continuing — link may warn)"
+      fi
+    done
+    # Re-point the linker flags at the staged dir. CPATH stays on the
+    # Homebrew include dir (headers don't carry build-version info).
+    JPEG_LIB_FLAG="-L$JPEG_STAGE_DIR"
+    export LIBRARY_PATH="$JPEG_STAGE_DIR${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    echo "  jpeg-turbo staged lib dir: $JPEG_STAGE_DIR"
+    echo "  updated LIBRARY_PATH=$LIBRARY_PATH"
+  else
+    log_warn "vtool not found — link step may emit fatal version-mismatch warning if Homebrew dylibs target a newer macOS than $MAC_DEPLOY_TARGET (see run #63)"
+  fi
 else
   JPEG_INC_FLAG=""
   JPEG_LIB_FLAG=""
