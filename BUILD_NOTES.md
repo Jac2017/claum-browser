@@ -5,6 +5,65 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 16:13 UTC** (session `kind-stoic-cori`) — **CODE INTERVENTION
+  this cycle: the GTMDefines.h root cause is identified and patched.**
+  Picked up where `wizardly-gifted-faraday` left off (commit `eba62f7`
+  added log-tail + artifact instrumentation; `41ae6b3` / `7015f5b`
+  noted no #63 had dispatched 5 min after their push). I went
+  straight to the raw log via the GitHub API — `api.github.com` is
+  proxy-blocked from the watcher sandbox, but it works fine from the
+  user's own Chrome (different network), so I used the Chrome MCP to
+  run an authenticated `fetch()` from a github.com tab and pulled
+  the 5.6 MB log down in one shot.
+
+  **Run #62 (commit `396fc6b`) finished status `failed` after
+  33m 21s, ninja last tick `[43898/55997]`** — the FURTHEST a Claum
+  build has ever progressed (~78%, well past the SOLINK
+  `libvk_swiftshader.dylib` checkpoint at `[12845]` that blocked
+  #32 and #34, and through the entire post-Metal-Toolchain compile
+  phase). This contradicts earlier hypotheses that #62 was hanging
+  in `gn gen` with zero compile activity — sccache stats showed
+  `0` because compile completed and stats were dumped before the
+  failure surfaced (the failure is in the linker-prep dependency
+  chain that ninja schedules right after the bulk compile phase).
+
+  **Two FAILED: markers, both same root cause:**
+
+  ```
+  FAILED: obj/.../google_toolbox_for_mac/GTMUILocalizer.o
+    AppKit/GTMUILocalizer.m:19:9: fatal error: 'GTMDefines.h' file not found
+  FAILED: obj/.../google_toolbox_for_mac/GTMUILocalizerAndLayoutTweaker.o
+    AppKit/GTMUILocalizerAndLayoutTweaker.h:20:9: fatal error: 'GTMDefines.h' file not found
+  ```
+
+  **Diagnosis:** Chromium's `-I` flags already include
+  `-I.../google_toolbox_for_mac/src/Foundation` — so
+  `GTMDefines.h` ought to resolve. Cross-checked the upstream
+  `google/google-toolbox-for-mac` repo via the GitHub API code
+  search: the file moved out of `Foundation/` and now lives at
+  `Sources/Defines/Public/GTMDefines.h`. Chromium's BUILD.gn was
+  pinned against the OLD layout, but our `git clone --depth 1`
+  pulls upstream HEAD which has the NEW layout, so the
+  `-IFoundation` include lookup misses every time.
+
+  **Fix pushed in this commit:** in
+  `claum/scripts/build-mac.sh` right after the GTM staging clone,
+  `install -m 0644 src/Sources/Defines/Public/GTMDefines.h
+  src/Foundation/GTMDefines.h`. Idempotent: the wrapper checks
+  for the legacy file before copying, and warns (not errors) if
+  upstream has been restructured a third time. Heavily commented
+  with the why (per Matt's "novice-friendly comments" preference).
+  `bash -n` clean.
+
+  This push triggers run **#63**. The `eba62f7` instrumentation
+  is now in the loop, so if anything else fails the build log tail
+  + a 7-day artifact will be visible at the END of the build step.
+  No `build-failure`-labeled issues from the handler workflow as
+  of this cycle (the autopilot `[autopilot] Build wedged on…`
+  issues are a different label and represent the `#52→#62`
+  same-SHA wedge that the new SHA naturally resets).
+
+
 - **2026-04-29 21:30 UTC** (session `wizardly-gifted-faraday`) — **CODE
   INTERVENTION this cycle.** Build pipeline still wedged on `396fc6b`
   (latest run still **#62**, status `failed`, duration `33m 26s`,

@@ -408,6 +408,58 @@ else
 fi
 
 # ----------------------------------------------------------------------------
+# Run #62 fix: relocate GTMDefines.h to where Chromium expects it.
+# ----------------------------------------------------------------------------
+# Background — what GTMDefines.h is and why this breaks:
+#   GTMDefines.h is the umbrella header that every Obj-C file in
+#   google-toolbox-for-mac (`#import "GTMDefines.h"`) starts with. It
+#   provides debug macros, deprecation guards, etc. — without it, NOTHING
+#   in the library compiles.
+#
+# Chromium's BUILD.gn for third_party/google_toolbox_for_mac was written
+# years ago against the OLD upstream layout, where the file lived at:
+#   src/Foundation/GTMDefines.h
+# Chromium accordingly adds `-I.../src/Foundation` to the compile flags.
+#
+# Sometime after Chromium pinned its DEPS commit, Google reorganized the
+# upstream repo and moved the header to a brand-new path:
+#   src/Sources/Defines/Public/GTMDefines.h
+# Foundation/ still exists in upstream HEAD, but no longer contains
+# GTMDefines.h, so clang fails with:
+#   AppKit/GTMUILocalizer.m:19:9: fatal error: 'GTMDefines.h' file not found
+#
+# Run #62 hit exactly this at ninja [43889/55997] (78% of the build —
+# the FURTHEST a Claum build has ever gotten; all earlier blockers
+# are now resolved).
+#
+# Fix — `cp` (not symlink) the relocated header back into the legacy
+# Foundation/ path. Copy is safer than symlink because:
+#   1. ungoogled-chromium's prune step has been known to follow & delete
+#      symlinks pointing outside the prune target.
+#   2. sccache hashes file contents, not symlink target paths — a real
+#      file gives consistent cache keys across machines.
+# We don't pin to an older commit (which would be the "cleanest" fix)
+# because earlier tags don't have the AppKit fixes Chromium also relies
+# on — pinning back would just trade one breakage for another.
+# ----------------------------------------------------------------------------
+NEW_DEFINES="$GTM_DIR_ABS/Sources/Defines/Public/GTMDefines.h"
+LEGACY_DEFINES="$GTM_DIR_ABS/Foundation/GTMDefines.h"
+if [ -f "$NEW_DEFINES" ] && [ ! -f "$LEGACY_DEFINES" ]; then
+  # mkdir -p in case Foundation/ ever vanishes from upstream too.
+  mkdir -p "$(dirname "$LEGACY_DEFINES")"
+  # `install -m 0644` copies the file AND sets sane perms in one step.
+  install -m 0644 "$NEW_DEFINES" "$LEGACY_DEFINES"
+  echo "  staged GTMDefines.h: Sources/Defines/Public -> Foundation/ (run #62 fix)"
+elif [ -f "$LEGACY_DEFINES" ]; then
+  echo "  GTMDefines.h already at Foundation/ (no relocation needed)"
+else
+  # Don't fail the build here — let ninja produce its own error so the
+  # build log shows the real missing-file message. Just warn loudly.
+  log_warn "  GTMDefines.h not found at either old or new upstream path."
+  log_warn "  google-toolbox-for-mac may have been restructured again — check upstream."
+fi
+
+# ----------------------------------------------------------------------------
 # Stage system `dsymutil` into the Chromium-expected toolchain path.
 # ----------------------------------------------------------------------------
 # dsymutil is Apple's debug-symbol utility, used by Chromium when packaging
