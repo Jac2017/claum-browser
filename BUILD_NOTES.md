@@ -5,6 +5,115 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 14:54 UTC** (session `vibrant-cool-allen`) — **MAJOR
+  STATE CHANGE since last cycle (2026-04-26 18:51 UTC):** the build
+  is now WEDGED. Run **#47** finished at some point after 18:51 UTC
+  on 2026-04-26 (we don't have a last-tick observation that confirms
+  whether it succeeded or failed before sccache cleanup), then the
+  Claum autopilot dispatched runs **#48 → #62**, all on commit
+  `396fc6b` (the BUILD_NOTES `[skip ci]` commit at the top of main),
+  and **all 15 attempts failed** with identical ~33m total duration.
+  The autopilot has officially escalated and **stopped retrying** —
+  it has filed **17 separate "[autopilot] Build wedged on 396fc6b
+  after 15 attempts" issues** (issues #2–#18 in the repo), one per
+  escalation cycle. Issue #18 is the most recent; #1 is the older
+  cancelled-job aggregator.
+
+  **Run #62 fingerprint (representative of all 15 retries):**
+
+  - URL: https://github.com/Jac2017/claum-browser/actions/runs/25030833231
+  - Job ID: `73311899660` · Commit: `396fc6b` · Branch: `main`
+  - Triggered: "Manually run by github-actions[bot]" (i.e. autopilot)
+  - Status: **Failure** · Total duration: **33m 26s**
+  - Step durations:
+    - Set up job 3s · Check out 42s · Select Xcode 0s
+    - **Ensure Metal Toolchain installed 1s** ← (was 44s on #47;
+      faster now means it's already on disk OR the runner is
+      different — flagging for diagnosis)
+    - Free up disk space 0s · Install build deps 4s
+    - **Restore sccache disk cache 1m 14s** ← (was 8s on self-
+      hosted run #47 — strongly suggests this is a different
+      runner)
+    - Install/configure sccache 1s/0s · Diagnostic SDK 3s
+    - Cache Chromium source 0s
+    - **Run Claum build 26m 31s ← FAILED HERE** ← exit code 1
+    - Show sccache stats 1s · Save sccache 4m 34s
+    - Package .dmg 0s · Upload artifact 0s (skipped, build failed)
+  - **sccache stats reported:** Cache hit % **0%**, Compile
+    requests **0**, Cache hits **0**, Cache misses **0**, Cache
+    writes **0**. **Zero compile activity** means the build script
+    failed BEFORE the compile/link phase — i.e. somewhere in
+    download / unpack / patch-apply / `gn gen`. Identical signature
+    on runs #55–#62 (all `~33m` total).
+  - Annotations on the run page: **1 error, 5 warnings, 1 notice.**
+    The single error annotation is just `Process completed with
+    exit code 1.` — it does NOT include the failing log line. The
+    5 warnings are all benign brew "already installed" messages
+    (jpeg-turbo, rsync, python@3.14, ninja, plus the Node.js 20
+    deprecation notice).
+
+  **What's frustrating: I cannot read the actual build log.**
+  Every documented and undocumented log endpoint I tried failed:
+
+  - `api.github.com/.../jobs/.../logs` — proxy-blocked from this
+    sandbox (HTTP 403 `cowork-egress-blocked`, only github.com
+    web is allowed).
+  - `github.com/.../actions/runs/25030833231/logs` (zip) — HTTP
+    404 even with auth header (browser session UA), because the
+    repo's anonymous logs view is gated.
+  - `github.com/.../commit/.../checks/.../logs/12` — HTTP 404
+    same reason.
+  - **Chrome MCP rendered run page** — log container is React-
+    virtualized; the in-page error overlay literally says "We
+    are currently unable to download the log. Please try again
+    later." for this specific run, even when the page is opened
+    interactively. `body.innerText` for the expanded "Run Claum
+    build" step returns just `Run Claum build` (15 chars). The
+    `/backscroll` endpoint returned `{}` (empty JSON). This is
+    consistent with the **6th cycle** of "log virtualized, can't
+    read live ticks" notes from prior watchers — but now with
+    the run finished and the log STILL unreadable, so it's not
+    just an in-progress quirk.
+
+  **Hypotheses for the failure (cannot confirm without log):**
+
+  1. **The runner switched from self-hosted Mac mini to GitHub-
+     hosted macos-15.** `Restore sccache disk cache 1m 14s` (vs
+     8s on self-hosted) and `Ensure Metal Toolchain 1s` (vs 44s)
+     are both consistent with a brand-new GHA runner where the
+     Actions cache restore takes longer but the brew packages are
+     pre-installed. If Matt's Mac mini runner went offline or
+     deregistered, GitHub may be falling back to hosted. **But
+     the workflow's `runs-on: [self-hosted, macOS, ARM64]` should
+     PREVENT that fallback — it would queue indefinitely instead
+     of running on hosted.** So either (a) the runner labels were
+     edited to also accept hosted, (b) someone added a duplicate
+     `Build Claum (macOS)` workflow that uses GHA, or (c) the
+     self-hosted runner is actually online but in a degraded state.
+  2. **The Chromium source cache or sccache disk cache is
+     corrupted.** The 4m 34s `Save sccache disk cache` at the end
+     suggests SOMETHING is being saved (cache write activity), but
+     the 0 compile requests means nothing was compiled. If the
+     prior run wrote a partial/corrupt cache, every retry would
+     hit the same broken state.
+  3. **The brew pruning step or a patch hunk silently changed
+     output and is now hitting a hard failure under newer macOS
+     SDK / Xcode 16.x.**
+
+  **Decision: ESCALATE per task instructions** ("If truly stuck
+  after 3 attempts on the same error, leave a note in BUILD_NOTES
+  escalation section and stop"). The autopilot has already retried
+  15× and given up. Continuing to dispatch new builds without log
+  visibility just burns runner minutes. **What is needed from a
+  human or a session with elevated access** is documented in the
+  Escalation section below (search "## Escalation — 2026-04-29").
+
+  **Files touched this cycle:** only this `BUILD_NOTES.md` entry.
+  No code change pushed (would be a guess without log access).
+  Commit message uses `[skip ci]` so the build workflow does not
+  re-trigger from this BUILD_NOTES update — the autopilot already
+  established that nothing on `396fc6b` builds.
+
 - **2026-04-26 18:51 UTC** (session `tender-zen-ramanujan`) — run **#47**
   (commit `7e7ea71`, job `73090451041`) **still In progress** at
   **~1h 48m total runtime** (job started 17:02:30 UTC, check time
@@ -1171,6 +1280,100 @@ Edited `claum/scripts/build-mac.sh` lines ~85–117. New logic:
    compile command that's stuck, not just the tick counter.
 4. **`gtimeout` fallback** if GNU `timeout` isn't on the runner (macOS
    doesn't ship it by default; Homebrew `coreutils` provides `gtimeout`).
+
+## Escalation — 2026-04-29 (vibrant-cool-allen)
+
+The Claum autopilot has retried `396fc6b` (the BUILD_NOTES head
+commit on `main`) **15 times** and stopped on its own. Issue **#18**
+in the repo is the most recent escalation summary (issues #2–#17 are
+duplicates from prior retry waves; #1 is unrelated job-cancellation
+aggregator). The build needs human / elevated-access intervention
+before any further autopilot dispatches are useful.
+
+### What this session COULD do, with no log access
+
+- ✅ Confirmed the failure pattern is identical and reproducible
+  (`~33m total`, `0 sccache compile requests`, exit code 1).
+- ✅ Confirmed the autopilot has correctly stopped at its 15-attempt
+  cap rather than burning more runner minutes.
+- ✅ Updated this BUILD_NOTES entry so the next watcher cycle (or a
+  human triaging the repo) starts from the right state.
+- ❌ Could **not** read the actual build log to identify the
+  failing line — see "What's frustrating" in the watcher log entry
+  above. All four log-fetch routes 404 / proxy-block / virtualize.
+
+### What we need a session-with-elevated-access to do
+
+The fix path that's blocked here mostly comes down to **getting eyes
+on the failing build log**. Suggested order:
+
+1. **From a developer machine**, with the GitHub UI logged in to a
+   user that owns the `claum-browser` repo, open
+   <https://github.com/Jac2017/claum-browser/actions/runs/25030833231>
+   and click `Run Claum build` in the steps list. The lazy-loaded
+   log SHOULD render the actual `FAILED:` / `ninja: error` /
+   `fatal error` line (run-#62's failing line is at `step 12 line
+   45820`, which the page anchor `#step:12:45820` jumps to).
+2. Alternatively, install `gh` CLI locally and run
+   ```
+   gh run view 25030833231 --log-failed --repo Jac2017/claum-browser
+   ```
+   from a machine that can reach `api.github.com` (this sandbox
+   cannot — the egress allowlist blocks it).
+3. **Confirm the runner.** Run `gh api repos/Jac2017/claum-browser/actions/runs/25030833231` and check
+   `runner_name` / `runner_group_name`. The 33m duration profile
+   (1m 14s sccache restore vs. 8s on self-hosted run #47) suggests
+   the job moved to a GitHub-hosted macos-15 runner — but that
+   *shouldn't* be possible with `runs-on: [self-hosted, macOS,
+   ARM64]`. If the self-hosted runner deregistered, the build
+   should have queued forever, not failed in 33m. Worth verifying.
+4. **Once the failing line is known**, the fix likely follows the
+   established pattern in `claum/scripts/build-mac.sh`: stage a
+   missing tool / Google-pruned binary AFTER the ungoogled prune
+   step. Recent precedents: node (commit `a311924`), google-toolbox
+   (`8d8d8d8`-era), llvm-build / otool-classic (`a0b4cc9`),
+   esbuild (`427d334`), Metal Toolchain (`7e7ea71`).
+
+### What can be done from here without seeing the log (LOW value)
+
+- Push a **diagnostic commit** to `claum/scripts/build-mac.sh` that
+  echoes a `==> STAGE: <name> ($(date))` marker before each major
+  phase (download tarball / ungoogled prune / stage Google bins /
+  apply Claum patches / `gn gen` / `autoninja`). The next failed
+  run's annotation context (5-10 lines before the `Process
+  completed with exit code 1` annotation) sometimes leaks into
+  the page even when the full log doesn't render. **Tradeoff:**
+  any new push triggers a new `Build Claum (macOS)` run, which
+  the autopilot will then retry 15× before escalating again,
+  burning ~7h of runner time. Only worth doing if a human is
+  watching live to grab the log when it does render.
+
+- I have **chosen NOT to push that diagnostic commit this cycle**
+  to avoid more wasted runner minutes. The next cycle / human
+  should decide whether to push it based on whether (1) is
+  feasible.
+
+### Operational notes for the next watcher
+
+- The local checkout at `/sessions/vibrant-cool-allen/mnt/Projects/claum-browser/.git/`
+  has stale lockfiles (`index.lock`, `ORIG_HEAD.lock`,
+  `index.stash.10.lock`) that I cannot `rm -f` (returns "Operation
+  not permitted" — same virtiofs hidden-file restriction documented
+  by `kind-keen-fermat` 18:05 and `lucid-eloquent-keller` 18:19
+  watchers). Workaround used this cycle: **fresh shallow clone**
+  into `/tmp/claum-watcher-<epoch>/`, edit BUILD_NOTES there, push
+  from there using `https://x-access-token:${TOKEN}@github.com/...`.
+  Exact same pattern that prior watchers used. The workaround is
+  zero-risk because `origin/main` is the source of truth — local
+  edits to the broken Projects/.git checkout never get pushed.
+- The GitHub web `/logs/<step>` URL is not just gated on auth — it
+  also appears to return 404 for COMPLETED runs whose logs were
+  never successfully streamed during the run. So historic log
+  recovery may not even be possible for runs #48–#62 from any
+  session. The path of least resistance is still (1) above —
+  open the run in a browser logged into a user with repo access
+  and let the lazy loader render.
+
 
 ## Escalation — watcher cannot push fixes from this session
 
