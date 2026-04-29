@@ -5,6 +5,135 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 17:48 UTC** (session `clever-elegant-gauss`) — Run
+  **#64** (commit `3c21431` "vtool-lower jpeg-turbo dylib
+  LC_BUILD_VERSION", run id `25122785968`, job `73627687977`)
+  has now **FAILED** at total duration **`35m 55s`**, exit code
+  `1`. Status header confirms: `Status: Failure` / `Total
+  duration: 35m 55s` / `Artifacts: –`. The vtool jpeg-turbo
+  fix from `3c21431` worked — build cleared the
+  `chrome_framework` link checkpoint that killed #63 and got
+  ~32k ticks **further** than #63 ever did.
+
+  **Last successful ninja tick: `[44739/55997]` CXX
+  `client_side_detection_service.o`** — best run yet, ~80%
+  through ninja. Fresh class of failure, never seen in any
+  prior watcher cycle.
+
+  **Failure root cause — ungoogled-chromium safe_browsing
+  pruning leaves dangling symbol references:**
+  At `2026-04-29T17:36:35Z` the build hit **12 compile errors**
+  across 2 source files. Reformatted from the raw log
+  (lines 47307-47369), all errors are `use of undeclared
+  identifier` / `no member ... in namespace 'prefs'`:
+
+  ```
+  components/safe_browsing/core/browser/password_protection/
+    password_protection_service_base.cc:293:10  PHISHING_REUSE_*  (truncated)
+    password_protection_service_base.cc:294:10  PHISHING_REUSE
+    password_protection_service_base.cc:432:27  IsEnhancedProtectionEnabled
+  components/safe_browsing/content/browser/
+    client_side_detection_service.cc:104:14  prefs::kSafeBrowsingEnabled
+    client_side_detection_service.cc:108:7   prefs::kSafeBrowsingEnhanced
+    client_side_detection_service.cc:652:9   IsEnhancedProtectionEnabled
+    client_side_detection_service.cc:776:9   IsEnhancedProtectionEnabled
+  ```
+
+  Then `FAILED: [code=1]` for the two `.o` outputs and
+  `ninja: build stopped: subcommand failed`. **All 12 errors
+  reference symbols that ungoogled-chromium's
+  `fix-building-without-safebrowsing.patch` strips out** of
+  `components/safe_browsing/core/common/safe_browsing_prefs.{h,cc}`
+  and friends — but the **consumer** files (in
+  `components/safe_browsing/{core,content}/browser/...`) still
+  `#include` and reference those symbols, so they fail to
+  compile. This is **NOT** caused by `fix-safe-browsing-gn.py`
+  (which only patches `chrome/browser/safe_browsing/BUILD.gn`,
+  a different file); these failing components are in
+  `components/safe_browsing/...` and are compiled regardless
+  of the chrome/browser-level fix.
+
+  **Why it surfaced on #64 specifically:** Earlier runs
+  (#22-#62) all died well before ninja even reached the
+  `components/safe_browsing` compile cluster — they failed
+  on bootstrap, modulemaps, missing third_party node,
+  GTMDefines.h, jpeg-turbo LC_BUILD_VERSION, etc. #64 is the
+  first run to push past all the staging issues and hit the
+  bulk-CXX phase deeply enough to expose this upstream
+  ungoogled-vs-Chromium-146 source mismatch.
+
+  **No build-failure issue opened by handler.** Filtering
+  `label:build-failure` still returns "Invalid value
+  build-failure for label" — handler appears to have not run
+  on this failure (or the label was never created). The
+  `build-failure-handler.yml` workflow may need its trigger
+  verified in a future cycle, but that's a secondary problem.
+
+  **Fix attempt this cycle:** **NONE** (intentional). This is
+  the **first observed failure** of this exact class, and the
+  fix is non-trivial — a speculative "remove these source
+  files from the BUILD.gn sources list" sed patch would
+  almost certainly cascade into link-time `undefined symbol`
+  failures because other files (e.g.
+  `client_side_detection_host.cc`, the password_protection
+  GN target's `public_deps`) almost certainly depend on the
+  symbols those .cc files would have exported. Burning
+  another ~30min build cycle on a guess is worse than
+  documenting and waiting.
+
+  **Recommended next-cycle attempts (in order of safety):**
+
+  1. **Add a sed patch in `build-mac.sh`** (after
+     ungoogled patches, before `gn gen`) that re-injects the
+     stripped definitions into
+     `components/safe_browsing/core/common/safe_browsing_prefs.h`
+     (or `.cc`). Specifically need to restore:
+     - `extern const char kSafeBrowsingEnabled[]` and its
+       definition (the pref name string, probably
+       `"safebrowsing.enabled"`).
+     - `extern const char kSafeBrowsingEnhanced[]` and its
+       definition (probably `"safebrowsing.enhanced"`).
+     - Function `bool IsEnhancedProtectionEnabled(const
+       PrefService& prefs)` — likely a 1-line
+       `return prefs.GetBoolean(kSafeBrowsingEnhanced);`
+     - Enum value `PHISHING_REUSE` (and possibly
+       `PHISHING_REUSE_*` siblings — log truncated the
+       full identifier on line 293) — should be added back
+       to the `WarningUIType` or `RequestOutcome` enum in
+       `password_protection_service_base.h` or sibling.
+     This is the **lowest-risk** fix: it surgically
+     un-strips just what's needed without changing any
+     build-time exclusion logic. Worst case: the symbols
+     are dead-code-stripped at link time anyway.
+
+  2. **Excise the 2 failing `.cc` files from their GN
+     targets** via sed against
+     `components/safe_browsing/core/browser/password_protection/BUILD.gn`
+     and `components/safe_browsing/content/browser/BUILD.gn`.
+     **HIGHER RISK** — likely creates link errors in
+     downstream consumers. Only attempt if Option 1 fails.
+
+  3. **Roll back ungoogled's
+     `fix-building-without-safebrowsing.patch`** in
+     `apply-patches.sh` so the original symbols stay defined.
+     This restores the (privacy-impacting) safe browsing
+     code, but for a developer browser that's an acceptable
+     trade-off vs. a non-building tree.
+
+  **Operational note:** the in-mount checkout at
+  `/sessions/clever-elegant-gauss/mnt/Projects/claum-browser`
+  has the same wedged `.git/index.lock` (Apr 29 17:32) and
+  several `.gone-by-watcher-N` / `.bk_NNNN` files in `.git/`
+  that earlier watchers couldn't `rm` because the Cowork
+  mount denies `unlink(2)` on existing files. Standard
+  workaround used: shallow `git clone --depth 5` into
+  `/sessions/clever-elegant-gauss/tmp/claum-browser/`
+  (regular Linux fs allows `rm`), edit + commit there,
+  push using PAT from
+  `/sessions/clever-elegant-gauss/mnt/Projects/claum-browser/.gh_token`.
+  Same story the previous 4+ cycles documented.
+
+
 - **2026-04-29 17:33 UTC** (session `upbeat-zen-maxwell`) — Run
   **#64** (commit `3c21431`, run id `25122785968`, job
   `73627687977`) still **In progress** at **~28m elapsed** since
