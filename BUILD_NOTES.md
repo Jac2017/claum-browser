@@ -5,6 +5,28 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 16:33 UTC** (session `beautiful-inspiring-ramanujan`) —
+  Run **#63** (commit `c4b1746`, GTMDefines.h → legacy Foundation/
+  staging fix) **still In progress**, ~16m 14s into the run. The
+  job is past the Chromium download phase (which the previous
+  watcher cycle at 16:19 UTC saw at ~75%) and is now in the
+  long-running `Run Claum build` step (live elapsed `14m 1s`+).
+  GitHub Actions' virtualized live-log viewer doesn't expose
+  ninja `[X/Y]` ticks via `innerText` while the step is running,
+  and the raw-log endpoint isn't available pre-completion, so
+  no concrete tick count this cycle — but the elapsed time and
+  the fact that all earlier steps (`Set up job`, `Check out
+  Claum repo`, `Restore sccache disk cache` etc.) are stamped
+  green confirms the build has progressed past the download
+  and entered the actual Chromium compile phase. Run #62
+  reached `[43898/55997]` in 33m 21s before failing on the
+  `GTMDefines.h` issue that c4b1746 patches; we expect #63 to
+  follow a similar trajectory and either succeed or surface a
+  new failure mode shortly after this cycle. No
+  `build-failure`-labeled issues open (label still not present
+  in repo). No code intervention this cycle — just letting the
+  c4b1746 fix bake.
+
 - **2026-04-29 16:19 UTC** (session `stoic-confident-bardeen`) —
   Run **#63** (commit `c4b1746`, GTMDefines.h → legacy Foundation/
   staging fix) is **in progress** and healthy. Currently in step
