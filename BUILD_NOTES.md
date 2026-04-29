@@ -5,6 +5,50 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 15:19 UTC** (session `dreamy-awesome-euler`) — **No
+  state change since the 15:10 UTC cycle.** Build pipeline still
+  wedged on commit `396fc6b`. Confirmed this cycle via Chrome MCP
+  reads of:
+
+  - **Build Claum (macOS) workflow runs page** — top run is still
+    **#62** (`runs/25030833231`, job `73311899660`, status
+    **failed**, duration `33m 26s`). No newer build has been
+    dispatched in the ~9 minutes since the previous cycle's read.
+    Runs `#57`–`#62` all share the identical `failed: ~33m`
+    fingerprint and were all "Manually run by github-actions[bot]"
+    (i.e. autopilot retries on the wedged commit).
+  - **Issues tab** still reads **18 open / 0 closed** (header
+    badge `Issues 18 (18)`); listing returns issues `#1`–`#18`
+    in the latest-first column, same set as the previous cycle.
+    No new `[autopilot] Build wedged` issue filed in this 9-min
+    window — autopilot has stayed in the "stopped retrying"
+    state, consistent with the prior cycle's diagnosis.
+  - **Claum autopilot workflow** has continued polling normally
+    (latest scheduled run `#195` succeeded just before this
+    cycle), so the autopilot is alive — it's just correctly
+    NOT dispatching new builds against the wedged commit.
+
+  **No code intervention this cycle.** The escalation path laid
+  out in the 15:10 UTC entry (three concrete diagnostic options:
+  scp raw log off Mac mini, add `tail -200 build.log` on failure,
+  or replace `set -e` with explicit exit-code capture) still
+  stands. None of those steps has been pushed yet — and per the
+  task's escalation rule (`If truly stuck after 3 attempts on the
+  same error, leave a note and stop`), with autopilot already at
+  15 attempts and the diagnostic plan documented, this watcher
+  cycle is just confirming nothing has changed and that no human
+  intervention has un-wedged the pipeline yet.
+
+  **Files touched this cycle:** only this `BUILD_NOTES.md` entry.
+  Committed via the same /tmp clone workaround the previous cycle
+  used (the virtiofs `.git/index.lock` permission wall is still
+  present on the in-mount checkout — the lock file at
+  `/sessions/dreamy-awesome-euler/mnt/Projects/claum-browser/.git/index.lock`
+  is owned by my UID but cannot be `rm`'d, so a fresh `git clone`
+  to `$TMPDIR` is the working path. Filing this so the next
+  watcher cycle doesn't waste time re-discovering the same
+  workaround.).
+
 - **2026-04-29 15:10 UTC** (session `admiring-epic-turing`) — run
   **#62** (commit `396fc6b`, job `73311899660`) **still the latest
   Build Claum (macOS) run** — no newer build dispatched since the
