@@ -5,6 +5,35 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 16:46 UTC** (session `amazing-friendly-gates`) — run
+  **#63** (commit `c4b1746` "stage GTMDefines.h to legacy Foundation/
+  path", run id `25120350635`, job `73619025956`) is **In progress** at
+  `Started 30m 21s ago`, `Run Claum build` step elapsed **`28m 19s`**.
+
+  **Latest ninja tick observed:** **`[1434/55997] CXX
+  obj/third_party/boringssl/boringssl/sqr...`** — already past the
+  early devtools-frontend bundle phase from prior runs and now deep in
+  CXX compilation of partition_alloc / boringssl. We are still well
+  before the SOLINK checkpoint at `[12845/56129]` that killed #32 and
+  #34. Progress is advancing healthily (jumped from `[608]` at first
+  read to `[1434]` ~30 sec later — log was loading lazily, but the
+  highest-tick line is real).
+
+  **No FAILED markers** in the visible log. The only `error:` strings
+  in the log were the **expected** "corrupt patch at line N" warnings
+  emitted by `fix-safe-browsing-gn.py` diagnostics — those are
+  informational, not build failures.
+
+  **Build-failure issue tracker:** `label:build-failure` returned
+  `Invalid value build-failure for label` — the label doesn't exist
+  yet, which means the `build-failure-handler.yml` workflow has **not
+  fired since it was added** (commit `3eb53e9`). All 19 open issues
+  are unrelated to auto-failure handling.
+
+  **Action taken:** none — build is progressing as expected, no
+  intervention required. Watcher exits and will check again on next
+  scheduled tick.
+
 - **2026-04-29 16:40 UTC** (session `elegant-inspiring-cori`) — Run
   **#63** (commit `c4b1746`, GTMDefines.h → legacy `Foundation/`
   staging fix; run id `25120350635`, job id `73619025956`) is **still
