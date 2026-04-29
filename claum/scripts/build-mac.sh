@@ -1104,6 +1104,72 @@ else
   log_warn "Could not find $SB_FILE — skipping diagnostic."
 fi
 
+# ---------------------------------------------------------------------------
+# claum-watcher: dump component safe_browsing BUILD.gn (run #66 instrumentation)
+# ---------------------------------------------------------------------------
+# Background — runs #64 and #65 both failed at ninja [44760/55997] with
+# `password_protection_service_base.cc` and `client_side_detection_service.cc`
+# referencing identifiers (`IsEnhancedProtectionEnabled`, `PHISHING_REUSE`,
+# `kSafeBrowsingEnabled`, etc.) that were stripped by ungoogled-chromium's
+# `0001-fix-building-without-safebrowsing.patch`. The previous watcher
+# proposed wrapping the .cc files in `if (safe_browsing_mode != 0)`, but
+# the latest diagnostic shows safe_browsing_mode != 0 is ALREADY true in
+# this build (these CXX commands ran), so that guard would be a no-op.
+#
+# To write the right fix we need to see the actual structure of the
+# component BUILD.gn files that own these .o targets. The .o paths are:
+#   obj/components/safe_browsing/core/browser/password_protection/password_protection/password_protection_service_base.o
+#   obj/components/safe_browsing/content/browser/client_side_detection_service/client_side_detection_service.o
+# ninja's path convention is obj/<dir>/<target_name>/<source>.o, so the
+# owning BUILD.gn files are:
+#   components/safe_browsing/core/browser/password_protection/BUILD.gn
+#   components/safe_browsing/content/browser/BUILD.gn
+# and the GN target names are `password_protection` and
+# `client_side_detection_service` respectively.
+#
+# This diagnostic does not modify the build; it just prints the BUILD.gn
+# structure to the workflow log so the next watcher cycle can write a
+# precise targeted fix.
+# ---------------------------------------------------------------------------
+log_step "Diagnostic D: dump component safe_browsing BUILD.gn files (run #66)"
+
+dump_build_gn() {
+  # Args: $1 = absolute path to BUILD.gn, $2 = source filename to grep for
+  local f="$1"
+  local needle="$2"
+  if [ ! -f "$f" ]; then
+    log_warn "  (file not found: $f)"
+    return 0
+  fi
+  local total
+  total=$(wc -l < "$f")
+  echo "  $f has $total lines"
+  echo "  ---- head (first 40 lines) ----"
+  cat -n "$f" | sed -n '1,40p' || true
+  echo "  ---- end head ----"
+  echo "  ---- context around mentions of $needle (5 lines before/after) ----"
+  # `grep -n -B 5 -A 5` prints the matching line with 5 lines of context on
+  # either side. The `|| true` swallows grep's exit-1 when there are no
+  # matches so we never fail the build from the diagnostic.
+  grep -n -B 5 -A 5 "$needle" "$f" || true
+  echo "  ---- end context ----"
+  echo "  ---- search for any 'sources' assignments (line numbers only) ----"
+  grep -n -E '^\s*sources\s*[=+]\s*\[' "$f" || true
+  echo "  ---- end sources search ----"
+}
+
+PP_BUILD="$CLAUM_BUILD_ROOT/build/src/components/safe_browsing/core/browser/password_protection/BUILD.gn"
+CSDS_BUILD="$CLAUM_BUILD_ROOT/build/src/components/safe_browsing/content/browser/BUILD.gn"
+
+echo "==> Diagnostic D-1: password_protection BUILD.gn"
+dump_build_gn "$PP_BUILD" "password_protection_service_base.cc"
+echo "---- end diagnostic D-1 ----"
+
+echo "==> Diagnostic D-2: content/browser/safe_browsing BUILD.gn"
+dump_build_gn "$CSDS_BUILD" "client_side_detection_service.cc"
+echo "---- end diagnostic D-2 ----"
+
+
 gn gen "$OUT_DIR" --args="$GN_ARGS"
 
 # Build the main browser target.
