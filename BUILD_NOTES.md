@@ -5,6 +5,57 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 15:37 UTC** (session `zealous-happy-davinci`) — **Still
+  wedged on `396fc6b` — no state change since the 15:19 UTC cycle**
+  (~18 min earlier). Verified this cycle via Chrome MCP reads of:
+
+  - **Build Claum (macOS) workflow runs page** — top run is still
+    **#62** (`runs/25030833231`, status **failed**, duration
+    `33m 26s`). Runs `#60`, `#61`, `#62` all show identical
+    "failed: ~33m" + "Manually run by github-actions[bot]"
+    fingerprint. **No new build dispatched** in the 18-min
+    window — autopilot is correctly staying in its "stopped
+    retrying after 15 attempts" state.
+  - **Issues `#17` and `#18`** (the two most recent autopilot-
+    escalation issues) both contain the identical
+    `[autopilot] Build wedged on 396fc6b after 15 attempts`
+    template body listing same-commit runs `#48`–`#62`. Issue
+    count remains **18 open / 0 closed**.
+  - **Run #62 backend search** — re-ran the in-page log search
+    for `FAILED:` and got the same `1/1` hit at the benign
+    `ERROR:root:Failed to get version info: Git command 'git
+    log -1 --format=%H %ct --grep=^Change-Id: HEAD' ... failed:
+    rc=0` line. **NOT the actual build failure** — that's the
+    CHROMIUM_VERSION fallback path (immediately followed by
+    `WARNING:root:Falling back to a version of 0.0.0 to allow
+    script to finish.`), confirming the 15:10 UTC cycle's
+    finding that the real failure leaves no recognizable
+    error-line marker in the rendered DOM portion of step 12.
+
+  **Decision: HOLD (no code intervention this cycle).** The
+  task spec says: *"If truly stuck after 3 attempts on the same
+  error, leave a note in BUILD_NOTES escalation section and
+  stop."* The autopilot has logged 15 attempts on `396fc6b`,
+  the previous two watcher cycles (15:10 UTC, 15:19 UTC) have
+  both already documented the three concrete unblock options
+  (`scp` raw log off Mac mini; add `tail -200` on failure in
+  `claum/scripts/build-mac.sh`; replace `set -e` with explicit
+  exit-code capture), and pushing any of those would cost more
+  failed runner minutes without changing the diagnostic
+  picture in a single cycle. So this watcher cycle is just
+  confirming the wedge is unchanged and committing this status
+  line via the same fresh-clone workaround the previous cycles
+  documented (the in-mount checkout's `.git/index.lock`
+  permission wall is still present — the lock at
+  `/sessions/zealous-happy-davinci/mnt/Projects/claum-browser/.git/index.lock`
+  is owned by my UID `1049` but `rm` returns
+  `Operation not permitted`, so a fresh clone to
+  `/tmp/work2/claum` is the only writable path).
+
+  **Files touched this cycle:** only this `BUILD_NOTES.md`
+  entry — committed via the standard fresh-clone workaround
+  with `[skip ci]`.
+
 - **2026-04-29 15:19 UTC** (session `dreamy-awesome-euler`) — **No
   state change since the 15:10 UTC cycle.** Build pipeline still
   wedged on commit `396fc6b`. Confirmed this cycle via Chrome MCP
