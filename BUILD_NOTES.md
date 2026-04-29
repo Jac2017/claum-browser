@@ -5,6 +5,32 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:52 UTC** (session `friendly-festive-newton`) — Run **#67**
+  (commit `0770c82`, run id `25130216538`, job `73654108681`) is
+  **In progress** and **healthy**. Phase markers up to `==> [6/6] Running
+  gn gen and ninja`; latest visible ninja tick `[441/55995]` (note total
+  is now `55995`, down from `55997`, consistent with the Path A fix
+  removing the two safe_browsing `.cc` source list entries). Earlier
+  "corrupt patch at line N" lines visible in the log are from the
+  patch-application phase that has since completed (build advanced past
+  it into ninja), so they are non-fatal — same pattern as prior runs.
+  `label:build-failure` query still returns *"Invalid value
+  build-failure for label"* on this fork (label not defined), so the
+  handler workflow's auto-issue path produces no signal here.
+  No fix pushed this cycle — observe-only. The build is still very early
+  in the ninja phase, well before historical failure points
+  (`[12845]` SOLINK checkpoint, `[44760]` safe_browsing wedge). Next
+  watcher should expect the run to be either still building (~25–30m
+  more) or just-completed.
+
+  **Workspace note:** the in-mount checkout at
+  `/sessions/friendly-festive-newton/mnt/Projects/claum-browser/` was
+  5 commits behind origin and had pre-existing uncommitted edits from
+  prior watcher sessions, so I did the BUILD_NOTES update in a fresh
+  clone at `/tmp/claum-watcher-2026-04-29-19-50/repo` and pushed
+  from there.
+
+
 - **2026-04-29 19:46 UTC** (session `eager-stoic-hopper`) — **PUSHED FIX**.
   Most recent cycle (`determined-upbeat-cerf` 19:29 UTC) said run **#66** was
   in progress; it has since **FAILED** at total **36m 11s** /
