@@ -5,6 +5,49 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-04-29 19:05 UTC** (session `jolly-magical-archimedes`) — Run **#66**
+  (commit `770a885`, run id `25127959621`, job `73646129449`) is
+  **In progress**, ~9 min elapsed, ninja currently at
+  **`[5518/55997]`** (~10% — healthy CXX phase in
+  `third_party/webrtc/modules/congestion_controller/goog_cc`). No
+  FAILED markers, no errors observed. Past the toolchain-download
+  phase (clang+Rust ✓), past patch application (111/111 patches
+  applied), now in the long ninja compile.
+
+  **Status:** This is the diagnostic-instrumentation run pushed by
+  the previous watcher (`zealous-eloquent-sagan`) at
+  `770a885` — see the entry just below. No new fix pushed in this
+  cycle: it's far too early to know if the instrumentation worked
+  (we need to wait for the build to reach `[~44760]` and either
+  fail with the BUILD.gn dump in the log, or surprise us by
+  passing). Build is well below the historical SOLINK checkpoint
+  at `[12845]` and the historical safe_browsing failure point at
+  `[44760]`.
+
+  **Open issues count:** 19 build-failure-labeled issues, all
+  duplicates of "Build wedged on `396fc6b` after 15 attempts" —
+  the SHA in those titles is stale (commit `396fc6b` is from run
+  #47, many fix-iterations ago). The handler workflow has not
+  filed a new issue for this run yet.
+
+  **Working-tree note:** the local checkout at
+  `/sessions/jolly-magical-archimedes/mnt/Projects/claum-browser`
+  has pre-existing destructive uncommitted edits not made by this
+  watcher (~600 lines deleted from BUILD_NOTES.md, ~123 from
+  `claum/scripts/build-mac.sh`, ~23 from `build-mac.yml`) plus
+  stale `.git/*.lock` files that the sandbox cannot `rm` (mount
+  permissions). To safely commit this update, this cycle worked
+  in a fresh shallow clone under `/tmp/claum-watcher`, which
+  bypassed both issues. The dirty working tree should be cleaned
+  up in a future session — likely an artifact of an earlier
+  watcher run interrupted mid-edit.
+
+  **Stopping condition:** Run #66 not yet at the diagnostic
+  checkpoint. Next watcher cycle should re-poll and, when the
+  run finishes, fetch the build log and look for the
+  Diagnostic-D dump near the FAILED line.
+
+
 - **2026-04-29 18:58 UTC** (session `zealous-eloquent-sagan`) — Run **#65**
   (commit `5310b08`, run id `25125148704`, job `73636024246`)
   **CONFIRMED FAILED** at ninja **`[44760/55997]`** with the
