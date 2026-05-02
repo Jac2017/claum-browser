@@ -5,6 +5,35 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 18:25 UTC** (session `lucid-charming-mccarthy`, HEARTBEAT)
+  — Run **#85** (id `25258209066`, job `74060983735`,
+  SHA `36aa707`) is **In progress** and the `Run Claum build`
+  step duration is actively ticking up (sampled 21m 56s →
+  22m 27s → 22m 56s → 23m 35s within this watcher window),
+  confirming the runner is alive. Started 17:57 UTC, so
+  ~28m elapsed at sample time, putting it ~16m past the
+  previous (#85) heartbeat at 18:05 UTC. Could NOT scrape
+  the live ninja `[N/M]` tick this cycle: GitHub's SPA
+  fetches step logs from a presigned Azure blob URL
+  (`productionresultssa9.blob.core.windows.net`), and those
+  three GET requests stayed in `pending` state in this
+  Chrome MCP session — the proxy that already blocks
+  `api.github.com` looks to also be choking the blob fetch
+  this cycle. The workflow-level signal is still healthy:
+  status reads "In progress" (not Failed/Cancelled), no
+  red error banner, no FAILED workflow run for SHA `36aa707`,
+  and no fresh `Build Claum (macOS)` entry below it. Issues
+  page with `label:build-failure` rendered the "Invalid value"
+  banner again — confirming there's still no managed
+  `build-failure` Label in the repo, but also confirming no
+  failure issue was filed by the handler this cycle.
+  No code action; will re-poll. If next watcher also can't
+  see ninja ticks but the step duration has crossed ~36m
+  (run #84's full duration), check whether the run flipped
+  to "completed" status — at that point look at Artifacts
+  on the run summary page to detect success vs failure
+  without needing the streamed log.
+
 - **2026-05-02 18:05 UTC** (session `kind-focused-brown`, HEARTBEAT)
   — run **#85** (id `25258209066`, job `74060983735`,
   SHA `36aa707` which contains `f388d5a` trigger_throttler/
