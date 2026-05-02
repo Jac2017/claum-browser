@@ -5,6 +5,37 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:18 UTC** (session `jolly-confident-maxwell`) — run
+  **#84** (commit `cbf606c`, run id `25257076878`, job
+  `74058130482`) is **still in progress** at ~17m 50s total runtime
+  (job started 2026-05-02T17:00:26Z). Page-level liveness signals
+  remain healthy: 4 `currently running` aria-labels (run + job +
+  step + workflow), `Cancel workflow` button visible, no `FAILED:`
+  / `##[error]` / `fatal error` / `FileNotFoundError` /
+  `undefined symbol` / `ninja: error` markers anywhere in rendered
+  DOM. All setup steps complete with the same durations as last
+  cycle (`Set up job 5s`, `Check out Claum repo 37s`, sccache
+  `Restore 1m 22s`). `Run Claum build` step has been ticking for
+  the whole cycle and shows no per-step duration suffix yet, which
+  is the GH UI's way of saying it's still running. Live ninja count
+  not directly sampleable — same DOM-virtualization story as runs
+  #43 (the page renders only ~1.2k of log into the DOM and the
+  Search-logs box matches only against rendered DOM for runs of
+  this size). At ~17.5m in, the build is well past the 70s
+  Chromium download and the `[4/6] Apply ungoogled-chromium
+  patches` / `[5/6] Apply Claum patches` / `[6/6] gn gen` phases —
+  it's in the multi-hour ninja phase now. **Build-failure issue
+  count is up to 46 open** (vs. 6 noted last cycle) — but every
+  one of them is `[autopilot] Build wedged on bfa9bae after 15
+  attempts`, all against the **stale** `bfa9bae` commit, opened
+  Apr 30 → May 2 by the handler workflow before `cbf606c` was
+  pushed. None reference `cbf606c` or any commit on the current
+  HEAD. **Step 3 / Step 4 N/A** — no failure to handle, no DMG
+  yet. Workspace `.git/index.lock` is the same un-`unlink`-able
+  17:00-UTC stale lock from when the previous cycle's git was
+  killed; used the documented shallow-clone workaround in
+  `$HOME/tmp/claum-browser-$$` to commit + push.
+
 - **2026-05-02 17:05 UTC** (session `funny-clever-edison`) — run
   **#84** (commit `cbf606c`, run id `25257076878`, job
   `74058130482`) is **in progress** at ~3m total runtime. Job has
