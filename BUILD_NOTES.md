@@ -4672,3 +4672,81 @@ entirely. Last-resort option is `use_system_xcode=true`.
   retrigger the build-mac workflow.
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-23-11-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 23:28 UTC
+
+- run #91 (run id `25263837990`, SHA `63f6063`, "Build Claum
+  (macOS) #91") still surfaces as **In progress** at the
+  workflow-run level (Cancel workflow button visible, Total
+  duration `–`, Artifacts `–`), but the **`Run Claum build`
+  step itself shows a red X (failed) at 29m 17s** while the
+  job timer continues at 35m+. That timing is identical to
+  run #89 (29m 17s) and within seconds of #90 (29m 24s),
+  i.e. the run almost certainly hit the same
+  `chrome/browser/safe_browsing/` header-strip cluster at
+  `[~47007/55971]`. The job is still in cleanup steps (sccache
+  flush + cache save), so the run will flip to **Failure**
+  once those finish.
+- **First DOM-level capture of the actual FAILED: file list**
+  (recovered from run #90's raw `job-logs.txt` blob via the
+  Actions UI's *gear → View raw logs* link, which redirects
+  to `productionresultssa16.blob.core.windows.net/.../job-logs.txt`
+  with a short-lived SAS token — that route succeeds even
+  though `api.github.com` is proxy-blocked from this sandbox,
+  so it's the right primitive for future cycles too):
+  - run #90 broke at ninja steps **47005..47015 / 55971**
+  - *all 6 failures* shared the same root cause:
+    `fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`
+  - failing translation units, in order they appear in the log:
+    * `chrome/browser/safe_browsing/tailored_security/message_retry_handler.cc:13`
+    * `chrome/browser/safe_browsing/tailored_security/tailored_security_service_factory.cc:9`
+      (via `chrome_tailored_security_service.h:17`)
+    * `chrome/browser/safe_browsing/safe_browsing_pref_change_handler.cc:12`
+    * `chrome/browser/safe_browsing/tailored_security/chrome_tailored_security_service.cc:5`
+      (via `chrome_tailored_security_service.h:17`)
+    * `chrome/browser/safe_browsing/tailored_security/tailored_security_url_observer.cc:16`
+    * `chrome/browser/safe_browsing/safe_browsing_service.cc:71`
+  - run terminator: `ninja: build stopped: subcommand failed.`
+    then `##[error]Process completed with exit code 1.`
+- Implication for `claum/scripts/fix-safe-browsing-components-gn.py`:
+  the autopilot's run #91 commit `63f6063` already drops
+  `tailored_security/*` and four top-level `safe_browsing_*.cc`,
+  which exactly matches the consumer set above, so #91 *should*
+  clear this batch. If #91 still fails at ~47007–47020, the
+  next consumer wave will be **header transitive** — a header
+  inside the kept `chrome/browser/safe_browsing/` source tree
+  is itself `#include`-ing the missing
+  `components/safe_browsing/core/common/safe_browsing_prefs.h`,
+  in which case the fix script needs to either drop those
+  headers or arrange for the components-side header to be
+  generated/restored. Worth a `grep -RIl
+  components/safe_browsing/core/common/safe_browsing_prefs.h
+  chrome/browser/safe_browsing/` against the unpacked source
+  on the next failure cycle so the fix is data-driven, not
+  guess-and-push.
+- Per STEP 2 / STEP 3 of the brief: progress *was* advancing
+  (#82 → #90 each compiled ~7 more files into the cluster
+  before stopping; #91 expected to either clear it or expose
+  one more wave). I am **not pushing a code fix** this cycle
+  because the existing autopilot already committed the right
+  drop-set for this wave (`63f6063`) and #91 isn't terminal
+  yet — pushing a competing fix would just race the autopilot
+  and confuse the build queue. STEP 3's "If truly stuck after
+  3 attempts" escalation does not yet apply: each of #88, #89,
+  #90 *did* advance (47007 → 47011 → 47014), and #91 is the
+  first cycle that pre-emptively dropped the *measured* wave
+  rather than the previous run's tail.
+- Total open Issues: still **46**; no new
+  `[autopilot] Build wedged` issue this cycle, consistent with
+  the run not yet having a final status.
+- Lock-file note for next watcher: `.git/index.lock`,
+  `.git/HEAD.lock`, and `.git/refs/heads/main.lock` were left
+  by the prior session and could not be `rm`'d (sandbox
+  perms); only `mv` succeeds. Used
+  `mv .git/index.lock .git/index.lock.gone-bardeen-...` and
+  `git update-ref refs/heads/main "$(git rev-parse origin/main)"`
+  + `git read-tree --reset HEAD` to recover, then appended this
+  entry. Those `.git/*.lock.*` debris files keep accumulating
+  cycle over cycle and should probably be cleaned up by an
+  external (out-of-sandbox) process, e.g. on the user's host
+  machine, since nothing inside the sandbox can unlink them.
