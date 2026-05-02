@@ -4466,3 +4466,32 @@ entirely. Last-resort option is `use_system_xcode=true`.
   label to apply, same state as prior cycles, not a regression).
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-17-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:31 UTC
+
+- run #90 (SHA `45321eb`) **In progress**, `Run Claum build`
+  step ticking forward in real time (job duration advanced
+  from ~19m 57s at the prior cycle's poll to ~24m 39s during
+  this cycle's polls — i.e. ~4m 42s of additional ninja
+  compilation since the 22:17 UTC heartbeat).
+- The in-page **Search logs** UI on the job page returned
+  `0/0` matches for both `FAILED:` and `fatal error:` —
+  build is healthy, no new failure markers. `Run Claum
+  build` step icon is the spinning in-progress dot (not
+  red X / not green check).
+- Could not extract a precise ninja tick from the streamed
+  DOM this cycle — GH's virtualized log only renders the
+  visible viewport, so scrolling/expanding/collapsing the
+  step momentarily blanks the body. Per Note 4 in the prior
+  watcher's "Notes for the next watcher", the spinning-icon
+  + advancing-elapsed-time signal is sufficient when the
+  run is mid-build and the DOM extract is flaky.
+- `build-failure`-labeled issues page still returns
+  "Invalid value build-failure for label" (the label has
+  never been created in this repo — handler classifies but
+  there's no label to apply, same state as prior cycles,
+  not a regression).
+- Per brief STEP 2 ("if progress is advancing → record
+  progress, exit run") no code change pushed this cycle.
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-31-UTC.md`.
