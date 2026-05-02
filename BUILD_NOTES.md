@@ -4447,3 +4447,22 @@ entirely. Last-resort option is `use_system_xcode=true`.
   a regression).
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-05-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:17 UTC
+
+- run #90 (SHA `45321eb`) **In progress**, ~10 min into ninja
+  compilation. Latest tick captured: `[10852/55971]` (~19%) —
+  recent ticks all CXX of `third_party/dawn/src/dawn/native/`
+  `sources/*Vk.o` (the Vulkan backend for Dawn / WebGPU). No
+  `FAILED:` markers, no `fatal error:` strings, no
+  `##[error]` lines. We're past pre-ninja phases and ~2k
+  ticks shy of the historical SOLINK `libvk_swiftshader.dylib`
+  checkpoint at `[12845]` (cleared cleanly in run #87 already).
+  Per brief STEP 2 ("if progress is advancing → record progress,
+  exit run") no code change pushed this cycle.
+  `build-failure`-labeled issues page still returns "Invalid
+  value build-failure for label" (the label has never been
+  created in this repo — handler classifies but there's no
+  label to apply, same state as prior cycles, not a regression).
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-17-UTC.md`.
