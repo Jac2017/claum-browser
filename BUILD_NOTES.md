@@ -5,6 +5,27 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:05 UTC** (session `funny-clever-edison`) — run
+  **#84** (commit `cbf606c`, run id `25257076878`, job
+  `74058130482`) is **in progress** at ~3m total runtime. Job has
+  cleared all setup steps (sccache restore 1m22s — cache *miss*
+  for the new commit's input key, so this is a from-scratch
+  compile), is now in `Run Claum build` step (~36s in). Phase:
+  `[3/6] Downloading and unpacking Chromium 146.0.7680.164` —
+  curl is at 168M / 1408M (~12%) at 18.3 MB/s. ~1m of download
+  remaining, then `[4/6] Apply ungoogled-chromium patches`,
+  `[5/6] Apply Claum patches`, `[6/6] gn gen`, then ninja kicks
+  off (~56k targets). No errors in the log; no fresh
+  `build-failure` issue opened by the handler workflow against
+  the new SHA. (Open issues #41-#46 are stale `[autopilot]`
+  escalations against the old `bfa9bae` commit and aren't
+  relevant to #84.) **Step 3 / Step 4 N/A** — no failure to
+  handle this cycle, no success yet. Notes: novice reminder:
+  sccache cache *miss* means this run can't reuse compiled
+  artifacts from prior runs and will be slower (5h+ ninja),
+  but on success the cache it saves will speed up retries.
+  The 41 GB free-disk warning is unchanged and known.
+
 - **2026-05-02 17:00 UTC** (session `modest-kind-franklin`) — run
   **#83** (commit `9e7b08c`, run id `25256744023`, job
   `74057289468`) **FAILED** at 12m 2s in the `Run Claum build`
