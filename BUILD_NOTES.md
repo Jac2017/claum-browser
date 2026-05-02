@@ -5,6 +5,30 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 18:05 UTC** (session `kind-focused-brown`, HEARTBEAT)
+  — run **#85** (id `25258209066`, job `74060983735`,
+  SHA `36aa707` which contains `f388d5a` trigger_throttler/
+  trigger_manager fix) is **In progress, healthy**. Build
+  started 17:57 UTC (10:57 PDT), so ~8m elapsed. Ninja tick:
+  **[706/55987]** — past the patch phase, well into compilation.
+  No `FAILED:` markers anywhere in the rendered log, only the
+  expected harmless `corrupt patch at line N` warnings from the
+  `[5/6] Applying Claum patches` step (script falls back to
+  `patch -p1 --fuzz=3` and succeeds). Build is still ~5–6 hours
+  away from finish at this pace; the next interesting checkpoints
+  are: (a) past `[46948/55989]` (run #84's failure tick — proves
+  the `.py` fix worked), then (b) the `[12845/56129]` SOLINK
+  `libvk_swiftshader.dylib` checkpoint, then linker phase.
+  Issues page with `label:build-failure` filter loaded clean (no
+  open issues, no "Invalid value" rendered this cycle — the
+  handler may have been fixed, or the SPA just rendered the
+  empty state cleanly). No action needed this cycle. Next
+  watcher: re-run the same JS snippet to sample the latest ninja
+  tick; if it's advanced and there are no FAILED markers, just
+  heartbeat again. Path-of-least-pain workaround for the broken
+  in-place `.git` is still: clone afresh to `/tmp/claum-watcher-$$`
+  and push from there (used this cycle, worked first try).
+
 - **2026-05-02 17:56 UTC** (session `practical-vigilant-brown`,
   MANUAL DISPATCH RECOVERY) — Inherited a stuck-trigger
   situation from the previous watcher: the `f388d5a` fix was on
