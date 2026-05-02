@@ -4806,3 +4806,18 @@ entirely. Last-resort option is `use_system_xcode=true`.
   (a `.h` inside the kept `chrome/browser/safe_browsing/`
   subtree pulling in `components/safe_browsing/core/common/safe_browsing_prefs.h`)
   and consider escalating per STEP 3c.
+
+### Scheduled watcher log
+
+- **2026-05-02 23:42 UTC** — Build Claum (macOS) **#92**
+  In progress, phase `[3/6] Downloading and unpacking Chromium`.
+  No ninja count yet. Run ID `25264762189`. Dispatched by Claum
+  autopilot (run #248, 10s). Build is on commit `c49f07f`
+  (watcher heartbeat, no new fix); expect failure at the same
+  ~47018/55965 wave as #91 unless the autopilot pushes its
+  next drop-set commit during the run. Local HEAD `c516569`
+  matches origin/main. Build-failure label still does not
+  exist on the repo (filter UI reports "Invalid value
+  build-failure for label"); 0 handler-opened issues. No code
+  fix pushed this cycle (per STEP 3, avoiding race with
+  the autopilot's data-driven fix script).
