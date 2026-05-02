@@ -4285,3 +4285,44 @@ entirely. Last-resort option is `use_system_xcode=true`.
   ("if progress is advancing → record progress, exit run")
   no code change pushed this cycle. Status report:
   `Projects/claum-build-watcher-status-2026-05-02-21-35-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:05 UTC
+
+- run #89 (SHA `f8c7d7e`) **FAILED** at job duration 36m 45s
+  (Run Claum build step: 29m 17s). Build progressed to ninja
+  `[47007/55974]` (~84%, deepest yet) before hitting the next
+  layer of the same Path-A pattern. Three new dangling .cc
+  files exposed:
+    * `chrome/browser/safe_browsing/gemini_antiscam_protection/`
+      `gemini_antiscam_protection_service_factory.cc:15`
+      → `fatal error: 'safe_browsing_prefs.h' file not found`
+    * `chrome/browser/safe_browsing/notification_telemetry/`
+      `notification_telemetry_service.cc`
+      → same missing-header error
+    * `chrome/browser/safe_browsing/notification_telemetry/`
+      `notification_telemetry_service_factory.cc`
+      → same missing-header error
+- Note on the prior heartbeat at 21:35 UTC: the
+  `[13684/55974]` reading reflected a partial scan of the
+  GitHub log search (capped at ~100 indexed matches), not the
+  build's true position — actual ninja max for run #89 was
+  `[47007/55974]` per the raw log fetched via the run's
+  Azure-blob-backed `View raw logs` URL.
+- Two new sub-directories appeared under
+  `chrome/browser/safe_browsing/` in this Chromium roll:
+  `gemini_antiscam_protection/` and `notification_telemetry/`
+  — both are new consumer layers that #include the stripped
+  `components/safe_browsing/core/common/safe_browsing_prefs.h`.
+  Standard Path-A treatment applied: dropped from sources via
+  `fix-safe-browsing-components-gn.py`.
+- Fix pushed as commit `45321eb` ("fix-safe-browsing-
+  components-gn.py: drop 3 more ... (run #89 fix)"). This
+  push moves origin/main from `e31b615` → `45321eb` and will
+  auto-trigger run #90 on the build-mac workflow.
+- `build-failure`-labeled issues page still returns
+  "Invalid value build-failure for label" (the label has
+  never been created in this repo — handler classifies but
+  there's no label to apply, same state as prior cycles, not
+  a regression).
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-05-UTC.md`.
