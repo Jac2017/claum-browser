@@ -4495,3 +4495,40 @@ entirely. Last-resort option is `use_system_xcode=true`.
   progress, exit run") no code change pushed this cycle.
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-31-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:40 UTC
+
+- run #90 (SHA `45321eb`) **In progress** — "Run Claum build"
+  step now at **29m 24s** (was 24m 39s at last heartbeat
+  `340e264`, advance ≈ +4m 45s, healthy progression).
+- Six pre-build steps all green (Set up job 7s, Check out
+  Claum repo 45s, Select Xcode 0s, Install build deps 4s,
+  Install sccache 2s, Cache Chromium source 0s). Post-build
+  steps (Package .app as .dmg, Upload build log, Upload
+  artifact) have not started — i.e. ninja is still running.
+- Log search through the per-job UI (`?search_logs=true`)
+  hits cap at ~100 matches per query so I can't pull the
+  current ninja tick directly, but a sweep for failure
+  markers (`FAILED:`, `fatal error`, `ninja: error`) returned
+  ZERO hits across the indexed log. Only "error" line in the
+  log is the benign `ERROR:root:Failed to get version info`
+  Chromium-internal git lookup that has appeared in every run.
+- **Past the cliff where #89 failed.** Run #89 hit
+  `[47007/55974]` and FAILED at job duration 36m 45s with
+  build step at 29m 17s. Run #90 is now at build-step 29m 24s
+  and still streaming, which means the three new
+  `gemini_antiscam_protection/` + `notification_telemetry/`
+  drops in commit `45321eb` cleared that compile cluster.
+  Next likely friction points (if pattern holds): more
+  `safe_browsing_prefs.h` consumers further into the build,
+  or the artifact-packaging stage (rare but historically
+  present, e.g. otool-classic in run #34/#35).
+- `build-failure`-labeled Issues page still returns
+  "Invalid value build-failure for label" — the label has
+  never been created in the repo, so the
+  build-failure-handler workflow can't tag any issue with it.
+  Same state as prior cycles; not a regression.
+- Per brief STEP 2 ("if progress is advancing → record
+  progress, exit run") **no code change pushed** this cycle.
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-40-UTC.md`.
