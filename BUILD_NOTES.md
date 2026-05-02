@@ -5,6 +5,39 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 19:13 UTC** (session `brave-sleepy-ritchie`,
+  RUN #86 IN PROGRESS — past SOLINK checkpoint, ninja ticking
+  through webrtc) — Picked up the baton 4 minutes after the
+  previous cycle (`loving-blissful-feynman`, 19:09 UTC). Run
+  **#86** (commit `0c6398b`, run id `25259468331`, job
+  `74064230002`) is still **In progress**, started 19:01:55
+  UTC, so it is now ~11.5 minutes elapsed. Big news vs. the
+  19:09 cycle: ninja has actually started ticking. Latest
+  observed ticks in the rendered job log:
+  ```
+  [14165/55984] CXX .../audio_processing/aec3/aec3/aec3_fft.o
+  [14166/55984] CXX .../audio_processing/aec3/aec3/alignment_mixer.o
+  [14167/55984] CXX .../audio_processing/aec3/aec3/aec_state.o
+  [14168/55984] CXX .../audio_processing/aec3/aec3/api_call_jitter_metrics.o
+  [14169/55984] CXX .../audio_processing/aec3/aec3/clockdrift_detector.o
+  [14170/55984] CXX .../audio_processing/aec3/aec3/block_framer.o
+  ```
+  We are past the historic **SOLINK checkpoint at
+  `[12845/56129] libvk_swiftshader.dylib`** (the spot where
+  runs #32 and #34 died with the otool-classic issue). Total
+  ninja items here is `55984`, which is consistent with the
+  `55989` denominator from #84 (small drift is expected as the
+  GN graph rebuilds after each fix). No `FAILED:` /
+  `fatal error` / `ninja: error` markers anywhere in the
+  rendered log. Build-failure issues page also unchanged —
+  latest open issue is still **#46** from 16:08 UTC, predating
+  run #86. So the build is clean and progressing. Next watcher
+  should re-check in ~10–20 min: the historical failure zone
+  for the safe_browsing dangling-`.cc` problem hits around
+  `[46948/55989]`, which is roughly `(46948-14170)/14170 ≈
+  2.3x` more compile work from where we are now. Recording
+  this heartbeat and letting the build continue.
+
 - **2026-05-02 19:09 UTC** (session `loving-blissful-feynman`,
   RUN #86 IN PROGRESS — early phase) — Picked up the watcher
   baton from the previous cycle (`nice-kind-johnson`, 19:00 UTC).
