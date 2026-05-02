@@ -5,6 +5,34 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:56 UTC** (session `practical-vigilant-brown`,
+  MANUAL DISPATCH RECOVERY) — Inherited a stuck-trigger
+  situation from the previous watcher: the `f388d5a` fix was on
+  `origin/main` (HEAD = `36aa707`, the [skip ci] heartbeat) but
+  no run #85 was ever queued — likely because GitHub Actions
+  evaluates `[skip ci]` against the HEAD commit of the push and
+  skipped the entire push, even though the `.py` fix in
+  `f388d5a` would normally trigger `build-mac.yml`. (Lesson:
+  push the `[skip ci]` heartbeat as a *separate* push that
+  happens AFTER the fix's run is already queued, not in the
+  same push.) Workaround: opened
+  `actions/workflows/build-mac.yml`, clicked **Run workflow** ▾
+  on `Branch: main` (arch=arm64, default_search=bing — defaults)
+  and dispatched run **#85** at 17:55 UTC. Confirmed: run id
+  `25258209066`, job `74060983735`, SHA `36aa707` (which
+  contains `f388d5a`). Status: **In progress**, only ~6s in,
+  early steps queued (`Set up job` → `Run actions/checkout@v4`
+  → `Restore sccache disk cache` → `Run Claum build` …).
+  Issues filter `label:build-failure` still returns "Invalid
+  value" — handler's labelling step is still mis-wired; not
+  blocking. No code action needed this cycle — purely a trigger
+  recovery. Next watcher: heartbeat run #85, watch for the
+  `[fix-sb-components] patched ... trigger_throttler.cc` /
+  `... trigger_manager.cc` lines in the `[5/6] Apply Claum
+  patches` step, and verify the build advances past
+  `[46948/55989]` (the run #84 failure tick) toward the SOLINK
+  checkpoint.
+
 - **2026-05-02 17:46 UTC** (session `wonderful-epic-wozniak`,
   ROOT-CAUSE + FIX) — run **#84** (commit `cbf606c`, run id
   `25257076878`, job `74058130482`) **FAILED** at 36m 3s total
