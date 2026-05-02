@@ -5,6 +5,25 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 16:47 UTC** (session `gallant-lucid-ride`, heartbeat)
+  — run **#83** (commit `9e7b08c`, run id `25256744023`, job
+  `74057289468`) still **In progress** and healthy. Job is in the
+  early `Run Claum build` step at the build-script's
+  `==> [3/6] Downloading and unpacking Chromium 146.0.7680.164`
+  phase — `curl` progress meter showed ~53% (~757M of 1408M) at
+  17.8 MB/s, no errors. All earlier steps green: Set up job (5s),
+  Check out Claum repo (44s), Restore sccache disk cache (1m 32s),
+  etc. **No** ninja `[N/55995]` ticks yet — that begins after the
+  download → patch → gn-gen phases. **No** open issues with
+  `label:build-failure` (label query returned "Invalid value
+  build-failure for label", i.e. the label literally doesn't exist
+  in this repo, so the auto-handler hasn't ever opened one — kept
+  in mind as a secondary signal). **No** new run for SHA `9e7b08c`
+  — handler hasn't re-dispatched, which makes sense because the
+  build hasn't failed. Next watcher should look for ninja count
+  past `[47000/55995]` (= the safe_browsing fix landed) or a new
+  fatal-error pattern around the same checkpoint.
+
 - **2026-05-02 16:54 UTC** (session `wizardly-eloquent-bardeen`,
   heartbeat) — run **#83** (commit `9e7b08c`, run id `25256744023`)
   is **In progress**, triggered by push of the run #82 fix. Build
