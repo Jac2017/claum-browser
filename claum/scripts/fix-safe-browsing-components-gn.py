@@ -340,6 +340,91 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "notification_telemetry_service_factory.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #90 dangling files — SIX more consumers of the same stripped
+    # safe_browsing_prefs.h header. Same Path-A pattern as runs
+    # #67/#82/#84/#85/#86/#87/#88/#89 — peeling back yet another layer of
+    # `chrome/browser/safe_browsing/` files that #include the stripped
+    # `components/safe_browsing/core/common/safe_browsing_prefs.h`.
+    #
+    # Notable: the previous fix (run #89, commit 45321eb) added 3 files
+    # under brand-new sub-directories (gemini_antiscam_protection/,
+    # notification_telemetry/), but it did NOT cover the older
+    # `tailored_security/` subdir nor the top-level `safe_browsing_service.cc`
+    # / `safe_browsing_pref_change_handler.cc`. Once those compile-units
+    # advanced past their previous failure point, ninja exposed THIS next
+    # batch of dangling consumers at almost the same tick (run #90 failed at
+    # the `[47005..47011/55971]` cluster, ~84%).
+    #
+    # Build broke at ninja [47005..47011/55971] with these six FAILED
+    # markers, all pointing at the same fatal error `'components/safe_browsing/
+    # core/common/safe_browsing_prefs.h' file not found`:
+    #
+    #   * chrome/browser/safe_browsing/tailored_security/
+    #         message_retry_handler.cc
+    #       -> obj/chrome/browser/safe_browsing/safe_browsing/
+    #          message_retry_handler.o
+    #
+    #   * chrome/browser/safe_browsing/tailored_security/
+    #         tailored_security_service_factory.cc
+    #       -> obj/.../tailored_security_service_factory.o
+    #
+    #   * chrome/browser/safe_browsing/safe_browsing_pref_change_handler.cc
+    #       -> obj/.../safe_browsing_pref_change_handler.o
+    #       (top-level under chrome/browser/safe_browsing/, not in a subdir)
+    #
+    #   * chrome/browser/safe_browsing/tailored_security/
+    #         chrome_tailored_security_service.cc
+    #       -> obj/.../chrome_tailored_security_service.o
+    #
+    #   * chrome/browser/safe_browsing/tailored_security/
+    #         tailored_security_url_observer.cc
+    #       -> obj/.../tailored_security_url_observer.o
+    #
+    #   * chrome/browser/safe_browsing/safe_browsing_service.cc
+    #       -> obj/.../safe_browsing_service.o
+    #       (top-level under chrome/browser/safe_browsing/, not in a subdir)
+    #
+    # All six .cc files are listed in the static_library("safe_browsing")
+    # target inside chrome/browser/safe_browsing/BUILD.gn — confirmed by the
+    # obj path `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o`
+    # (Chromium puts target outputs under
+    # `obj/<dir-of-BUILD.gn>/<target-name>/<source>.o`, regardless of how
+    # deep the .cc lives in subdirectories under that BUILD.gn).
+    #
+    # Same Path-A treatment: drop them from sources so ninja stops
+    # compiling them. Runtime safe_browsing is off in Claum anyway, so
+    # these consumers are dead code in this configuration.
+    #
+    # Why explicit BUILD.gn paths (not auto-discover): same reason as
+    # runs #85/#86/#88/#89 — we know exactly which BUILD.gn lists them,
+    # and AUTO_DISCOVER_ROOT only walks `components/safe_browsing/`.
+    # Widening it to `chrome/` would risk false-positive matches on
+    # same-named files elsewhere in the chrome/ tree.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "message_retry_handler.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "tailored_security_service_factory.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "safe_browsing_pref_change_handler.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_tailored_security_service.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "tailored_security_url_observer.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "safe_browsing_service.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
