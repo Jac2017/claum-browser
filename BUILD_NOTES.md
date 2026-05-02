@@ -4158,3 +4158,15 @@ entirely. Last-resort option is `use_system_xcode=true`.
   Next watcher cycle should retry log capture (and try downloading
   /actions/runs/25260273731/logs.zip via authenticated Chrome
   navigation as a fallback).
+- 2026-05-02 20:46 UTC — run #88 (manual workflow_dispatch by
+  github-actions[bot] on SHA 6cb75fd) IN PROGRESS at ~9m elapsed.
+  Latest visible ninja tick: `[200/55980] CXX
+  obj/third_party/abseil-cpp/absl/synchronization/synchronization/barrier.o`.
+  Build has cleared depot_tools sync + gn gen and started ninja
+  compilation phase. Far below the SOLINK [12845/55980] checkpoint
+  where #32/#34 historically failed (need ~50× more progress to
+  reach it). Issues tab `?label=build-failure` returned "Invalid
+  value build-failure for label" — handler has not created (or
+  needed) any code-error issue this cycle. No code change pushed.
+  Next watcher cycle: confirm ticks are still advancing past current
+  count of 200; expect ~thousands by next heartbeat.
