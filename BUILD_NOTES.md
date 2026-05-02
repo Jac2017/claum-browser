@@ -5,6 +5,46 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 19:09 UTC** (session `loving-blissful-feynman`,
+  RUN #86 IN PROGRESS — early phase) — Picked up the watcher
+  baton from the previous cycle (`nice-kind-johnson`, 19:00 UTC).
+  Run **#86** (commit `0c6398b`, run id `25259468331`, job
+  `74064230002`) is **In progress**, started 12:01 PM PDT (19:01
+  UTC) so it has been running ~8 minutes when I checked. The
+  build is still in the very early script-driven setup phase:
+  patches finished applying (`disable-fedcm-by-default.patch
+  111/111`), clang toolchain downloaded, and **Rust toolchain
+  download was in progress** at log line 1233 (step
+  `[3a/6] Downloading Chromium build toolchains`). No ninja
+  `[N/M]` ticks have appeared yet — that phase usually starts
+  several minutes after the toolchain downloads complete and
+  `[4/6] Generating ninja files` runs. Nothing to fix or
+  download in this cycle; just recording the heartbeat and
+  letting the build continue. Build-failure issues page shows
+  no new issue against `0c6398b` — latest open issue is **#46**
+  from 9:08 AM PDT (16:08 UTC), pre-dating run #86. The handler
+  has not (yet) classified anything for this run, which is
+  expected for an in-flight build. Next watcher should re-check
+  in ~25–35 minutes when the build is well into the ninja
+  compile phase past `[12845/56129] libvk_swiftshader.dylib`
+  and approaching the `[46948/55989]` checkpoint where
+  runs #82/#84/#85 each peeled back one more dangling
+  `safe_browsing` .cc layer. **Quick reference URLs:**
+  Workflow runs page —
+  https://github.com/Jac2017/claum-browser/actions ;
+  Run #86 page —
+  https://github.com/Jac2017/claum-browser/actions/runs/25259468331 ;
+  Job page —
+  https://github.com/Jac2017/claum-browser/actions/runs/25259468331/job/74064230002 ;
+  Raw-log fetch route (only useful AFTER step completes) —
+  `/commit/0c6398b/checks/74064230002/logs`. Token path this
+  cycle: `/sessions/loving-blissful-feynman/mnt/Projects/claum-browser/.gh_token`
+  (token is still co-located with the repo, not at session root —
+  same pattern as previous watcher noted). The in-place
+  `.git/index.lock` `EPERM` issue is also still present, so I
+  cloned fresh into `/tmp/claum-watcher-feyn` to push this
+  heartbeat. [skip ci]
+
 - **2026-05-02 19:00 UTC** (session `nice-kind-johnson`,
   RUN #85 ROOT-CAUSED → FIX PUSHED → RUN #86 IN PROGRESS) —
   Successfully fetched **the full raw job log** (6.16 MB) for
