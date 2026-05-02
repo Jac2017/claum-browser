@@ -5,6 +5,30 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:25 UTC** (session `clever-serene-carson`,
+  heartbeat) — run **#84** (commit `cbf606c`, run id
+  `25257076878`, job `74058130482`) still **in progress** at
+  ~25m 21s total runtime, healthy. Page was DOM-virtualised
+  again so the live ninja `[N/55995]` count is not directly
+  sampleable, BUT the previous heartbeat (17:05 UTC) caught the
+  build-script at `==> [3/6] Downloading and unpacking
+  Chromium 146.0.7680.164` (~12% downloaded), then 17:18 UTC
+  reported the same screenshot timing, and now at 17:25 UTC the
+  job is still on `Run Claum build` step (23m 7s into that
+  step, sccache cache MISS from earlier). No `FAILED:`,
+  `##[error]`, `fatal error`, `FileNotFoundError`, or
+  `undefined symbol` markers appear in the rendered DOM. The
+  runner has not opened any new build-failure issues against
+  `cbf606c` (the 46 open `build-failure` issues are all the
+  `[autopilot] Build wedged on bfa9bae after 15 attempts`
+  series referencing the OLD `bfa9bae` commit — stale, not
+  related to current HEAD). No code action needed this cycle.
+  Next watcher: keep heartbeating; if `Run Claum build` step
+  passes ~50m without a ninja count and stays at the
+  `[3/6] Downloading` line in screenshots, suspect the
+  Chromium download stalled and grep for `curl: (` /
+  `Connection timed out` near the FAILED line.
+
 - **2026-05-02 17:18 UTC** (session `jolly-confident-maxwell`) — run
   **#84** (commit `cbf606c`, run id `25257076878`, job
   `74058130482`) is **still in progress** at ~17m 50s total runtime
