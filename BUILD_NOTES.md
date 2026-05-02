@@ -4248,3 +4248,18 @@ entirely. Last-resort option is `use_system_xcode=true`.
     * check_client_download_request_base.cc (IsExtendedReportingEnabled,
       IsEnhancedProtectionEnabled)
   Fix pushed; this should auto-trigger a new build run (#89) on push.
+
+### Watcher heartbeat — 2026-05-02 21:28 UTC
+
+- run #89 (SHA f8c7d7e) **In progress**, ~4 min elapsed since
+  push. Currently in build-mac.sh phase
+  `[3/6] Downloading and unpacking Chromium 146.0.7680.164` —
+  sha256/384/512 hashes verified, tarball unpack underway.
+  All pre-build steps green (sccache restore 1m 27s, Xcode
+  selected, deps installed, modulemap diagnostic passed).
+  Ninja has not started — no `[N/56129]` ticks yet, no
+  `FAILED:` markers, no `fatal error:` strings. No
+  `build-failure` label exists in the repo so handler still
+  hasn't classified anything as a code error. Per brief
+  STEP 2 ("if progress is advancing → record progress, exit
+  run") no code change pushed this cycle.
