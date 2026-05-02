@@ -184,16 +184,31 @@ def patch_one(build_gn: pathlib.Path, cc_name: str) -> bool:
         )
         return False
 
+    # NOTE on multi-match handling (run #83 fix):
+    # ------------------------------------------
+    # Earlier versions of this script bailed when len(matches) > 1, on the
+    # theory that ambiguity = drift = unsafe. But run #83 hit the case
+    # where `ui_manager.cc` legitimately appears TWICE in
+    # `components/safe_browsing/content/browser/BUILD.gn` — once in the
+    # production `sources = [...]` list and once in a test/sibling target
+    # in the same file. Both references compile the same .cc, both fail
+    # with the same "use of undeclared identifier" error, and both need
+    # to be removed. Refusing to patch left the build perpetually broken.
+    #
+    # New policy: comment out ALL matching lines in this file. The pattern
+    # `line_re` is anchored to `^...$` with re.MULTILINE so each match is
+    # an exact whole-line hit on a quoted source list entry — false
+    # positives (e.g. comments, deps lists) are extremely unlikely. If a
+    # match accidentally lands somewhere harmless, commenting it out is a
+    # no-op anyway.
+    #
+    # We DO log the multi-match case so the build log makes it obvious
+    # we've moved past the old "refuse to patch" behavior.
     if len(matches) > 1:
-        # If we get more than one hit, the file has drifted from what we
-        # expect. Bail rather than patching blindly — failing here is
-        # MUCH preferable to silently breaking the build in a confusing
-        # way deep into the CXX phase.
         print(
-            f"[fix-sb-components] ERROR: {len(matches)} matches for "
-            f"{cc_name} in {build_gn} — refusing to patch ambiguously"
+            f"[fix-sb-components] note: {len(matches)} matches for "
+            f"{cc_name} in {build_gn} — patching all (run #83 policy)"
         )
-        return False
 
     def do_replace(m: re.Match) -> str:
         """Comment out the whole sources line and add a Claum marker.
@@ -212,20 +227,23 @@ def patch_one(build_gn: pathlib.Path, cc_name: str) -> bool:
         original_payload = f"{quoted}{comma}"
         return f"{indent}# {original_payload}  {CLAUM_MARKER}"
 
-    new_text, n = line_re.subn(do_replace, text, count=1)
-    # We already validated len(matches) == 1, so n must be 1 here. Defensive
-    # assertion in case the regex semantics surprise us.
-    if n != 1:
+    # `count=0` means "replace ALL matches" (re.sub default). Important for
+    # the multi-match case described above. For single-match files this is
+    # equivalent to count=1 and behaves the same as before.
+    new_text, n = line_re.subn(do_replace, text, count=0)
+    # We expect n == len(matches). If it doesn't, our regex/findall got out
+    # of sync somehow — bail loudly rather than write a half-patched file.
+    if n != len(matches):
         print(
-            f"[fix-sb-components] ERROR: expected 1 substitution but did {n} "
-            f"in {build_gn}"
+            f"[fix-sb-components] ERROR: expected {len(matches)} substitutions "
+            f"but did {n} in {build_gn}"
         )
         return False
 
     build_gn.write_text(new_text)
     print(
-        f"[fix-sb-components] patched {build_gn}: commented out source "
-        f"reference to {cc_name}"
+        f"[fix-sb-components] patched {build_gn}: commented out "
+        f"{n} source reference{'s' if n != 1 else ''} to {cc_name}"
     )
     return True
 
