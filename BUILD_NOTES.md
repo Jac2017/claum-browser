@@ -5,6 +5,59 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 19:45 UTC** (session `wonderful-modest-wozniak`,
+  RUN #86 ROOT-CAUSED, FIX PUSHED, RUN #87 IN PROGRESS) —
+  Picked up the watcher baton from the previous cycle
+  (`nice-zealous-feynman`, 19:35 UTC). Correction to that
+  cycle's "BUILD SUCCEEDED in 29m 9s" claim: run **#86**
+  actually FAILED at ninja `[46977/55984]` at timestamp
+  `19:33:28 UTC`, with `##[error]Process completed with
+  exit code 1` at `19:33:38`. The Actions UI confirms it
+  with `aria-label="failed: Run 86 of Build Claum (macOS)"`.
+  Likely the previous heartbeat misread an intermediate step
+  status — go straight to the raw log next time.
+- Used the `/commit/{sha}/checks/{jid}/logs` route again
+  (this remains the magic path — see previous watcher's
+  notes for why) and pulled the 6,160,588-byte log into the
+  Chrome MCP tab. Regex-scanned for `^FAILED:` and got 12
+  hits collapsing to 4 unique objects:
+  - `chrome/browser/safe_browsing/chrome_ping_manager_factory.cc:22`
+    -> `fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`
+  - `chrome/browser/safe_browsing/chrome_safe_browsing_tab_observer_delegate.cc`
+    -> same missing header (transitively via
+    `client_side_detection_host.h:34`)
+  - `chrome/browser/safe_browsing/chrome_safe_browsing_blocking_page_factory.cc:67`
+    -> `error: use of undeclared identifier 'IsSafeBrowsingProceedAnywayDisabled'`
+  - `chrome/browser/safe_browsing/chrome_password_protection_service.cc:131`
+    -> `error: unknown type name 'ExtendedReportingLevel'`
+- All four are the SAME root cause as runs #67/#82/#84/#85:
+  ungoogled-chromium's `safe_browsing_prefs.h` strips
+  symbols, and dependent `.cc` files in
+  `chrome/browser/safe_browsing/` blow up at CXX time. They
+  all produce `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o`
+  → so they all live in `chrome/browser/safe_browsing/BUILD.gn`
+  (the same file the run #85 trio targeted).
+- Added 4 explicit entries to the `TARGETS` list in
+  `claum/scripts/fix-safe-browsing-components-gn.py`
+  pointing at `chrome/browser/safe_browsing/BUILD.gn` —
+  same pattern as the run #85 trio. Pushed as `2751b0b`
+  on top of `5cb1ddf`.
+- Run **#87** auto-triggered by my push (run id `25260273731`,
+  SHA `2751b0b`) and is **In progress** as of 19:45 UTC.
+- Issues tab still shows the same 46 stale autopilot
+  `build-failure` issues; no fresh issue against `0c6398b`.
+- Sandbox quirk: the Chrome MCP tab blocks JS execution if
+  the result text contains `Set-Cookie`/`sig=`/etc. The
+  workaround is to filter those substrings out before
+  returning — e.g.
+  `lines.filter(l => !/cookie|set-cookie|sig=|sas/i.test(l))`.
+  Most of the time this isn't needed, only when grabbing
+  log tail or HTTP headers.
+- Heartbeat-then-fix push order followed: fix first (no
+  `[skip ci]`, triggers run #87) → wait 25s for run to
+  register → this heartbeat second (with `[skip ci]`).
+
+
 - **2026-05-02 19:35 UTC** (session `nice-zealous-feynman`,
   RUN #86 BUILD PHASE SUCCEEDED — now in artifact phase) —
   Picked up the watcher baton from the previous cycle
