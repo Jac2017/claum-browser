@@ -124,6 +124,48 @@ TARGETS = [
     # the right move — runtime safe_browsing is off anyway.
     (None, "trigger_throttler.cc"),
     (None, "trigger_manager.cc"),
+    # ------------------------------------------------------------------------
+    # Run #85 dangling files — three NEW consumers of the same stripped
+    # safe_browsing_prefs.h header, this time inside chrome/browser/safe_browsing/
+    # (NOT components/safe_browsing/). Build broke at ninja [46970..46978/55987]:
+    #
+    #   * chrome/browser/safe_browsing/metrics/bundled_settings_metrics_provider.cc
+    #       → fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h'
+    #         file not found
+    #
+    #   * chrome/browser/safe_browsing/chrome_client_side_detection_host_delegate.cc
+    #       → same missing-header error (transitively, via
+    #         components/safe_browsing/content/browser/client_side_detection_host.h)
+    #
+    #   * chrome/browser/safe_browsing/url_checker_delegate_impl.cc:179
+    #       → error: no member named 'IsEnhancedProtectionEnabled' in
+    #         namespace 'safe_browsing' (symbol declared in the same
+    #         stripped safe_browsing_prefs.h)
+    #
+    # All three .cc files are listed in the static_library("safe_browsing")
+    # target inside chrome/browser/safe_browsing/BUILD.gn (we can tell from
+    # the obj path: obj/chrome/browser/safe_browsing/safe_browsing/<name>.o).
+    # Same Path-A treatment: drop them from sources so ninja stops compiling
+    # them. Runtime safe_browsing is off anyway, so these consumers are dead
+    # code in this build configuration.
+    #
+    # Why explicit BUILD.gn paths (not auto-discover): we know exactly which
+    # BUILD.gn lists them (the obj path tells us), and we don't want to
+    # widen AUTO_DISCOVER_ROOT to include `chrome/` because there are dozens
+    # of unrelated files with the same names elsewhere in chrome/ (e.g.
+    # other `url_checker_delegate_impl.cc` style names). Explicit is safer.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "bundled_settings_metrics_provider.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_client_side_detection_host_delegate.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "url_checker_delegate_impl.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
