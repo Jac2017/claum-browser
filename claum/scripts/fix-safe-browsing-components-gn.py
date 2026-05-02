@@ -287,6 +287,59 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "check_client_download_request_base.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #89 dangling files — THREE more consumers of the same stripped
+    # safe_browsing_prefs.h header. Same Path-A pattern as runs
+    # #67/#82/#84/#85/#86/#87/#88 — peeling back another layer of
+    # `chrome/browser/safe_browsing/` files that #include the stripped
+    # `components/safe_browsing/core/common/safe_browsing_prefs.h`. This
+    # round added two new sub-directories under chrome/browser/safe_browsing/:
+    #   - gemini_antiscam_protection/  (new in this Chromium roll)
+    #   - notification_telemetry/      (new in this Chromium roll)
+    #
+    # Build broke at ninja [46998..47007/55974] (~84% — deepest we've gotten
+    # yet, which is good news: each fix peels back the next layer):
+    #
+    #   * chrome/browser/safe_browsing/gemini_antiscam_protection/
+    #         gemini_antiscam_protection_service_factory.cc:15
+    #       -> fatal error: 'components/safe_browsing/core/common/
+    #          safe_browsing_prefs.h' file not found.
+    #
+    #   * chrome/browser/safe_browsing/notification_telemetry/
+    #         notification_telemetry_service.cc
+    #       -> same missing-header error.
+    #
+    #   * chrome/browser/safe_browsing/notification_telemetry/
+    #         notification_telemetry_service_factory.cc
+    #       -> same missing-header error.
+    #
+    # All three .cc files are listed in the static_library("safe_browsing")
+    # target inside chrome/browser/safe_browsing/BUILD.gn (the obj path
+    # `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o` confirms
+    # this — Chromium puts target outputs under
+    # `obj/<dir-of-BUILD.gn>/<target-name>/<source>.o`, regardless of how
+    # deep the .cc file lives in subdirectories under that BUILD.gn).
+    #
+    # Same Path-A treatment: drop them from sources so ninja stops
+    # compiling them. Runtime safe_browsing is off in Claum anyway, so
+    # these consumers are dead code in this configuration.
+    #
+    # Why explicit BUILD.gn paths (not auto-discover): same as runs #85/#86/#88
+    # — we know exactly which BUILD.gn lists them, and AUTO_DISCOVER_ROOT
+    # only walks `components/safe_browsing/`. Widening it to `chrome/`
+    # would risk false-positive matches on same-named files elsewhere.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "gemini_antiscam_protection_service_factory.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "notification_telemetry_service.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "notification_telemetry_service_factory.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
