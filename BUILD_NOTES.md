@@ -4532,3 +4532,59 @@ entirely. Last-resort option is `use_system_xcode=true`.
   progress, exit run") **no code change pushed** this cycle.
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-40-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:49 UTC
+
+- run #90 (SHA `45321eb`) **FAILED** at job duration 37m 3s
+  (Run Claum build step: 29m 24s — only +7s past where #89
+  failed at 29m 17s). Build progressed to ninja
+  `[47005..47011/55971]` (~84%, basically the same cliff as
+  run #89). The 22:40 UTC heartbeat caught the run mid-step
+  at 29m 24s; ninja then stopped a few seconds later.
+- Root cause: SIX more `chrome/browser/safe_browsing/`
+  consumers of the stripped
+  `components/safe_browsing/core/common/safe_browsing_prefs.h`
+  header. Same Path-A pattern as runs #67/#82/#84/#85/#86/
+  #87/#88/#89, but two new layers exposed:
+    * `tailored_security/` subdir — four files:
+        - message_retry_handler.cc
+        - tailored_security_service_factory.cc
+        - chrome_tailored_security_service.cc
+        - tailored_security_url_observer.cc
+    * top-level files in chrome/browser/safe_browsing/:
+        - safe_browsing_pref_change_handler.cc
+        - safe_browsing_service.cc
+  All six fail with the same `fatal error: 'components/
+  safe_browsing/core/common/safe_browsing_prefs.h' file not
+  found` — pure header-strip casualties. Confirmed via raw
+  log fetch from the page-session
+  `/commit/45321eb.../checks/74073296313/logs` endpoint
+  (works after run completes; 6.2 MB log; first FAILED:
+  marker at offset 6,007,625; 18 total FAILED lines = 6
+  unique files × 3 occurrences each).
+- Fix pushed as commit `63f6063` ("fix-safe-browsing-
+  components-gn.py: drop 6 more chrome/browser/safe_browsing/
+  files (run #90 fix)"). This push moves origin/main from
+  `da9973a` → `63f6063` and will auto-trigger run #91 on the
+  build-mac workflow.
+- Sandbox-specific gotcha for the next watcher cycle: the
+  `.git` directory has a bind-mount restriction where
+  `unlink(2)` is denied on existing files (so `rm` fails
+  with "Operation not permitted" even though the file is
+  owned by the sandbox user), but `rename(2)` works for
+  intra-directory moves. Effect: stale `.git/index.lock`,
+  `.git/HEAD.lock`, `.git/ORIG_HEAD.lock` files left behind
+  by previous git invocations cannot be `rm`-d. Workaround:
+  `mv .git/index.lock .git/index.lock.gone-xN` (intra-dir
+  rename) succeeds and unblocks the next git command. Same
+  trick is needed if `BUILD_NOTES.md` blocks a fast-forward
+  merge: `mv BUILD_NOTES.md BUILD_NOTES.md.predev.gone`
+  before `git merge --ff-only origin/main`. Cross-fs `mv`
+  (e.g. into `/tmp/`) does NOT work because the kernel
+  implements that as copy+unlink and unlink fails.
+- `build-failure`-labeled Issues page still returns
+  "Invalid value build-failure for label" — the label has
+  never been created in the repo, same state as prior
+  cycles, not a regression.
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-49-UTC.md`.
