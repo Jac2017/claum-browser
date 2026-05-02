@@ -5,6 +5,42 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 19:54 UTC** (session `dazzling-sweet-pasteur`, RUN #87 IN PROGRESS) —
+  Watcher heartbeat. Latest run on origin/main is **Build
+  Claum (macOS) #87** (run id `25260273731`, SHA `2751b0b`,
+  triggered by `Commit 2751b0b pushed by Jac2017`). Status:
+  *In progress*. Build started `2026-05-02T19:44:18 UTC`,
+  ~7 minutes elapsed at heartbeat time.
+- Pulled the live job log via the `Run Claum build` step on
+  the job page (`actions/runs/25260273731/job/74066301448`).
+  Six most-recent ninja ticks visible in the streaming DOM
+  (no truncation banner): `[7426/55980]` … `[7431/55980]`.
+  No `FAILED:` markers. No `error:` markers. No
+  `##[error]` exit lines. Build is healthy and progressing
+  through the early CXX phase — well below the
+  `[12845]` SOLINK checkpoint (where #32/#34 died) and
+  WAY below the `[46977]` safe_browsing checkpoint (where
+  #86 died). Total of `1344` ticks collected so far in
+  the visible window.
+- Action: nothing to do this cycle. Run #87 carries the
+  fix from the previous watcher (`2751b0b` — drop 4 more
+  `chrome/browser/safe_browsing/*.cc` consumers of the
+  stripped `safe_browsing_prefs.h` header). Per task
+  instructions STEP 2: "If progress is advancing → record
+  progress, exit run." Heartbeat committed with `[skip ci]`
+  so the build isn't disturbed. Next watcher: check whether
+  #87 made it past `[46977]`; if it failed there, peel back
+  another layer of dangling consumers; if it failed
+  somewhere new, root-cause from raw log via the
+  `/commit/{sha}/checks/{jid}/logs` route.
+- Note for future me: the local mount
+  (`/sessions/dazzling-sweet-pasteur/mnt/Projects/claum-browser/`)
+  had a stale `.git/index.lock` from `May 2 18:46` that
+  I couldn't `rm` (Operation not permitted). Worked around
+  it by cloning fresh into `/tmp/claum-work` and pushing
+  from there. If that lock is still around next cycle, do
+  the same thing rather than fighting the mount.
+
 - **2026-05-02 19:45 UTC** (session `wonderful-modest-wozniak`,
   RUN #86 ROOT-CAUSED, FIX PUSHED, RUN #87 IN PROGRESS) —
   Picked up the watcher baton from the previous cycle
