@@ -4093,3 +4093,28 @@ entirely. Last-resort option is `use_system_xcode=true`.
        the `.dmg` is downloadable from the run page.
   Notes-only commit, `[skip ci]`, no code changes pushed this
   cycle.
+
+### Scheduled watcher log
+
+- 2026-05-02 20:35 UTC — run #87 (SHA 2751b0b) FAILED at 38m 28s on the
+  "Run Claum build" step (octicon-x-circle-fill confirmed in step icon
+  via DOM scan). The previous heartbeat (commit 2c6c198) called this
+  run a "BUILD PHASE COMPLETE" — that was incorrect; the build step
+  itself shows the red X, and run-level annotations show
+  `Process completed with exit code 1` plus
+  `No files were found with the provided path: /build.log`. Our
+  upload-on-failure step found nothing to upload (build-mac.sh's
+  `tee /build.log` redirect didn't open the file in time, or the path
+  drifted), so we have an *observability* regression on top of the
+  underlying compile error. The streaming-log iframe failed to
+  lazy-load lines this cycle (third reload + step-expand + 12s wait,
+  body still ~1.4kB of nav chrome only), and `api.github.com` is
+  proxy-blocked from this sandbox, so the actual FAILED: marker /
+  missing-file identifier was not recoverable. No code change pushed
+  this cycle: a speculative TARGETS addition to
+  fix-safe-browsing-components-gn.py without seeing the live error
+  would be a guess, not a fix. Full status:
+  /sessions/amazing-pensive-gates/mnt/Projects/claum-build-watcher-status-2026-05-02-20-33-UTC.md
+  Next watcher cycle should retry log capture (and try downloading
+  /actions/runs/25260273731/logs.zip via authenticated Chrome
+  navigation as a fallback).
