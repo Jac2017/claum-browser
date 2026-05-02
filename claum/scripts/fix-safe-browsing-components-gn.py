@@ -166,6 +166,59 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "url_checker_delegate_impl.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #86 dangling files — FOUR more consumers of the same stripped
+    # safe_browsing_prefs.h header. Same chrome/browser/safe_browsing/ layer
+    # as the run #85 trio, peeled back one more level. Build broke at ninja
+    # [46977/55984]:
+    #
+    #   * chrome/browser/safe_browsing/chrome_ping_manager_factory.cc:22
+    #       -> fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h'
+    #          file not found.
+    #
+    #   * chrome/browser/safe_browsing/chrome_safe_browsing_tab_observer_delegate.cc
+    #       -> same missing-header error (transitively, via
+    #          components/safe_browsing/content/browser/client_side_detection_host.h).
+    #
+    #   * chrome/browser/safe_browsing/chrome_safe_browsing_blocking_page_factory.cc:67
+    #       -> error: use of undeclared identifier
+    #          'IsSafeBrowsingProceedAnywayDisabled' (symbol declared in
+    #          the same stripped safe_browsing_prefs.h).
+    #
+    #   * chrome/browser/safe_browsing/chrome_password_protection_service.cc:131
+    #       -> error: unknown type name 'ExtendedReportingLevel' (also
+    #          declared in the stripped header).
+    #
+    # All four .cc files are listed in the static_library("safe_browsing")
+    # target inside chrome/browser/safe_browsing/BUILD.gn (the obj path
+    # `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o` confirms
+    # this — Chromium puts target outputs under
+    # `obj/<dir-of-BUILD.gn>/<target-name>/<source>.o`).
+    #
+    # Same Path-A treatment: drop them from sources so ninja stops
+    # compiling them. Runtime safe_browsing is off in this build anyway, so
+    # these consumers are dead code in this configuration.
+    #
+    # Why explicit BUILD.gn paths (not auto-discover): we know exactly
+    # which BUILD.gn lists them, and widening AUTO_DISCOVER_ROOT to
+    # include `chrome/` would risk false-positive matches on other files
+    # with the same names elsewhere in chrome/.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_ping_manager_factory.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_safe_browsing_tab_observer_delegate.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_safe_browsing_blocking_page_factory.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "chrome_password_protection_service.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
