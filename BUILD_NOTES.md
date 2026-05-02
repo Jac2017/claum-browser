@@ -4588,3 +4588,37 @@ entirely. Last-resort option is `use_system_xcode=true`.
   cycles, not a regression.
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-49-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 22:55 UTC
+
+- run #91 (run id `25263837990`, SHA `63f6063`, "Build Claum
+  (macOS) #91") **In progress**, job duration ~1m 33s.
+  Currently in pre-ninja phase **[3/6] Downloading and unpacking
+  Chromium 146.0.7680.164** — earlier phases [1/6] Checking
+  prerequisites and [2/6] Syncing ungoogled-chromium have already
+  completed. Ninja has not started yet, so no `[N/M]` tick to
+  report. The previous cycle (22:49 UTC, session
+  `wonderful-stoic-lamport`) pushed commit `63f6063`
+  (`fix-safe-browsing-components-gn.py: drop 6 more
+  chrome/browser/safe_browsing/ files`) which auto-triggered
+  this run on the build-mac workflow. Confirmed origin/main is
+  at `7ca233e` (this watcher heartbeat will replace it shortly
+  with a new no-op `[skip ci]` commit on top); GitHub-side run
+  for SHA `63f6063` was correctly created.
+- Per brief STEP 2 ("if progress is advancing → record progress,
+  exit run") **no code change pushed** this cycle — run #91 is
+  too early for any meaningful progress check (still cloning
+  Chromium). Next cycle should expect to see ninja ticks and a
+  meaningful `[N/55971]` count.
+- `build-failure`-labeled Issues page still returns
+  "Invalid value build-failure for label" — the label has never
+  been created in the repo, same state as prior cycles, not a
+  regression. The total open Issues count is 46 (unchanged from
+  prior cycle), so the build-failure-handler workflow has not
+  filed a new "real code error" issue for run #90. That is
+  consistent with run #90's failure being a header-strip
+  consumer error rather than a transient docker/network failure
+  — handler treats header-strip failures as code errors but
+  cannot tag because the label is missing.
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-22-55-UTC.md`.
