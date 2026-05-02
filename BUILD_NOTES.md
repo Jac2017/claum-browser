@@ -4622,3 +4622,53 @@ entirely. Last-resort option is `use_system_xcode=true`.
   cannot tag because the label is missing.
 - Status report:
   `Projects/claum-build-watcher-status-2026-05-02-22-55-UTC.md`.
+
+### Watcher heartbeat — 2026-05-02 23:11 UTC
+
+- run #91 (run id `25263837990`, SHA `63f6063`, "Build Claum
+  (macOS) #91") **In progress**, total run duration ~21m 4s as
+  shown on the run summary page. The single `build` job has been
+  running ~21m and the in-step "Run Claum build" timer is at
+  ~17m 43s. Status indicator on the workflow run page is
+  unambiguous: **In progress**, with no Total duration value
+  shown and no Artifacts present.
+- Forward progress vs. the previous cycle (22:55 UTC): the prior
+  cycle observed phase **[3/6] Downloading and unpacking
+  Chromium**, job 1m 33s. Now the job is at 17m+ inside the
+  "Run Claum build" step itself, which means phases [1/6]–[3/6]
+  are done and the build script is well into ninja compile
+  territory. The historical timeline says ninja first tick is at
+  ~4–6m, so we are tens of thousands of ticks deep.
+- I was unable to extract a precise `[N/55971]` ninja tick this
+  cycle: the GitHub Actions UI's virtualized log viewer did not
+  render any log content into the DOM after expanding the
+  "Run Claum build" step (page body length stayed at ~1303
+  chars). This is a UI-side rendering issue, not a build-side
+  issue — the run page itself shows status **In progress** with
+  no failure markers, and the `Cancel workflow` button is still
+  shown (which only appears for live runs). Per STEP 2 of the
+  brief ("If progress is advancing → record progress, exit
+  run"), forward progress is clear from the duration delta alone
+  (1m 33s → 17m 43s in the same step), so we record progress and
+  exit without trying to over-extract.
+- The historical SOLINK cliff at `[12845/55971] libvk_swiftshader.dylib`
+  (where #32 and #34 failed long ago) is well behind every
+  recent run. The cliff to actually watch is `[~47007/55971]`
+  where #82–#90 each failed one-by-one with `chrome/browser/safe_browsing/`
+  header-strip consumer errors. Run #91's commit `63f6063`
+  dropped six more such files (`tailored_security/*` plus four
+  top-level `safe_browsing_*.cc`); whether that was the last
+  batch will only be visible when the run either fails (new
+  consumer surfaces) or finally clears the cluster (>~47015).
+- `build-failure`-labeled Issues page still returns
+  "Invalid value build-failure for label" — label has never
+  been created, same state as prior cycles, not a regression.
+  Total open Issues count is **46** (unchanged from prior
+  cycle), so the handler has not filed any new "real code
+  error" issue, which is correct since run #91 is still in
+  progress.
+- Per STEP 2, **no code change pushed** this cycle. Heartbeat
+  appended here and committed with `[skip ci]` so it does not
+  retrigger the build-mac workflow.
+- Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-23-11-UTC.md`.
