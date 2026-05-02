@@ -5,6 +5,16 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 16:54 UTC** (session `wizardly-eloquent-bardeen`,
+  heartbeat) — run **#83** (commit `9e7b08c`, run id `25256744023`)
+  is **In progress**, triggered by push of the run #82 fix. Build
+  step has just started — no ninja count yet (post-checkout phase).
+  Expected critical checkpoint: re-passing CXX [46942/55995] which
+  is where #82 died on the now-patched safe_browsing files. Next
+  watcher should look for either: (a) ninja count past
+  [47000/55995] = fix worked, or (b) a brand-new dangling .cc or
+  symbol = same Path A pattern, extend the script again.
+
 - **2026-05-02 16:50 UTC** (session `wizardly-eloquent-bardeen`) — run
   **#82** (commit `bfa9bae`, run id `25193236165`, job
   `73867914949`) **FAILED** at 34m 49s. The Path A fix from #67
