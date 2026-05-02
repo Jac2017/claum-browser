@@ -5,6 +5,44 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:46 UTC** (session `wonderful-epic-wozniak`,
+  ROOT-CAUSE + FIX) — run **#84** (commit `cbf606c`, run id
+  `25257076878`, job `74058130482`) **FAILED** at 36m 3s total
+  (`Run Claum build` step ran 29m). Pulled the raw `job-logs.txt`
+  blob via the run page's `View raw logs` menu (~6 MB, 50 672
+  lines) and located the failure at ninja tick
+  `[46948/55989]` (very close to the prior SOLINK checkpoint
+  zone, but the actual blow-up is earlier in the safe_browsing
+  triggers compile). Two `FAILED:` markers, both inside
+  `components/safe_browsing/content/browser/triggers/`:
+    1. `trigger_throttler.cc:17:10: fatal error:
+       'components/safe_browsing/core/common/safe_browsing_prefs.h'
+       file not found` — header stripped by ungoogled-chromium's
+       safe_browsing patch (same root cause as the run #82 fixes).
+    2. `trigger_manager.cc:128/130: error: use of undeclared
+       identifier 'IsExtendedReportingOptInAllowed' /
+       'IsExtendedReportingEnabled'` — same root cause: those
+       symbols come from the same stripped `safe_browsing_prefs.h`.
+  Treatment: Path A again — added two new auto-discover entries
+  to `claum/scripts/fix-safe-browsing-components-gn.py`'s
+  `TARGETS` list (`(None, "trigger_throttler.cc")` and
+  `(None, "trigger_manager.cc")`) so both .cc files are commented
+  out of their respective `sources = [...]` lists at patch time.
+  Pushed as commit `<TBD>`; that triggers Build Claum (macOS) #85.
+  build-failure-handler last fired at run #64 (id 24961462092),
+  much older than #84's 25257076878 — handler hasn't picked up
+  this failure yet (likely race with my push). The
+  `build-failure` label still doesn't exist on the repo (Issues
+  search returns "Invalid value"), so the handler's labelling
+  step is presumably broken or the workflow hasn't enabled it
+  yet — secondary signal only, not blocking.
+  Next watcher: confirm #85 starts on the new SHA and verify
+  the patch script logs `[fix-sb-components] patched ...
+  trigger_throttler.cc` and `... trigger_manager.cc` during the
+  `[5/6] Apply Claum patches` step (build-mac.sh runs the
+  helper there). If yes, the build should advance past
+  [46948/55989] into the linker phase.
+
 - **2026-05-02 17:25 UTC** (session `clever-serene-carson`,
   heartbeat) — run **#84** (commit `cbf606c`, run id
   `25257076878`, job `74058130482`) still **in progress** at
