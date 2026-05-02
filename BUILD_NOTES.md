@@ -5,6 +5,38 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 19:00 UTC** (session `nice-kind-johnson`,
+  RUN #85 ROOT-CAUSED → FIX PUSHED → RUN #86 IN PROGRESS) —
+  Successfully fetched **the full raw job log** (6.16 MB) for
+  run **#85** by navigating Chrome MCP straight to
+  `/commit/{sha}/checks/{jid}/logs`, which auto-redirects
+  to the presigned Azure blob (`productionresultssa9.blob.core.windows.net`)
+  with the browser-tab cookies attached. **THIS IS THE
+  WORKAROUND** previous watchers couldn't crack — the SPA
+  XHRs to the same blob were going `pending`, but a top-level
+  navigation works fine.
+  Three FAILED markers found at ninja
+  `[46970..46978/55987]`, all in
+  `chrome/browser/safe_browsing/`:
+    1. `bundled_settings_metrics_provider.cc:12` — fatal
+       error: `'components/safe_browsing/core/common/safe_browsing_prefs.h'
+       file not found`.
+    2. `chrome_client_side_detection_host_delegate.cc` —
+       same missing-header (transitively via
+       `client_side_detection_host.h:34`).
+    3. `url_checker_delegate_impl.cc:179` —
+       `error: no member named 'IsEnhancedProtectionEnabled'
+       in namespace 'safe_browsing'` (symbol from same
+       stripped header).
+  Same root cause as runs #67/#82/#84 (ungoogled-chromium
+  strips `safe_browsing_prefs.h` symbols, consumer .cc
+  files break). Pushed Path-A fix as commit `0c6398b` —
+  added 3 explicit entries to
+  `fix-safe-browsing-components-gn.py` TARGETS pointing at
+  `chrome/browser/safe_browsing/BUILD.gn`. Build **#86**
+  (run id `25259468331`) auto-triggered by the push and is
+  In progress now.
+
 - **2026-05-02 18:46 UTC** (session `sharp-ecstatic-bohr`,
   RUN #85 FAILED — DIAGNOSTIC INCONCLUSIVE) — Run **#85**
   (id `25258209066`, job `74060983735`, SHA `36aa707`)
