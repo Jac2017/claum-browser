@@ -219,6 +219,74 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "chrome_password_protection_service.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #88 dangling files — SIX more consumers of the same stripped
+    # safe_browsing_prefs.h header. This is the deepest layer yet:
+    # `chrome/browser/safe_browsing/download_protection/` plus the sibling
+    # `chrome/browser/safe_browsing/external_app_redirect_checking.cc`. All
+    # listed in the same `static_library("safe_browsing")` target inside
+    # `chrome/browser/safe_browsing/BUILD.gn` (obj path is
+    # `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o` for every
+    # one — Chromium puts target outputs under
+    # `obj/<dir-of-BUILD.gn>/<target-name>/<source>.o`, regardless of how
+    # deep the .cc lives in subdirectories under that BUILD.gn).
+    #
+    # Build broke at ninja [46998..47004/55980] (i.e. ~47k of ~56k) with a
+    # mix of "fatal error: file not found" and "use of undeclared
+    # identifier" errors. Specific failure markers from the run #88 log:
+    #
+    #   * download_protection_service.cc:49
+    #       -> fatal error: 'components/safe_browsing/core/common/
+    #          safe_browsing_prefs.h' file not found.
+    #   * download_protection_util.cc:23
+    #       -> same missing-header error.
+    #   * external_app_redirect_checking.cc:17
+    #       -> same missing-header error.
+    #   * check_file_system_access_write_request.cc:229
+    #       -> error: use of undeclared identifier 'IsURLAllowlistedByPolicy'.
+    #   * check_client_download_request.cc:367,396,405,433,437,438,474
+    #       -> errors: use of undeclared identifier
+    #          'IsEnhancedProtectionEnabled', 'AreDeepScansAllowedByPolicy',
+    #          'GetSafeBrowsingState', 'SafeBrowsingState',
+    #          'MatchesEnterpriseAllowlist'.
+    #   * check_client_download_request_base.cc:87,90
+    #       -> errors: use of undeclared identifier
+    #          'IsExtendedReportingEnabled', 'IsEnhancedProtectionEnabled'.
+    #
+    # Every undeclared identifier above lives in `safe_browsing_prefs.h`
+    # (or its sibling helper headers in the same dir), all of which the
+    # ungoogled-chromium safe_browsing patch strips. So same Path-A
+    # treatment: drop these files from the sources list. Runtime safe
+    # browsing is off in Claum anyway, so these consumers are dead code.
+    #
+    # Why explicit BUILD.gn paths (not auto-discover): we know exactly
+    # which BUILD.gn lists them, and AUTO_DISCOVER_ROOT only walks
+    # `components/safe_browsing/`. Widening it to chrome/ would risk
+    # false-positive matches against same-named files elsewhere.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "download_protection_service.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "download_protection_util.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "external_app_redirect_checking.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "check_file_system_access_write_request.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "check_client_download_request.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "check_client_download_request_base.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc

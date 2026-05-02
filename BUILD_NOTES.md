@@ -4229,3 +4229,22 @@ entirely. Last-resort option is `use_system_xcode=true`.
   still streaming, just heartbeat. If the run flips to failed, pull
   the FAILED: marker from `/actions/runs/25261321080/logs.zip`
   via authenticated download.
+
+- 2026-05-02 21:23 UTC — run #88 (SHA 6cb75fd) FAILED at 37m 22s on
+  "Run Claum build" step (ninja [46998..47004/55980]). Root cause:
+  SIX MORE chrome/browser/safe_browsing/ consumers of the stripped
+  safe_browsing_prefs.h header — the deepest chrome/browser/
+  safe_browsing/download_protection/ subdir plus sibling
+  external_app_redirect_checking.cc. Same Path-A pattern as runs
+  #67/#82/#84/#85/#86/#87. Files dropped from sources via
+  fix-safe-browsing-components-gn.py:
+    * download_protection_service.cc (header-not-found)
+    * download_protection_util.cc (header-not-found)
+    * external_app_redirect_checking.cc (header-not-found)
+    * check_file_system_access_write_request.cc (IsURLAllowlistedByPolicy)
+    * check_client_download_request.cc (IsEnhancedProtectionEnabled,
+      AreDeepScansAllowedByPolicy, GetSafeBrowsingState,
+      SafeBrowsingState, MatchesEnterpriseAllowlist)
+    * check_client_download_request_base.cc (IsExtendedReportingEnabled,
+      IsEnhancedProtectionEnabled)
+  Fix pushed; this should auto-trigger a new build run (#89) on push.
