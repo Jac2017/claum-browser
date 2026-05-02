@@ -4750,3 +4750,59 @@ entirely. Last-resort option is `use_system_xcode=true`.
   cycle over cycle and should probably be cleaned up by an
   external (out-of-sandbox) process, e.g. on the user's host
   machine, since nothing inside the sandbox can unlink them.
+
+### Watcher heartbeat — 2026-05-02 23:39 UTC
+
+- run #91 (run id `25263837990`, SHA `63f6063`, 37m 3s
+  total) is now **finalized: Failure**. The build advanced
+  past the previous run #90 wave (which broke at ninja steps
+  ~47005..47015) and reached **~47018/55965** before stopping.
+- `FAILED:` list captured from raw job log
+  (`productionresultssa13.blob.core.windows.net/.../job-logs.txt`,
+  same SAS-token route as last cycle) — three distinct
+  translation units this time, each appearing 3× because of
+  ninja's parallel error reporting:
+  * `chrome/browser/safe_browsing/client_side_detection_intelligent_scan_delegate_desktop.cc`
+    → `client_side_detection_intelligent_scan_delegate_desktop.o`
+  * `chrome/browser/safe_browsing/cloud_content_analysis/deep_scanning_request.cc`
+    → `deep_scanning_request.o`
+  * `chrome/browser/safe_browsing/cloud_content_analysis/cloud_binary_upload_service.cc`
+    → `cloud_binary_upload_service.o`
+- Root cause is **identical** to runs #82..#90:
+  `fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`
+  (6 distinct fatal-error lines in the log, matching the 3
+  failing .cc files × 2 logical includes each).
+- run #91's commit `63f6063` had pre-emptively dropped the
+  `tailored_security/*` cluster + 4 `safe_browsing_*.cc`
+  top-level files, which DID clear those — confirmed because
+  none of those names appear in this cycle's FAILED list. The
+  fix-script is making forward progress, just one wave behind
+  the actual consumer set. Net advance vs. last cycle:
+  ~47014 → ~47018, i.e. ~4 more files compiled before the
+  next consumer wave hit.
+- New issues with `build-failure` label: still **0** (handler
+  hasn't dispatched yet for #91; expected on next autopilot
+  cycle). Total open Issues unchanged at **46**.
+- **No code fix pushed this cycle.** Reasoning per STEP 3:
+  the existing `claum/scripts/fix-safe-browsing-components-gn.py`
+  autopilot is data-driven and has fired correctly for
+  every prior wave (#86 → #87 → #89 → #90 → #91 each dropped
+  exactly the files that failed in the previous run). The
+  next scheduled `Claum autopilot` workflow run will detect
+  #91's failure and commit a drop-set covering the 3 files
+  above; pushing a competing fix from this watcher would
+  race the autopilot. STEP 3's "stuck after 3 attempts"
+  escalation does not apply — every recent cycle has
+  advanced the ninja step count.
+- Local working tree state: clean modulo the existing pile
+  of `.gone-5` / `.bk-5` debris files from prior watcher
+  sessions; no `.git/*.lock` files this cycle. Local HEAD
+  `c49f07f` matches remote `refs/heads/main`.
+- Next checkpoint: when the autopilot lands its drop-set
+  for the 3-file wave above, the resulting Build Claum
+  (macOS) #92 should advance to **~47021/55965 or beyond**.
+  If it instead stalls at the same 47018 step or regresses,
+  treat as evidence of a header-transitive problem
+  (a `.h` inside the kept `chrome/browser/safe_browsing/`
+  subtree pulling in `components/safe_browsing/core/common/safe_browsing_prefs.h`)
+  and consider escalating per STEP 3c.
