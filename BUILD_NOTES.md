@@ -5,6 +5,30 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 17:00 UTC** (session `modest-kind-franklin`) — run
+  **#83** (commit `9e7b08c`, run id `25256744023`, job
+  `74057289468`) **FAILED** at 12m 2s in the `Run Claum build`
+  step (4m 8s into the build script). Root cause: the
+  `fix-safe-browsing-components-gn.py` script bailed with
+  `ERROR: 2 matches for ui_manager.cc in
+  components/safe_browsing/content/browser/BUILD.gn — refusing to
+  patch ambiguously`. The .cc legitimately appears twice in that
+  BUILD.gn (production target + test target). **Fix pushed**
+  (commit `cbf606c`): replaced the "refuse on ambiguity" branch in
+  `patch_one()` with a "patch ALL matches" policy (`subn(...,
+  count=0)` instead of `count=1`). Self-tested on a synthetic
+  fixture: pass 1 commented out 7 .cc files across 2 BUILD.gn
+  files (ui_manager.cc → 2 matches, both removed, note logged);
+  pass 2 idempotently skipped all 7 entries. Push triggered run
+  **#84** (run id `25257076878`, job `74058130482`), now **In
+  progress**. No `build-failure` label exists in the repo (handler
+  workflow can't open issues with a missing label — secondary
+  signal still unavailable). Next watcher should look for either
+  (a) ninja count past `[47000/55995]` = run #84 cleared the
+  patch-stage and the original safe_browsing fix landed, or
+  (b) a brand-new dangling .cc/symbol surface = extend the TARGETS
+  list in `fix-safe-browsing-components-gn.py` again.
+
 - **2026-05-02 16:47 UTC** (session `gallant-lucid-ride`, heartbeat)
   — run **#83** (commit `9e7b08c`, run id `25256744023`, job
   `74057289468`) still **In progress** and healthy. Job is in the
