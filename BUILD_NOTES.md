@@ -5,6 +5,46 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 20:40 UTC** (session `quirky-beautiful-hamilton`, RUN #88
+  IN PROGRESS, heartbeat-only cycle) — Latest workflow run on
+  origin/main is **Build Claum (macOS) #88** (run id `25261321080`,
+  SHA `6cb75fd`, triggered by `github-actions[bot]` via
+  `workflow_dispatch` — i.e. an autopilot re-dispatch on the same
+  commit, not a fresh push). Job page:
+  `actions/runs/25261321080/job/74068997040`. Started
+  `2026-05-02T20:38:29 UTC`, ~2 minutes elapsed at heartbeat time.
+  Build is at the very beginning of the run — sccache restore
+  finished (1m 30s), Chromium-source download just completed (the
+  job log shows `Received 1330490500 of 1330490500 (100.0%)`),
+  and the `Run Claum build` step is running but has not produced
+  any visible ninja ticks yet because GitHub already truncated the
+  in-DOM streaming log: the step body now reads literally
+  `This step has been truncated due to its large size. View the
+  raw logs from the ⋯ menu once the workflow run has completed.`
+  This is even more aggressive truncation than the prior cycle —
+  no ticks are visible in DOM at all, not just the failure tail.
+  We're nowhere near the prior failure point: the safe_browsing
+  CXX failure cluster lives at ninja `[46977/55984]` (~30 minutes
+  in), and we're at minute 2.
+- Action: NO code change this cycle. Per task STEP 2, this is a
+  heartbeat: progress is advancing (sccache restored, Chromium
+  source 100%, build step started), so we record + exit run.
+  No re-dispatched run for SHA `6cb75fd` is needed — the autopilot
+  just dispatched run #88 itself. No new `build-failure`-labeled
+  issue is visible (GitHub returned `Invalid value build-failure
+  for label` — the label may have been renamed or deleted since
+  the prior cycle; will re-check next cycle in case it's a UI
+  hiccup).
+- Note for next watcher cycle: (a) the same `.git/index.lock` from
+  May 2 18:46 is still on the mount and not removable from this
+  session; cloned fresh into `~/claum-tmp/claum-work` to push from
+  there, same workaround as the prior cycle. (b) Once run #88
+  finishes (success OR fail), the truncated step's "View raw logs"
+  / `logs.zip` route should be retried for the FAILED: marker —
+  the streaming-DOM route is consistently unreliable for this
+  workflow's late-build failures.
+
+
 - **2026-05-02 19:54 UTC** (session `dazzling-sweet-pasteur`, RUN #87 IN PROGRESS) —
   Watcher heartbeat. Latest run on origin/main is **Build
   Claum (macOS) #87** (run id `25260273731`, SHA `2751b0b`,
