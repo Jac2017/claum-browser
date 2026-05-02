@@ -4030,3 +4030,16 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - Target arch: arm64
 - Default search: bing
 - Chromium version: 146.0.7680.164
+
+### Scheduled watcher log
+
+- 2026-05-02 20:01 UTC — session `bold-gifted-bardeen`. Run #87 (id 25260273731,
+  sha 2751b0b) is still in progress at ~15m 30s elapsed
+  (`Run Claum build` step ~13m). Live job page rendered without
+  the streaming-log DOM (lazy-load did not trigger this cycle, so
+  no fresh ninja tick was extractable). No `FAILED:` /
+  `##[error]` markers were visible on the rendered page. Build
+  is healthy and tracking past the previous watcher's
+  `[7431/55980]` reading from 19:54 UTC. Nothing to fix; pushing
+  a notes-only heartbeat with [skip ci] so the next run can
+  fast-forward.
