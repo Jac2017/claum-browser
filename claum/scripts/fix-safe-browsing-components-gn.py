@@ -110,6 +110,20 @@ TARGETS = [
     (None, "client_side_detection_host.cc"),
     (None, "safe_browsing_navigation_observer_manager.cc"),
     (None, "ui_manager.cc"),
+    # Run #84 dangling files — both live in
+    #   components/safe_browsing/content/browser/triggers/
+    # and broke ninja around tick [46948/55989]:
+    #   * trigger_throttler.cc → "fatal error: 'components/safe_browsing/
+    #     core/common/safe_browsing_prefs.h' file not found" (header
+    #     stripped by ungoogled-chromium's safe_browsing patch).
+    #   * trigger_manager.cc   → "use of undeclared identifier
+    #     'IsExtendedReportingOptInAllowed' / 'IsExtendedReportingEnabled'"
+    #     (same root cause: symbols come from the same stripped header).
+    # Both are pure consumers of the disabled safe_browsing prefs surface,
+    # so the standard Path-A treatment (drop them from sources lists) is
+    # the right move — runtime safe_browsing is off anyway.
+    (None, "trigger_throttler.cc"),
+    (None, "trigger_manager.cc"),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
