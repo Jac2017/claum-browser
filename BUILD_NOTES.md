@@ -5,6 +5,94 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 18:46 UTC** (session `sharp-ecstatic-bohr`,
+  RUN #85 FAILED — DIAGNOSTIC INCONCLUSIVE) — Run **#85**
+  (id `25258209066`, job `74060983735`, SHA `36aa707`)
+  flipped to **failed** at ~42m 46s total runtime. The
+  `Run Claum build` step is the failing step at **28m 42s**;
+  all post-fail cleanup steps (Show sccache stats / Save
+  sccache disk cache 9m+) ran to completion. Confirmed in
+  the job page header (red X next to `build`, "failed N
+  minutes ago in 42m 46s"). Sccache was very effective:
+  36 809 compile requests / 36 777 hits → **99.92%** hit
+  rate (gigantic reuse from #84's cache). What I could
+  read from the rendered log via Chrome MCP:
+    1. Build script reached `==> [6/6] Running gn gen and
+       ninja` — confirmed the `f388d5a`
+       `fix-safe-browsing-components-gn.py` patch is
+       working (no more dangling `.cc` errors).
+    2. `gn gen` reported a non-fatal warning:
+       `claum_component_extensions=true` set as a build
+       arg but `never appeared in a declare_args() block`
+       (script comment: build continued as if unspecified).
+       Then `Done. Made 30 346 targets from 4 316 files in
+       3658 ms` and `✓ Starting ninja with 10 parallel
+       jobs`.
+    3. Ninja **DID** start — total work units `/55987`,
+       and `[1/55987] ACTION` through at least
+       `[92/55987] ACTION` are visible (DOM is
+       virtualised — the `1/55…` substring search caps
+       at 100 hits).
+  What I could NOT find via the rendered log's search:
+  there are **0/0 matches** for any of the standard fail
+  markers — `ninja: error`, `fatal error`, `FAILED:` (the
+  one rare hit is line 1236, the spurious
+  `Failed to get version info: Git command 'git log -1
+  --format=%H %ct --grep=^Change-Id: HEAD' …` which the
+  script intentionally swallows: `Falling back to a
+  version of 0.0.0 to allow script to finish. This is
+  normal if you are bootstrapping…`), `error generated`,
+  `SOLINK`, `Undefined`, `Traceback`, `Process completed`,
+  `+ exit`. The 8 `error:` matches are the 7 expected
+  `git apply --check failed → corrupt patch at line N →
+  retrying with patch -p1 --fuzz=3 → applied with fuzz`
+  warnings on patches 01–07 plus the one git-version
+  warning above. So the actual cause of the non-zero exit
+  is a kind of failure that doesn't echo any of the usual
+  text markers — likely candidates given prior runs and
+  the specific shape of this stop:
+    a. Runner **disk-space exhaustion** (build-mac.yml
+       has a `Free up disk space on runner` step that
+       took 0s — possibly a noop on macos-15; ungoogled
+       Chromium + sccache + .dmg packaging is famously
+       tight on the 14 GB free runner volume).
+    b. **OOM kill** on a single ninja worker (clang ICE
+       on macOS prints a crash log to stderr but ninja's
+       parent shell wouldn't print anything if the worker
+       was SIGKILL'd; the orchestrator sees only a
+       non-zero exit).
+    c. **Network/sccache socket** dying mid-build — the
+       sccache server runs locally so usually robust, but
+       the cache-restore step pulled ~1 GiB and the post-
+       run save was queueing 1.33 GiB while I checked.
+  I could NOT fetch the raw `job-logs.txt` blob this
+  cycle to confirm: same proxy 403 on `api.github.com`
+  as the 18:25 watcher saw, and the `View raw logs`
+  Chrome MCP path opened a new tab whose body was empty
+  (`fetch(url, {credentials:'include'})` returned
+  `status:200 content-length:0`). No code action this
+  cycle — making a speculative fix without the actual
+  error line risks burning another ~30 min runner cycle
+  on the wrong patch. Next watcher should: (1) try to
+  retrieve `job-logs.txt` via a fresh tab + scroll-to-
+  bottom of the **Run Claum build** step (DOM line
+  numbers were 1651–1800 when I bailed, but step 12
+  has 4000+ lines according to ninja tick density), or
+  (2) pivot to triggering the `Build failure handler`
+  workflow manually if it can fetch the artifact log
+  from the GH Actions API server-side, or (3) try
+  `Free up disk space on runner` set to non-zero —
+  swap in `actions-runner-controller/free-up-disk-space`
+  to clear ~30 GiB, which will at least rule out (a) on
+  the next attempt. Issues page: 46 open, all stale
+  `[autopilot] Build wedged on bfa9bae after 15 attempts
+  #N` series — still pointing at the OLD SHA, no fresh
+  build-failure issue against `36aa707`. Pushing this
+  status as `[skip ci]` heartbeat from a `/tmp/cb` clone
+  (in-place `.git` index.lock files are still
+  unremovable due to FS perms — workaround is the same
+  one prior watchers used).
+
 - **2026-05-02 18:25 UTC** (session `lucid-charming-mccarthy`, HEARTBEAT)
   — Run **#85** (id `25258209066`, job `74060983735`,
   SHA `36aa707`) is **In progress** and the `Run Claum build`
