@@ -4263,3 +4263,25 @@ entirely. Last-resort option is `use_system_xcode=true`.
   hasn't classified anything as a code error. Per brief
   STEP 2 ("if progress is advancing → record progress, exit
   run") no code change pushed this cycle.
+
+### Watcher heartbeat — 2026-05-02 21:35 UTC
+
+- run #89 (SHA `f8c7d7e`) **In progress**, ~10 min elapsed
+  since push. Ninja is now compiling — latest tick captured
+  was `[13684/55974]` (target total dropped slightly from
+  56129 to 55974 after the `fix-safe-browsing-components-gn.py`
+  diet, expected). **Past the historical SOLINK
+  `libvk_swiftshader.dylib` checkpoint at ~[12845]** that
+  blocked runs #32 and #34. No `FAILED:` markers, no
+  `fatal error:` strings, no `Error:` lines, no exit-code
+  signals in the streamed log. Recent tick samples show ACTION
+  steps (mojom validators) and an AR step
+  (`obj/third_party/angle/libangle_image_util.a`) — i.e. we're
+  past the link-heavy SwiftShader stage and into the broad
+  static-archive build phase. `build-failure`-labeled issues
+  page still returns "Invalid value build-failure for label"
+  (label has never existed in this repo, documented in
+  prior cycles — not a regression). Per brief STEP 2
+  ("if progress is advancing → record progress, exit run")
+  no code change pushed this cycle. Status report:
+  `Projects/claum-build-watcher-status-2026-05-02-21-35-UTC.md`.
