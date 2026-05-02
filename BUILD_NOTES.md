@@ -4170,3 +4170,28 @@ entirely. Last-resort option is `use_system_xcode=true`.
   needed) any code-error issue this cycle. No code change pushed.
   Next watcher cycle: confirm ticks are still advancing past current
   count of 200; expect ~thousands by next heartbeat.
+- 2026-05-02 20:58 UTC — run #88 (SHA 6cb75fd, manual workflow_dispatch by
+  github-actions[bot]) STILL IN PROGRESS at ~22m elapsed (header:
+  Status = "In progress", Total duration = "–", Artifacts = "–").
+  All pre-ninja steps have completed (Check out repo / Select Xcode /
+  Install deps / Restore sccache / Configure sccache / Diagnostic
+  modulemap / Cache Chromium source — none of those show a failing
+  icon). The "Run Claum build" step is the active step (no duration
+  shown next to it yet); subsequent steps (sccache stats, Save
+  sccache, Package .app as .dmg, Upload artifact, Post Cache, Post
+  Install sccache, Post Check out) are queued but unstarted. No
+  post-build steps means the long ninja compile is still running.
+  Could not extract a precise current ninja tick: GitHub's streaming-
+  log iframe again failed to lazy-load lines into innerText (counted
+  0 elements for .js-checks-log-display .log-line / log-line /
+  .checks-log-display-content selectors after click + 6s + scroll —
+  same observability regression noted in 20:33 UTC report). Last
+  watcher saw 200/55980 at 20:46 UTC, so progress over the last 12m
+  is positive (ninja is past gn gen and into the C++ compilation
+  phase). Issues tab `?label=build-failure` continues to return
+  "Invalid value build-failure for label" → label still doesn't
+  exist in the repo; handler has not opened a code-error issue.
+  No code change pushed. Next cycle: re-check #88 — at 22m elapsed
+  it's plausibly halfway to the historical SOLINK failure point
+  [12845/55980], or already past it; if step is still running and no
+  step-failure icons appear, just heartbeat again.
