@@ -4043,3 +4043,25 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `[7431/55980]` reading from 19:54 UTC. Nothing to fix; pushing
   a notes-only heartbeat with [skip ci] so the next run can
   fast-forward.
+
+- 2026-05-02 20:06 UTC — session `sweet-kind-lovelace`. Run #87
+  (id 25260273731, sha 2751b0b) STILL in progress, now ~22m elapsed
+  (started 19:44 UTC). The `Run Claum build` step is the currently
+  active step (no elapsed time yet rendered on it — meaning it has
+  not finished). All preceding steps completed cleanly:
+  Set up job 4s, Check out 46s, Xcode 0s, Metal 0s, Free disk 0s,
+  Install deps 4s, Restore sccache 1m18s, Install sccache 2s,
+  Configure sccache 0s, Diagnostic SDK 3s, Cache Chromium source 1s.
+  Streaming log DOM did NOT lazy-load this cycle (same intermittent
+  issue prior watcher hit at 20:01 UTC). The `\[\d+/\d+\]` ninja
+  regex returned 0 hits because `document.body.innerText` capped at
+  ~1248 chars — log content lives in a virtualized container that
+  doesn't populate the text node. No `FAILED:` / `##[error]` /
+  `fatal error` markers visible. The `label:build-failure` open
+  issues filter returned 0 results — handler hasn't fired for sha
+  2751b0b. Decision: run is healthy, exit and let it cook. Next
+  watcher should re-check; if still in-progress at ~30+ min stuck on
+  same step elapsed time, escalate. The expected total runtime for a
+  successful build is ~50–60 min based on cache-warm history.
+  Heartbeat-only notes commit pushed with `[skip ci]`.
+
