@@ -4065,3 +4065,31 @@ entirely. Last-resort option is `use_system_xcode=true`.
   successful build is ~50–60 min based on cache-warm history.
   Heartbeat-only notes commit pushed with `[skip ci]`.
 
+
+- 2026-05-02 20:15 UTC — session `youthful-sharp-fermi`. Run #87
+  (id 25260273731, sha 2751b0b) **build phase complete, artifact
+  phase active**. The `Run Claum build` step has finally finished
+  with a duration of **30m 52s** (no `FAILED:` markers reachable
+  from DOM, but the next step already ticked through). Step
+  ordering observed:
+    13. Run Claum build — 30m 52s ✓
+    14. Show sccache stats and prepare cache for save — 2s ✓
+    15. Save sccache disk cache — _in progress / queued_
+    16. Run actions/cache/save@v4 — _pending_
+    17. Package .app as .dmg — _pending_
+    18. Upload build log on failure — _pending_
+    19. Upload build artifact — _pending_
+  This is the same checkpoint where run #86 failed at 36m 31s, so
+  we are now in the danger zone for #87 too. Streaming-log DOM
+  still lazy-loads only on user interaction so ninja count was
+  unreadable, but the post-build step (#14) completing in 2s
+  is a strong signal the compile + link succeeded — that step
+  runs `sccache --show-stats` which would otherwise short-circuit
+  on a previous-step failure. `label:build-failure` issues = 0
+  open. Next watcher should look specifically at:
+    a. Whether step 17 "Package .app as .dmg" succeeds — that's
+       where dmg creation logic lives and a common failure spot.
+    b. Whether step 19 "Upload build artifact" succeeds — if so,
+       the `.dmg` is downloadable from the run page.
+  Notes-only commit, `[skip ci]`, no code changes pushed this
+  cycle.
