@@ -5,6 +5,65 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-02 16:50 UTC** (session `wizardly-eloquent-bardeen`) — run
+  **#82** (commit `bfa9bae`, run id `25193236165`, job
+  `73867914949`) **FAILED** at 34m 49s. The Path A fix from #67
+  (drop 2 dangling .cc files) successfully cleared the original
+  blockers but exposed **5 MORE dangling .cc files** in the same
+  `components/safe_browsing/content/browser/` tree, all failing at
+  ninja [46942/55995] in the CXX phase:
+    1. `safe_browsing_tab_observer.cc` — fatal error:
+       `safe_browsing_prefs.h` file not found (header stripped by
+       ungoogled-chromium's safe_browsing patch)
+    2. `safe_browsing_blocking_page.cc` — same missing header
+    3. `client_side_detection_host.cc` — same missing header
+    4. `ui_manager.cc` — same missing header
+    5. `safe_browsing_navigation_observer_manager.cc` — undeclared
+       identifier `IsURLAllowlistedByPolicy` (symbol stripped from
+       the same patch)
+  **Fix pushed:** extended `fix-safe-browsing-components-gn.py` with
+  5 new entries using a new "auto-discover" mode that walks
+  `components/safe_browsing/` to find each cc filename's owning
+  BUILD.gn (we can't statically know the path from the watcher
+  sandbox). Also fixed a per-file idempotency bug: the previous
+  `CLAUM_MARKER in text` check was whole-file scoped, which would
+  have made the script skip ALL later cc filenames in any BUILD.gn
+  that already had ANY patch applied — broke once we started
+  patching multiple files in `content/browser/BUILD.gn`. Replaced
+  with a per-cc_name regex check that only treats THIS specific
+  file as already-patched if it has our marker on its line. Both
+  changes self-tested on synthetic fixtures (pass 1 patches all 7
+  targets across 3 BUILD.gn files including 4 in the same file;
+  pass 2 idempotently skips all 7).
+
+- **2026-04-29 20:20 UTC** (session `hopeful-relaxed-wright`) — run
+  **#67** (commit `0770c82`, run id `25130216538`, job
+  `73654108681`) is **still In progress** ~33 min into the job.
+  Active step is still `Run Claum build` (the post-build steps
+  `Show sccache stats`, `Save sccache disk cache`,
+  `Package .app as .dmg`, `Upload build artifact` have **not**
+  started, no Failed/Cancelled icon anywhere). Timer is
+  incrementing — the previous cycle 12 min ago showed the step at
+  19m 27s, so it's added the expected ~12 min since. The Actions
+  live-log React view **still does not render ninja tick lines**
+  into the DOM after expanding `Run Claum build` and waiting 5s
+  (body innerText ~1.4 KB; same render-quirk as the last two
+  cycles, **not a failure signal**). Per the historical pattern
+  this build typically needs ~50–60 min for the full ninja phase,
+  so we should be closing in on the post-build steps within ~20
+  min. **Build-failure handler signal:** queried
+  `/issues?q=label:build-failure` — GH search reports
+  "Invalid value build-failure for label" (the label still hasn't
+  been registered) and the issue list shows the same 19 stale
+  `[autopilot] Build wedged on 396fc6b ...` issues (#1–#19) — no
+  new issue opened for run #67. Per "progress advancing → record
+  and exit", this watcher exits. Also fixed local-only filemode
+  drift on `claum/scripts/fix-safe-browsing-components-gn.py`
+  (`chmod +x`) so the working tree is clean. Next watcher: check
+  for terminal status (success/failure) since the build should be
+  near done — if successful, the `.dmg` artifact will be ready to
+  download.
+
 - **2026-04-29 20:08 UTC** (session `nifty-trusting-curie`) — run
   **#67** (commit `0770c82`, run id `25130216538`, job
   `73654108681`) is still **In progress**. Job started 21m 37s ago

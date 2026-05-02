@@ -75,6 +75,26 @@ src_dir = pathlib.Path(sys.argv[1])
 # --- Targets to patch --------------------------------------------------------
 # Each entry is (relative BUILD.gn path, .cc filename to remove from sources).
 # Both paths are relative to the chromium `src` directory.
+#
+# Two flavors of entries are supported:
+#   1. Explicit: a tuple where the first element is the BUILD.gn path
+#      (relative to `src/`). We patch THAT file specifically.
+#   2. Auto-discover: a tuple where the first element is None. We walk the
+#      `components/safe_browsing/` subtree and patch the first BUILD.gn we
+#      find that contains the .cc filename. This is useful when run #82 etc.
+#      surfaces a NEW dangling .cc file but we don't yet know which BUILD.gn
+#      lists it — Chromium's safe_browsing tree has many BUILD.gn files.
+#
+# Run #67 (path A) — the original two entries.
+# Run #82 — five new dangling .cc files exposed once #67's fix landed.
+#   Each of these failed at the CXX phase with either:
+#     * "fatal error: 'safe_browsing_prefs.h' file not found" (header
+#       stripped by ungoogled-chromium's safe_browsing patch), or
+#     * "use of undeclared identifier 'IsURLAllowlistedByPolicy'"
+#       (symbol stripped from the same patch)
+#   We can't statically know which BUILD.gn file lists each of these .cc
+#   files (the live runner is the only place with the actual extracted
+#   tree), so we use auto-discovery (None) for them.
 TARGETS = [
     (
         "components/safe_browsing/core/browser/password_protection/BUILD.gn",
@@ -84,7 +104,19 @@ TARGETS = [
         "components/safe_browsing/content/browser/BUILD.gn",
         "client_side_detection_service.cc",
     ),
+    # Run #82 dangling files — auto-discover BUILD.gn under components/safe_browsing/
+    (None, "safe_browsing_tab_observer.cc"),
+    (None, "safe_browsing_blocking_page.cc"),
+    (None, "client_side_detection_host.cc"),
+    (None, "safe_browsing_navigation_observer_manager.cc"),
+    (None, "ui_manager.cc"),
 ]
+
+# Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
+# file. We intentionally limit this to the safe_browsing tree so we don't
+# accidentally match an unrelated `ui_manager.cc` elsewhere in Chromium
+# (there are MANY files named `ui_manager.cc` across the codebase!).
+AUTO_DISCOVER_ROOT = "components/safe_browsing"
 
 
 # --- Per-target patcher ------------------------------------------------------
@@ -108,10 +140,24 @@ def patch_one(build_gn: pathlib.Path, cc_name: str) -> bool:
 
     text = build_gn.read_text()
 
-    # Idempotency: if we've already patched this file, the marker will be
-    # present. Skip silently in that case so re-runs are no-ops.
-    if CLAUM_MARKER in text:
-        print(f"[fix-sb-components] {build_gn.name}: already patched (marker present)")
+    # Idempotency (PER-FILE): we used to check `CLAUM_MARKER in text` which
+    # told us only if SOMETHING in this BUILD.gn had been patched — fine
+    # when each BUILD.gn was patched at most once, but with auto-discover
+    # mode multiple cc filenames can point at the same BUILD.gn. Instead,
+    # check for a line that looks like our previously-applied patch
+    # specifically for THIS cc_name. That makes re-runs no-ops PER cc_name
+    # without skipping later cc_names in the same file.
+    already_patched_re = re.compile(
+        # leading whitespace, our `# ` comment prefix, the quoted source
+        # (possibly path-prefixed), optional comma, then the marker text.
+        r'^\s*#\s*"[^"\n]*' + re.escape(cc_name) + r'",?\s+' + re.escape(CLAUM_MARKER),
+        re.MULTILINE,
+    )
+    if already_patched_re.search(text):
+        print(
+            f"[fix-sb-components] {build_gn}: {cc_name} already patched "
+            f"(per-file marker present), skipping"
+        )
         return True
 
     # Build a regex that matches the WHOLE line containing the .cc filename
@@ -184,16 +230,75 @@ def patch_one(build_gn: pathlib.Path, cc_name: str) -> bool:
     return True
 
 
+# --- Auto-discovery helper ---------------------------------------------------
+# Walks the AUTO_DISCOVER_ROOT subtree looking for any BUILD.gn that contains
+# the given .cc filename in a quoted string (i.e. probably a sources-list
+# entry). Returns a list of matching BUILD.gn paths.
+#
+# Why we accept multiple matches: a .cc file can legitimately appear in two
+# different BUILD.gn files if the same code is built into more than one
+# target (e.g. one for production and one for tests). We patch all of them
+# so ninja stops compiling that .cc anywhere.
+def find_build_gns_with(src_root: pathlib.Path, cc_name: str) -> list:
+    # Restrict search to the safe_browsing subtree to avoid matching
+    # unrelated files with the same name elsewhere in Chromium.
+    discover_root = src_root / AUTO_DISCOVER_ROOT
+    if not discover_root.is_dir():
+        print(
+            f"[fix-sb-components] WARN: auto-discover root "
+            f"{discover_root} not found; skipping {cc_name}"
+        )
+        return []
+
+    needle = f'"{cc_name}"'  # match the .cc surrounded by quotes
+    # Also allow a path prefix in front of the .cc name (e.g.
+    # "content/browser/safe_browsing_tab_observer.cc"), so the search has
+    # to be substring-style on the unquoted form too. We do a quick
+    # cheap text search using `in` rather than regex for performance —
+    # the file count is small.
+    matches = []
+    for build_gn in discover_root.rglob("BUILD.gn"):
+        try:
+            text = build_gn.read_text()
+        except OSError:
+            continue
+        # Match either bare quoted ("foo.cc") or path-prefixed ("a/b/foo.cc").
+        if needle in text or f'/{cc_name}"' in text:
+            matches.append(build_gn)
+    return matches
+
+
 # --- Main loop ---------------------------------------------------------------
 # Track failures so we can exit non-zero if anything goes wrong. We still
 # attempt every target even if an earlier one fails — that gives the build
 # log the most useful diagnostic surface in one shot.
 all_ok = True
 for rel_path, cc_name in TARGETS:
-    full_path = src_dir / rel_path
-    ok = patch_one(full_path, cc_name)
-    if not ok:
-        all_ok = False
+    if rel_path is None:
+        # Auto-discover mode: search the safe_browsing subtree for any
+        # BUILD.gn referencing this .cc file, then patch each one we find.
+        candidates = find_build_gns_with(src_dir, cc_name)
+        if not candidates:
+            print(
+                f"[fix-sb-components] WARN: auto-discover found no BUILD.gn "
+                f"referencing {cc_name} under {AUTO_DISCOVER_ROOT}; skipping"
+            )
+            # Don't fail the build if a future Chromium roll has already
+            # removed this file — the symptom we wanted to fix would be
+            # gone too. Treat as success.
+            continue
+        # Patch every BUILD.gn that lists this .cc — see find_build_gns_with
+        # docstring for why multiple matches are legitimate.
+        for build_gn in candidates:
+            ok = patch_one(build_gn, cc_name)
+            if not ok:
+                all_ok = False
+    else:
+        # Explicit mode: known BUILD.gn path, patch it directly.
+        full_path = src_dir / rel_path
+        ok = patch_one(full_path, cc_name)
+        if not ok:
+            all_ok = False
 
 if not all_ok:
     # Exit 1 so the calling shell script can decide how to react. Today
