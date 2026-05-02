@@ -4195,3 +4195,37 @@ entirely. Last-resort option is `use_system_xcode=true`.
   it's plausibly halfway to the historical SOLINK failure point
   [12845/55980], or already past it; if step is still running and no
   step-failure icons appear, just heartbeat again.
+
+- 2026-05-02 21:06 UTC — run #88 (SHA 6cb75fd, manual workflow_dispatch by
+  github-actions[bot]) STILL IN PROGRESS at ~28m elapsed (header
+  shows Status = "In progress", Total duration = "–", Artifacts =
+  "–"). Step list: every pre-ninja step has a duration and is green
+  (Set up job 7s, Check out Claum repo 45s, Select Xcode 0s, Ensure
+  Metal Toolchain 1s, Free up disk 0s, Install build deps 3s,
+  Restore sccache 1m 30s, Install sccache 2s, Configure sccache 0s,
+  Diagnostic SDK modulemap 3s, Cache Chromium source 1s). The
+  "Run Claum build" step is currently active — no duration shown,
+  and every step that follows it (Show sccache stats / Save sccache
+  / Package .app as .dmg / Upload build log / Upload build artifact
+  / Post-Cache / Post-Install / Post-Checkout) is still unstarted,
+  so the long ninja compile is what we're sitting in. No
+  octicon-x-circle-fill / FAILED marker on any step row, and the
+  body text scan turned up no "FAILED:" / "fatal:" / "##[error]"
+  matches. Could not extract a precise ninja tick — same lazy-load
+  observability gap as the prior cycle (page innerText is only ~58
+  lines of nav-chrome + step list; no log iframe content rendered
+  in DOM). Issues filter `?q=is%3Aissue+label%3Abuild-failure`
+  still returns "Invalid value build-failure for label", so the
+  label hasn't been created and the build-failure-handler has not
+  opened any code-error issue this cycle. Per the task file
+  (progress is advancing → record progress, exit run), no code
+  change is warranted while the build is healthy and active. Local
+  /Projects checkout was 17 commits behind and dirty, so this
+  heartbeat was written from a fresh clone (`/tmp/claum-watcher-
+  clone-*`) for a clean push. Next cycle: re-check run #88; at
+  ~28m elapsed we should be near or past the SOLINK
+  libvk_swiftshader.dylib checkpoint that previously broke #32 /
+  #34 — if observability returns, confirm tick > [12845/55980]; if
+  still streaming, just heartbeat. If the run flips to failed, pull
+  the FAILED: marker from `/actions/runs/25261321080/logs.zip`
+  via authenticated download.
