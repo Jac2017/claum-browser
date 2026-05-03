@@ -6397,3 +6397,48 @@ entirely. Last-resort option is `use_system_xcode=true`.
   still empty (no row, no `build-failure` label exists yet on repo).
   Linear advance from 08:21 cycle's 21m → expected to be deep into
   ninja by next cycle. No code change. [skip ci]
+- 2026-05-03 08:41 UTC — heartbeat (session `laughing-determined-maxwell`) —
+  Build Claum (macOS) **#99** still In progress on commit `33c8a4c`
+  (run id `25273689954`, job id `74100055423`, started
+  `2026-05-03T07:57:55Z`, so ~43m of total wall time at this read).
+  Latest ninja tick is **`[33807/55953]` (~60.4%)** on
+  `obj/third_party/blink/renderer/modules/xr/xr/xr_depth_information.o`
+  (CXX wave through blink XR module). The streamed step log
+  pulled cleanly via the SAS-redirected blob (33,807 ninja lines
+  in 4.2 MB), with **zero `FAILED:` markers, zero `fatal error:`
+  lines, and zero `file not found` entries** anywhere in the
+  log. Build is well past the `[12845]` SOLINK
+  `libvk_swiftshader.dylib` checkpoint and the `[16577]` mark
+  noted in the prior `b14d2af` cycle, advancing linearly toward
+  the historically-troublesome `~[47018]` safe_browsing-consumer
+  cliff (which took down #91, #92, #98). Pace looks healthy —
+  ~17 ticks/sec averaged across the run so far.
+- Per STEP 2 of the watcher SKILL (*"If progress is advancing
+  → record progress, exit run."*) → **no code fix this cycle.**
+  The relevant question is whether the autopilot's prior
+  `33c8a4c` drop-set (which already includes `ef40e99`'s drop
+  of `permission_revocation_request.cc`) covers the next layer
+  of transitive `chrome/browser/safe_browsing/` consumers
+  beyond the `[48717]` failure that took down #98. We'll know
+  in roughly the next 12–15 minutes of ninja time, when ticks
+  approach `[47000]` then `[48700]`. The next watcher cycle
+  should re-poll then.
+- Autopilot run **#252** (cron-scheduled at `2026-05-03T07:57:46Z`,
+  duration 8s) succeeded and dispatched the intervention that
+  triggered run #99 (annotation: *"Failed run: #98
+  id=25272302974 status=completed conclusion=failure attempt=1
+  age=28.8min sha=cea09e4. Attempts on commit: 1/15"*). So the
+  autopilot is correctly working its retry budget on `cea09e4`.
+- Issues tab `?q=label:build-failure` → still **0 rows**, no
+  error message either; the `build-failure` label has not been
+  created on the repo so the handler workflow's issue-creation
+  arm remains a no-op. Open issues count unchanged at **46**.
+  As prior watchers noted, until the label exists this channel
+  is silent and we should rely solely on the Actions tab as the
+  failure signal.
+- Local mount at `/sessions/laughing-determined-maxwell/mnt/Projects/claum-browser`
+  is 45 commits behind `origin/main` and its `.git/index.lock`
+  cannot be unlinked (mount permissions), same as prior cycles.
+  Heartbeat commit prepared via shallow clone in `~/work/`. No
+  uncommitted source changes besides this heartbeat append.
+  [skip ci]
