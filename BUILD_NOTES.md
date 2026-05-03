@@ -5,6 +5,80 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-03 02:50 UTC** (session `confident-kind-einstein`, RUN
+  #94 IN PROGRESS, heartbeat-only cycle) — Latest workflow run on
+  origin/main is **Build Claum (macOS) #94** (run id `25267716484`,
+  SHA `90fa9e1`, triggered manually by `github-actions[bot]` —
+  i.e. the auto-handler workflow re-dispatch after run #93 on
+  same SHA failed; this is the second attempt). Started
+  `2026-05-03 02:26:30 UTC`, ~24m elapsed at heartbeat time.
+  Job page: `actions/runs/25267716484/job/74084834587`.
+  Pre-ninja steps complete in DOM: `Set up job` 18s,
+  `Restore sccache disk cache` 1m 52s, `Install sccache` 2s,
+  `Configure sccache` 0s, `Diagnostic - SDK modulemap layout` 3s,
+  `Cache Chromium source` 0s, then `Run Claum build` step started
+  (no completion duration yet → still running).
+- **No `FAILED:` markers, no `##[error]` lines, no `fatal error`
+  lines** found in the visible DOM text this cycle. Streaming
+  ninja-tick extract failed again — the `Run Claum build` open
+  `<details>` element returned only its summary text and the
+  inner log content was blocked behind GitHub's lazy/virtualized
+  log container (the same `[BLOCKED: Cookie/query string data]`
+  marker we saw in earlier flaky cycles). Tried
+  scrollIntoView + 6s wait + re-click + 7s wait → still 0 ticks
+  in DOM text. Per BUILD_NOTES guidance, this is a known
+  intermittent and the fallback (raw log via `…` menu) only
+  works post-completion, so deferring to next cycle.
+- Last KNOWN ninja count is from the previous watcher cycle
+  (`b936434`, ~15 min earlier): `[4088/55961]` — i.e. ~7.3% into
+  the build. With ~15 more wall-clock minutes elapsed on a
+  cache-warm run, ninja should be progressing past that, but
+  cannot confirm a higher count this cycle due to the DOM
+  flake. Build is still well below the `[12845]` SOLINK
+  checkpoint (`libvk_swiftshader.dylib`, classic #32/#34
+  failure) and the `[47007±30]` safe_browsing checkpoint where
+  recent runs (#89, #91, #92) died.
+- Run **#94** is the auto-handler retry of **#93** (which
+  failed at 39m 20s on commit `d72e905` — the
+  `fix-safe-browsing-components-gn.py` drop-4-more patch).
+  Failure mode for #93 was not re-checked this cycle (it
+  was already classified by the autopilot per `273ff28` /
+  `b936434` notes — they explicitly say `no fix needed this
+  cycle` and `no new fix`, indicating it was a transient/
+  retryable failure rather than a new code error).
+- `build-failure`-labeled issues page still returns 0 rows
+  (open Issues count = 46 total, none of which carry the
+  label). The label has never been created on this repo,
+  same state as ~14 prior watcher cycles. Issues remains a
+  no-signal channel. Not a regression.
+- Action: NO code change this cycle. Per task STEP 2 —
+  "If progress is advancing → record progress, exit run."
+  Heartbeat committed with `[skip ci]` so #94 isn't
+  perturbed.
+- Notes for next watcher cycle:
+  1. Local checkout at `/sessions/confident-kind-einstein/`
+     `mnt/Projects/claum-browser` is in a stuck state with
+     `index.lock` / `HEAD.lock` / `ORIG_HEAD.lock` left over
+     from a previous session and unremovable from this
+     session's UID — used the `tmp-clone` workaround at
+     `/tmp/claum-clone` (clone-and-push) just like cycles
+     listed in the prior block.
+  2. If next cycle finds run #94 still IN PROGRESS at
+     ninja `[<<47007]`: heartbeat only. If past `[47007]`:
+     celebrate quietly (cleared the safe_browsing hot zone
+     for the second straight build after #93 made it
+     through the build phase but failed elsewhere). If
+     FAILED at `[47007±30]`: another peel of dangling
+     consumers — same Path-A treatment via
+     `fix-safe-browsing-components-gn.py`, append the new
+     filenames to its drop list.
+  3. The streaming-DOM ninja-tick extract is flaky again
+     this cycle. If next cycle hits the same blank-DOM
+     situation, try clicking `View raw logs` (the `⋯` menu
+     on the step) and reading from the raw text endpoint
+     instead — the truncation banner only blocks mid-run
+     reads through the rendered viewer.
+
 - **2026-05-03 00:07 UTC** (session `zen-funny-pasteur`, heartbeat-only
   cycle) — Build Claum (macOS) **#92** still **In progress** on
   commit `c49f07f` (full SHA
