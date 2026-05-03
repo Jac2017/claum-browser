@@ -4925,3 +4925,55 @@ entirely. Last-resort option is `use_system_xcode=true`.
   past the 47k cliff without a fresh fix. If it stalls at
   `[47018]` again, autopilot will dispatch its next
   drop-set; this watcher should NOT pre-empt it.
+- **2026-05-03 00:18 UTC** (session `fervent-relaxed-gauss`,
+  failure-capture cycle) — Build Claum (macOS) **#92**
+  finalized as **Failure** at 36m 50s on commit `c49f07f`
+  (run id `25264762189`, job id `74077420298`). Build died
+  at the expected `~[47021/55965]` (~85 %) safe_browsing
+  cliff with the same `'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`
+  pattern. Captured **4 distinct failing translation units**
+  in this run (one more than #91 captured):
+  - `chrome/browser/safe_browsing/client_side_detection_intelligent_scan_delegate_desktop.cc`
+  - `chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc`
+  - `chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc`
+  - `chrome/browser/safe_browsing/cloud_binary_upload_service.cc`
+- Last green ninja tick before failure was
+  `[47021/55965] CXX cloud_binary_upload_service.o` (which
+  itself then FAILED on the same line ~ms later — the build
+  marks the tick before reading compiler stderr). Ninja
+  printed 47198 total `[N/M]` lines across the 6.06 MB log;
+  no `FAILED:` markers anywhere except the safe_browsing
+  block at lines 49392–49647 of step 12 (22 markers total =
+  4 unique × 3 ninja restart waves + 4 in the
+  `step:35:2` summary block + 2 final-error tags).
+- **Action taken: NONE (no code fix pushed this cycle).**
+  Per task STEP 3 / established autopilot pattern: the
+  data-driven `claum/scripts/fix-safe-browsing-components-gn.py`
+  is responsible for picking up safe_browsing waves and
+  has fired correctly for every prior wave (#86 → #87 →
+  #89 → #90 → #91 → ...). At capture time the next
+  `Claum autopilot` cron tick had not yet run for this
+  failure (top run on `/actions` is still **#92**;
+  the most recent autopilot is `25264760186` which
+  *dispatched* #92 — i.e. ran *before* the failure).
+  Pushing a competing fix from this watcher would race
+  the autopilot. STEP 3's "stuck after 3 attempts on the
+  same error" escalation does not apply: every recent
+  cycle has advanced the failure cliff by capturing more
+  files (#90 ⇒ 6 files, #91 ⇒ 3 files, #92 ⇒ 4 files),
+  so the system is making forward progress.
+- `build-failure`-labeled issues filter still returns
+  `Invalid value build-failure for label` (label has never
+  been created on the repo), so the auto-issue channel
+  remains a no-signal source.
+- Local checkout under
+  `/sessions/fervent-relaxed-gauss/mnt/Projects/claum-browser`
+  has stale `.git/HEAD.lock` + `.git/index.lock` from
+  a prior session (consistent with prior watcher reports);
+  this commit was made via the documented
+  `/tmp/claum-watcher-{ts}` fresh-clone workaround.
+- Next checkpoint: when the autopilot lands its drop-set
+  for the 4-file wave above, **run #93** should advance
+  past `[47021]` and into the next consumer layer
+  (or — best case — clear the 47k cliff and proceed
+  toward the `~[55965]` final link + dmg packaging stage).
