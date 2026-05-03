@@ -5533,3 +5533,58 @@ entirely. Last-resort option is `use_system_xcode=true`.
   shallow clone in `/tmp/work-epic-jolly-davinci-5/claum-browser` (same
   pattern as prior cycles). Heartbeat appended via that
   clone with `[skip ci]`.
+
+- **2026-05-03 04:38 UTC** (session `quirky-youthful-faraday`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96**
+  is now **Failure** on commit `50f2d8e`
+  (the prior watcher's `state_store.cc` drop-set fix
+  for run #95's `[47051]` failure). Run ID
+  `25269246053`, job ID `74088807916`, started
+  `2026-05-03T03:54:45Z`, ran **37 m 29 s** to failure
+  at `~2026-05-03T04:32:14Z` — i.e. fresh failure, ~5 min
+  before this poll. The 37-39 m duration matches the
+  established `chrome/browser/safe_browsing/` cliff
+  pattern from #93/#94/#95: each consecutive run dies in
+  the `[47000+]` SOLINK consumer wave on the next
+  un-dropped header/source.
+- Latest 5 runs on the actions list:
+  `#96` Build (Failure, `50f2d8e`), `#95` Build (Failure,
+  `bdaeb90`), `#250` autopilot (Success, 9 s), `#94`
+  Build (Failure, manual-dispatch by github-actions Bot),
+  `#249` autopilot (Success, 9 s). **No `#97` Build
+  dispatched yet**, no `#251` autopilot yet — autopilot
+  has not fired since #96 failed.
+- Per the established pattern from prior cycles
+  (`elegant-adoring-euler` push of `bdaeb90`,
+  `compassionate-vibrant-ritchie` push of `50f2d8e`),
+  the next failing file is identified by reading the raw
+  log around the `FAILED:` marker. **I could not extract
+  it this cycle** — the in-progress log endpoint pattern
+  `/checks/74088807916/logs` returns its content only to
+  authenticated browser sessions and the streamed log is
+  not in `document.body.innerText` until the failed step
+  is manually expanded; the same DOM-extract flake all
+  prior watchers have logged. Per STEP 2/3 ambiguity and
+  the strong "*don't pre-empt autopilot*" guidance from
+  every recent watcher cycle (`epic-jolly-davinci`,
+  `vigilant-clever-pasteur`, `eloquent-optimistic-noether`),
+  → **no code fix this cycle.** Autopilot is on a ~30-60 m
+  cadence and is overdue for its next tick; expectation is
+  that it will detect #96's failure, drop the next
+  `chrome/browser/safe_browsing/` file from
+  `fix-safe-browsing-components-gn.py`, and dispatch
+  `#97`. If on the *next* watcher cycle there is still no
+  `#97` and no `#251` autopilot, that is a divergence from
+  pattern that warrants direct intervention.
+- Issues filter `label:build-failure` still returns no
+  matches (label has never been created on this repo —
+  same finding as 5+ prior watchers). Open Issues count
+  unchanged at **46**.
+- Local mount
+  `/sessions/quirky-youthful-faraday/mnt/Projects/claum-browser`
+  is `~30` commits behind origin and has the same
+  unwriteable `.git` from prior watcher cycles
+  ("`Operation not permitted`" on `.git/objects/*` tmp
+  files); this watcher operates from a fresh shallow
+  clone in `/tmp/work2/claum-browser`. Heartbeat appended
+  via that clone with `[skip ci]`.
