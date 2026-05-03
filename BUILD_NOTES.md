@@ -6664,3 +6664,24 @@ entirely. Last-resort option is `use_system_xcode=true`.
   (all the old `bfa9bae` autopilot-spam wedge — no new failure
   signal). Per task STEP 2 (no failure to fix, build advancing /
   awaiting dispatch), this watcher cycle pushes only a heartbeat.
+- **2026-05-03 10:38 UTC** (session `wizardly-gifted-hypatia`,
+  heartbeat-only cycle) — Build Claum (macOS) **#101** dispatched
+  by autopilot **#254** at ~10:30 UTC, currently **In progress**
+  on commit `8169257` (the watcher's `[skip ci]` heartbeat sitting
+  on top of the rawptr fix `478dcc6`). Run ID `25276730118`,
+  Job ID `74107707159`. Phase has progressed `[3/6]` → `[6/6]
+  Running gn gen and ninja`; latest ninja tick `[508/55953]`
+  (~0.9 %), no `FAILED:` markers, no `fatal error` lines, no
+  `file not found` lines. The "git log --grep=^Change-Id" stderr
+  warning that appears in the log is the usual benign metadata
+  probe and is unrelated to ninja. Per watcher SKILL §2 (*"If
+  progress is advancing → record progress, exit run."*) → **no
+  code fix this cycle.** Critical checkpoints to watch in this
+  run: `[12845]` SOLINK `libvk_swiftshader.dylib` (the classic
+  #32/#34 cliff), `[47018]` safe-browsing consumer wave (#91/#92
+  cliff cleared by autopilot drop-sets), and especially
+  `[50369/55953]` `obj/third_party/pdfium/core/fxcodec/fxcodec/jpeg_common.o`
+  (the new #99/#100 cliff that the `-I` → `-isystem` fix is
+  meant to clear). `label:build-failure` Issues query returns
+  zero rows and no "Invalid value" warning — channel still
+  silent. [skip ci]
