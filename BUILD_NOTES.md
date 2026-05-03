@@ -4977,3 +4977,49 @@ entirely. Last-resort option is `use_system_xcode=true`.
   past `[47021]` and into the next consumer layer
   (or — best case — clear the 47k cliff and proceed
   toward the `~[55965]` final link + dmg packaging stage).
+
+- **2026-05-03 00:28 UTC** (session `eloquent-optimistic-noether`,
+  fix push) — Build Claum (macOS) **#92** finished
+  **Failure** at ninja `[47012..47021/55965]` (job
+  ended `2026-05-03T00:15:59Z`, 36m 50s total). Failure
+  log fetched via authenticated GitHub API
+  (`/actions/jobs/74077420298/logs`, 6.15 MB, 50,810
+  lines, 47,199 ninja ticks). Same 4-file cluster as
+  #91 (no fix had been pushed between #91 and #92):
+
+    * `chrome/browser/safe_browsing/client_side_detection_intelligent_scan_delegate_desktop.cc`:17
+    * `chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc`:15
+    * `chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc`:48
+    * `chrome/browser/safe_browsing/download_protection/cloud_binary_upload_service.cc`
+
+  All four error: `fatal error:
+  'components/safe_browsing/core/common/safe_browsing_prefs.h'
+  file not found`. Per STEP 3 (real code error,
+  no autopilot fix arriving), watcher pushed
+  `d72e905` — adds these 4 files to
+  `fix-safe-browsing-components-gn.py` TARGETS list,
+  same Path-A peel pattern as #67/.../#90/#91. Push
+  triggered **run #93** at `2026-05-03T00:27:43Z`,
+  `status=in_progress`, run id `25265610035`.
+
+- Note (run #93): The `build-failure` label DOES exist
+  on the repo (API filter returns 5+ open issues, all
+  titled `[autopilot] Build wedged on bfa9bae after 15
+  attempts` — these are unrelated to current main HEAD
+  `d72e905`, they're escalations from a different stuck
+  SHA). Earlier sessions' notes that "label has never
+  been created" used a UI search syntax that fails on
+  multi-word filter values; the API filter works.
+- Local checkout under
+  `/sessions/eloquent-optimistic-noether/mnt/Projects/claum-browser`
+  has the same stale `.git/index.lock` issue prior
+  watchers documented (mount-level unlink restriction).
+  Fix was prepared and pushed from a fresh shallow
+  clone at `/tmp/work/claum-browser-fix`.
+- Next checkpoint: when ninja approaches `[47020]` in
+  #93. If it advances past `[47025+]` we've cleared
+  this layer; expect the next consumer wave at the
+  bottom of `download_protection/` or in
+  `tailored_security/` follow-on (e.g. headers
+  transitively pulling `safe_browsing_prefs.h` even
+  if their direct `.cc` doesn't include it).
