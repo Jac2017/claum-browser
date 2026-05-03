@@ -5,6 +5,88 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-03 03:19 UTC** (session `wizardly-relaxed-rubin`, RUN
+  #95 IN PROGRESS, heartbeat-only cycle, no fix pushed) — Latest
+  workflow run on origin/main is **Build Claum (macOS) #95**
+  (run id `25268412875`, SHA `bdaeb90`, event `push` —
+  the previous watcher's run-#94 fix push). Run started
+  `2026-05-03 03:07:16 UTC`. Job id `74086620588`. Step
+  `Run Claum build` started `03:09:59 UTC`, in_progress
+  ~9–10 min at heartbeat time. The job-logs API endpoint
+  returned a Path-presigned 404 (BlobNotFound) — Azure logs
+  blob is only published once the job ends, so live ninja
+  count is unavailable from `api.github.com` in this cycle.
+  The job is still on the `Run Claum build` step (verified
+  via `actions/runs/25268412875/jobs`). Build step is **well
+  before the prior failure cliff** at ~29m (when ninja
+  `[47031..47033/55961]` blew up on the safe_browsing Path-A
+  wave in #94). No new action taken this cycle: the 3-file
+  run-#94 fix in `bdaeb90` is what we are testing.
+  HEAD: `0eaabae` (heartbeat from prior cycle, `[skip ci]`).
+- **2026-05-02 19:35 UTC** (session `nice-zealous-feynman`,
+  RUN #86 BUILD PHASE SUCCEEDED — now in artifact phase) —
+  Picked up the watcher baton from the previous cycle
+  (`brave-sleepy-ritchie`, 19:13 UTC). **Big news:** run
+  **#86** (commit `0c6398b`, run id `25259468331`, job
+  `74064230002`) has finished `Run Claum build` in
+  **29m 9s** with no `FAILED:` markers, and the workflow has
+  moved on to the post-build steps. The **`fix-safe-browsing-components-gn.py`
+  drop-3-dangling-`.cc` patch worked** — the build did not
+  fail at the `[46948/55989]` safe_browsing checkpoint that
+  runs #82/#84/#85 each died at. Step list pulled from the
+  job page right now (timestamps 19:33–19:34 UTC):
+  - `Set up job` 4s — done
+  - `Check out Claum repo` 46s — done
+  - `Restore sccache disk cache` 1m 31s — done (this is what
+    let the compile run in 29 min instead of >2 hours; sccache
+    cache hits 36805 / requests 36816 = 99.97% hit rate)
+  - `Run Claum build` **29m 9s — done** ← THE BIG ONE
+  - `Show sccache stats and prepare cache for save` 2s — done
+  - `Save sccache disk cache` ← **In progress** as of
+    19:34 UTC (uploading the 1,330,306,432-byte sccache
+    payload, currently sitting at `Sent 0 of 1330306432
+    (0.0%), 0.0 MBs/sec` — this is just GH-Actions cache@v4's
+    typical slow start; not stuck)
+  - `Run actions/cache/save@v4` — pending
+  - `Package .app as .dmg` — pending
+  - `Upload build log on failure` — pending (and will skip,
+    since no failure)
+  - `Upload build artifact` — pending (this is the one that
+    produces the `.dmg` we need)
+  - Post-job cleanup steps — pending
+  Sccache final stats from the rendered DOM tail:
+  ```
+  === sccache final stats ===
+  Compile requests        36816
+  Compile requests executed 36815
+  Cache hits              36805
+  Cache hits (Assembler)    246
+  Cache hits (C/C++)      36559
+  Cache misses                6
+  ```
+  No `FAILED:` / `fatal error` / `ninja: error` markers
+  anywhere in the rendered DOM. Build-failure issues page
+  still unchanged (the `build-failure` label literally does
+  not exist on the repo per "Invalid value build-failure for
+  label" — handler has never had to fire), so the auto-retry
+  workflow is dormant. **Sccache total ninja items was
+  `55984`** (down very slightly from `55989` last cycle —
+  one .cc file fewer in the GN graph, consistent with the
+  3-file drop in `0c6398b`). Next watcher should re-check
+  **in ~10–15 min**: by then the sccache save will be done,
+  the `.dmg` will be packaged, and the artifact upload should
+  be running or finished. **If artifact is up, download the
+  `.dmg` and present it** — see step 4 of the schedule
+  template. The artifact name pattern from recent successful
+  manual runs is `claum-macos-arm64.dmg` (verify on the run
+  page). Token path this cycle:
+  `/sessions/nice-zealous-feynman/mnt/Projects/claum-browser/.gh_token`.
+  Pushed from a fresh shallow clone at
+  `/tmp/claum-watcher-nice-zealous-feynman/repo` because of
+  the still-present `.git/index.lock` `EPERM` on the in-place
+  mount. [skip ci]
+
+
 - **2026-05-03 02:50 UTC** (session `confident-kind-einstein`, RUN
   #94 IN PROGRESS, heartbeat-only cycle) — Latest workflow run on
   origin/main is **Build Claum (macOS) #94** (run id `25267716484`,
