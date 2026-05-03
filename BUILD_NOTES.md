@@ -5936,3 +5936,21 @@ entirely. Last-resort option is `use_system_xcode=true`.
   (heartbeat from session `happy-blissful-wright`).
 - Token at `/sessions/eager-gallant-lovelace/mnt/Projects/claum-browser/.gh_token`
   (93 bytes, valid).
+
+### Scheduled watcher log — 2026-05-03 05:56 UTC (session: intelligent-youthful-euler)
+
+- **Mode:** heartbeat (no fix needed).
+- **Run #97** (`25271263010`) is **In progress** against commit
+  `84af7e4` (the previous cycle's fix). Phase
+  `[3/6] Downloading and unpacking Chromium 146.0.7680.164` at
+  `1m 43s` — well before the ninja `[~47000/55956]` cliff. No
+  `FAILED:` or `fatal error` markers in the streamed log. No new
+  `label:build-failure` issues opened against `84af7e4` (top issue
+  #46 is about a different commit `bfa9bae`).
+- **Action this cycle:** none beyond this heartbeat. Status report
+  written to `claum-build-watcher-status-2026-05-03-05-56-UTC.md`
+  in the user's Projects folder.
+- Local mount HEAD before this cycle: `0de311d` (mount is far
+  behind origin, expected — worked from fresh shallow clone at
+  `/tmp/cb-watcher-iye`).
+- Token at `claum-browser/.gh_token` (93 bytes, valid).
