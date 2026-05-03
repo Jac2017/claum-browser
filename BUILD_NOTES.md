@@ -6685,3 +6685,43 @@ entirely. Last-resort option is `use_system_xcode=true`.
   meant to clear). `label:build-failure` Issues query returns
   zero rows and no "Invalid value" warning — channel still
   silent. [skip ci]
+
+- **2026-05-03 10:43 UTC** (session `affectionate-sweet-rubin`,
+  heartbeat-only cycle) — Build Claum (macOS) **#101** still
+  In progress on commit `8169257` (heartbeat sitting on rawptr
+  fix `478dcc6`). Run ID `25276730118`, job ID `74107707159`.
+  Latest visible ninja tick is `[6197/55953]` (~11.1 %) at
+  log timestamp `10:40:12Z` — up from `[508/55953]` at the
+  prior 10:38 UTC cycle, ~5689 ticks in ~2 min → healthy pace
+  ~47 ticks/sec. Phase has advanced from `[3/6] Chromium
+  unpack` through `[5/6] Staging system tools` and into
+  `[6/6] Running gn gen and ninja`. **NOT yet past the
+  `[12845]` SOLINK `libvk_swiftshader.dylib` checkpoint**
+  (classic #32/#34 cliff), but advancing toward it.
+- No `FAILED:`, `fatal error:`, or `file not found` markers
+  in any of the ninja log scrolled (~6200 lines reviewed).
+  The single `ERROR:root:Failed to get version info: Git
+  command 'git log -1 --format=%H %ct --grep=^Change-Id:
+  HEAD'` line in earlier gn gen output is the known-benign
+  Chromium metadata probe (already noted in the 10:38
+  cycle), not a build break.
+- Per watcher SKILL §2 (*"If progress is advancing → record
+  progress, exit run."*) → **no code fix this cycle.**
+  Pre-empting with another fix would race the autopilot if
+  the rawptr fix proves incomplete at the `[50369]`
+  `pdfium/.../jpeg_common.o` cliff.
+- `?q=label:build-failure` Issues query: 0 rows, no
+  "Invalid value" warning — channel silent. Open Issues
+  count unchanged at **46**.
+- Local fresh shallow clone at
+  `/sessions/affectionate-sweet-rubin/work/claum-browser`
+  is on `main` at HEAD `2625ac4` (the prior watcher's
+  heartbeat) — not the mounted checkout, which is far
+  behind on `0de311d` and has stale `.git/index.lock`
+  debris from prior sessions. This watcher will append +
+  commit a heartbeat from the shallow clone only.
+- Next checkpoint: when ninja approaches `[12845]`,
+  `[47018]`, or `[50369]` (the new pdfium/jpeg_common
+  cliff that the `-I` → `-isystem` rawptr fix targets).
+  If `#101` clears `[50369+]`, the rawptr fix is confirmed
+  and the build has only ~10 % of ninja work remaining.
