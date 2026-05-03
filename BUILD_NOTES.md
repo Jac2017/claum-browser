@@ -6442,3 +6442,39 @@ entirely. Last-resort option is `use_system_xcode=true`.
   Heartbeat commit prepared via shallow clone in `~/work/`. No
   uncommitted source changes besides this heartbeat append.
   [skip ci]
+
+- **2026-05-03 08:47 UTC** (session `pensive-bold-allen`, heartbeat-only
+  cycle) — Build Claum (macOS) **#99** still **In progress** on
+  commit `33c8a4c`, run ID `25273689954`, job ID
+  `74100055423`. Build step started `2026-05-03 08:00:42 UTC`,
+  so it is now **~44 min into ninja**. Live-log container in the
+  job page DOM is empty (throttled, same as 08:25 cycle), but the
+  prior watcher at commit `1675e4a` captured a tick of
+  **`[33807/55953]` (~60%)** mid-cycle, so the build is
+  demonstrably advancing. Pre-build steps are all populated with
+  durations (Check out 47s, Free disk 0s, Install deps 5s,
+  sccache 0s); `Run Claum build` has no duration → still
+  running. Zero `FAILED:` / `fatal error:` /
+  `ninja: build stopped` / `file not found` markers anywhere
+  in DOM-loaded slices. Per STEP 2 of the watcher SKILL
+  ("*If progress is advancing → record progress, exit run.*") →
+  **no code fix this cycle.**
+- Issues filter `label:build-failure` returns 0 issue rows
+  (DOM probe found 0 `h3 a` issue title links inside the
+  Search results region — the visible "46" is the global repo
+  Open-Issues counter at the top, unchanged from prior cycle).
+  Handler has not opened anything against #99 yet — consistent
+  with no failure.
+- Local mount at `/sessions/pensive-bold-allen/mnt/Projects/claum-browser`
+  is 49 commits behind origin/main with the usual mount
+  `.git/index.lock` permission issue. Heartbeat prepared via
+  shallow clone in `/tmp/work-watcher-99-c3/repo`. Token read
+  from the mount's `.gh_token` (untracked, gitignored).
+- Next watcher cycle (~30 min, when the autopilot cron also fires)
+  should re-poll once GH's live log re-populates and try to read
+  the actual ninja count to confirm whether #99 has cleared the
+  `[47000+]` (state_store / safe_browsing) cliff and the
+  `[48717]` (`permission_revocation_request`) cliff in the
+  same run. Build-step at ~44 min suggests we're already at or
+  past those cliffs given the ~22 ticks/sec pace observed in #92.
+  [skip ci]
