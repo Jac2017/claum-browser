@@ -6072,3 +6072,51 @@ entirely. Last-resort option is `use_system_xcode=true`.
   for `FAILED:` and `ninja: error` to identify it. The
   autopilot's data-driven `fix-safe-browsing-components-gn.py`
   will NOT help with this new cliff (different file set).
+
+- **2026-05-03 07:02 UTC** (session `friendly-nifty-ptolemy`,
+  heartbeat-only cycle) — Build Claum (macOS) **#98**
+  In progress on commit `cea09e4` (autopilot's CLAUM_BUILD_ROOT
+  → job-env workflow fix to make the failure-log upload work).
+  Run ID `25272302974`, job ID `74096599055`. Latest ninja
+  tick is `[16577/55954]` (~29.6 %). Build step started at
+  `2026-05-03T06:49:20Z`; at the time of this poll
+  (~06:58:53Z, ~9.5 min in) ninja pace ~22 ticks/sec — the
+  same healthy cadence as #92/#93/#97. Build is **past the
+  `[12845]` SOLINK `libvk_swiftshader.dylib` checkpoint**
+  (the classic #32/#34 failure point). No `FAILED:` markers,
+  no `fatal error` lines, no `file not found` lines in the
+  streamed log (~18.3 kLines, 16583 ninja ticks captured).
+- Per task **STEP 2** ("*If progress is advancing → record
+  progress, exit run.*") → **no code fix this cycle.** Build
+  is healthy; the next failure cliff to watch is the
+  `~[47005]` wave of `chrome/browser/safe_browsing/`
+  consumers — but #97 already cleared that wave on commit
+  `84af7e4` (autopilot's 2-file drop-set). If #98 also
+  clears it and the dmg-package phase succeeds, this would
+  be the **first artifact-producing run since the chase
+  began**. The autopilot's `cea09e4` workflow fix should
+  also mean that any future failure beyond ninja gets a
+  proper log artifact uploaded.
+- `build-failure` issues channel: filter page returned
+  no error this cycle (label may now exist), but no new
+  issues triggered for #98 yet — handler only opens an issue
+  on Failure. Open issues count unchanged at **46** (all
+  stale per BUILD_NOTES history). Issues remains a no-signal
+  channel for now.
+- Local mount working tree at
+  `/sessions/friendly-nifty-ptolemy/mnt/Projects/claum-browser`
+  has the usual debris (`.gone-5`, `.bk-5`, `mywork-mayer`,
+  `.test-write.gone-5` files from prior watcher sessions)
+  plus a stale uncommitted edit to BUILD_NOTES.md left over
+  from a previous run. Local HEAD on the mount is `0de311d`
+  (way behind origin) and `.git/index.lock` cannot be
+  unlinked, so this watcher (like the previous few) appends
+  the heartbeat via a fresh shallow clone under `/tmp/`
+  and pushes from there.
+- Next checkpoint: when ninja approaches `[47000]`, re-poll.
+  If `#98` ticks past `[47030+]` and reaches the
+  `dmg-package` phase, tail that phase's log to confirm
+  the artifact uploads (the whole point of `cea09e4`'s
+  workflow change). If it fails again at `[47018]`, that
+  would mean the autopilot's drop-set in `84af7e4` was
+  not transitively complete and a new fix wave is needed.
