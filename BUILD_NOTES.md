@@ -6230,3 +6230,74 @@ entirely. Last-resort option is `use_system_xcode=true`.
   if any: ninja `[48720+/55954]` — likely another single
   `chrome/browser/permissions/` or other-dir consumer of the same
   stripped `safe_browsing_prefs.h` header.
+
+- **2026-05-03 07:52 UTC** (session `compassionate-brave-goodall`,
+  observation cycle — no new code change) — Build Claum (macOS)
+  **#98** still the latest workflow run on
+  `https://github.com/Jac2017/claum-browser/actions/workflows/build-mac.yml`
+  (workflow page header reports `98 workflow runs` total). Run
+  ID `25272302974`, job ID `74096599055`, commit `cea09e4`,
+  duration `42m 28s`, **Failure** at ninja `[48717/55954]`
+  (~87 %). Single `FAILED:` marker confirmed via XHR pull of
+  `/commit/cea09e4d.../checks/74096599055/logs/12` (6.21 MB
+  raw log) at line 49384 — same
+  `chrome/browser/permissions/permission_revocation_request.cc:29`
+  → `fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`
+  identified by the prior `kind-dazzling-archimedes` cycle.
+  The watcher-uploaded `claum-build-log-98` artifact is present
+  (591826 B zip → 4.5 MB build.log) confirming the `cea09e4`
+  workflow change worked end-to-end.
+- **Fix `ef40e99` is in `origin/main` tree** (HEAD `cae1531`,
+  fix sits one commit below). The
+  `fix-safe-browsing-components-gn.py` TARGETS table now contains
+  the explicit entry at line 638
+  `("chrome/browser/permissions/BUILD.gn", "permission_revocation_request.cc")`,
+  so the next build that runs the gn-prep step will drop that
+  source from the `permissions` target before ninja starts.
+- **Why run #99 has not started yet (~10 min after the fix push):**
+  the prior watcher pushed two commits in one push — `ef40e99`
+  (the fix, no skip-ci marker) followed by `cae1531`
+  (heartbeat-only, ends with `[skip ci]`). `build-mac.yml`
+  triggers on `push: branches: [main]` with `paths-ignore`
+  for `BUILD_NOTES.md`, `README.md`, `**/*.md`. The `.py`
+  change in `ef40e99` would normally trigger the workflow,
+  but GitHub honors `[skip ci]` in the **HEAD commit's
+  message** for the whole push, suppressing all otherwise-
+  triggered workflows. → Run #99 was skipped at the
+  push-trigger layer, not at the paths layer.
+- **Why this watcher is NOT pushing a new commit:** the
+  `claum-autopilot.yml` workflow runs on a `cron: '*/30 * * * *'`
+  schedule (every 30 min — see header comment "Every 30
+  minutes... fires off a fresh `workflow_dispatch`"). The most
+  recent autopilot tick was `Claum autopilot #251` at the run
+  list. The next tick should fire near 08:00 UTC (in ~8 min
+  from this heartbeat at 07:52 UTC) and will dispatch
+  `build-mac.yml` against current `origin/main` HEAD `cae1531`,
+  which already contains the fix. Pushing a competing
+  no-skip-ci commit from this watcher would race the autopilot
+  for the same build slot. STEP 5 of the SKILL still requires
+  this heartbeat note, but STEP 3 ("transient → handler handles
+  it, just log") applies because the missing-trigger condition
+  is itself transient and the autopilot is the designated
+  handler.
+- **Hint for the next watcher cycle:** if no `Build Claum
+  (macOS) #99` appears on the workflow page by ~08:05 UTC
+  (15+ min after the autopilot's expected wake-up), then the
+  autopilot itself is stuck and the next watcher should either
+  (a) click the workflow's manual "Run workflow" button via
+  Chrome MCP on
+  `https://github.com/Jac2017/claum-browser/actions/workflows/build-mac.yml`,
+  or (b) push an empty no-skip-ci commit
+  (`git commit --allow-empty -m "trigger build #99 (autopilot
+  stalled)"`) to force the trigger. Either path uses the
+  already-pushed `ef40e99` fix in tree — no new code change
+  required.
+- HEAD (origin/main): `cae1531`. Local mount checkout under
+  `/sessions/compassionate-brave-goodall/mnt/Projects/claum-browser`
+  is **41 commits behind** origin and has stale modifications
+  (`.git/objects/*` permission errors block fast-forward), so
+  this heartbeat was authored from a fresh shallow clone at
+  `~/work/claum-browser` and pushed via the `.gh_token` —
+  same fallback used by the `lucid-eloquent-davinci`,
+  `vigilant-clever-pasteur`, and `eloquent-optimistic-noether`
+  cycles.
