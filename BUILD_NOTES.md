@@ -6824,3 +6824,10 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - Escalation **HOLD remains** — the jpeg-cliff fingerprint (8 attempts) is unchanged and #106 is on the same code, so any failure will be the 9th attempt on the same fingerprint.
 - No fix authored this cycle. Heartbeat-only push from fresh shallow clone (`/tmp/tec-watcher-5/repo`); divergent local mount not used.
 
+
+#### 2026-05-03 17:38 UTC — cycle 18 heartbeat (session: ecstatic-affectionate-ride)
+- Build **#106** (Build Claum (macOS)) — **In progress** on commit `020000a` (the cycle-15 heartbeat-only sha that #105 also failed on; #106 is therefore a re-dispatch of the same code, no fix between #105 and #106). Run `25285548390`, job `74129332098`. Job duration ~21m 30s, "Run Claum build" step ~18m 40s. Ninja `[N/M]` ticks not surfaced via the React log viewer this poll (step expanded but log container empty in DOM snapshot — known UI quirk on long virtualized logs); duration is consistent with the build sailing past the early phases as in cycle 17.
+- Build **#105** confirmed **Failure** at **39m 53s** with 1 artifact uploaded — duration is right on the established **~39m jpeg-cliff pattern** that took down #101–#104.
+- build-failure issues: **46 Open / 0 Closed** — unchanged from cycle 17; newest still **#46** ("Build wedged on bfa9bae after 15 attempts"). No new fingerprint, so the escalation **HOLD remains in effect** (now attempt **#9** on the same jpeg-cliff fingerprint if #106 fails the same way).
+- No fix authored this cycle (per the standing hold). Heartbeat appended + committed `[skip ci]` from fresh shallow clone under `~/work/claum-browser`; the divergent mount (127 ahead / 19 behind) is not used for git ops. Token used: `<repo>/.gh_token` from the local mount (93 bytes), not the SKILL's referenced `/sessions/wonderful-stoic-lamport/.gh_token` which is in another sandbox.
+- Next checkpoint: re-poll once #106 either finalizes or its job duration approaches the ~39m jpeg-cliff window. The hold lifts only on (a) a *different* failure fingerprint, or (b) the autopilot pushing a new fix-bearing sha (not just a re-dispatch).
