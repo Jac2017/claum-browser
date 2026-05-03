@@ -6615,3 +6615,35 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `origin/main` by 1 commit; pushing next. Working tree clean
   modulo the BUILD_NOTES heartbeat which is included in the
   separate `[skip ci]` heartbeat commit below.
+
+### Scheduled watcher log — 2026-05-03 10:22 UTC (session: tender-clever-goldberg)
+
+- **State on entry:** origin/main HEAD is `6c250e3` (rawptr-fix wake
+  commit pushed by prior cycle at ~10:17 UTC). Last build is
+  **Build Claum (macOS) #100** which finalized **Failure** at ninja
+  `[50369/55953]` with the `chromium-rawptr` plugin firing on
+  jpeg-turbo's `jpeglib.h`. Substantive fix already landed in
+  commit `478dcc6` (`-I` → `-isystem` for the jpeg-turbo include
+  path in `claum/scripts/build-mac.sh`).
+- **Build #101 status:** not yet dispatched as of this cycle. The
+  workflow runs page shows: latest = `Build Claum (macOS) #100`
+  (39m 24s, Failure), then `Claum autopilot #253` (7s, ran on
+  `dd86b12`, fired BEFORE the rawptr push). No #101 row exists yet.
+- **Next expected event:** the next `Claum autopilot` cron tick
+  (every 30 min — next at ~10:30 UTC, ≈10 min after this cycle).
+  It will see origin/main advanced beyond the last built SHA and
+  dispatch a fresh `workflow_dispatch` build on `6c250e3`, which
+  carries the rawptr fix.
+- **Issues tab:** zero open issues with the `build-failure` label
+  (build-failure-handler workflow has not opened any new ones).
+- **Local checkout (`/Projects/claum-browser`):** stuck git lock files
+  (`.git/index.lock`, `.git/HEAD.lock`, `.git/ORIG_HEAD.lock`) owned
+  by other UIDs; cannot be removed from this sandbox session. Worked
+  around by cloning fresh into `/tmp` for this heartbeat. Next
+  cycle should be unaffected because each cycle gets a fresh sandbox.
+- **No new fix pushed this cycle.** No code changes — the existing
+  fix in `478dcc6` is correct and we are simply waiting for the
+  autopilot cron tick to dispatch the build that exercises it.
+- **STEP-3 escalation guard:** does NOT fire. Each recent run has
+  advanced the ninja step count, and #100's `[50369]` is a fresh
+  frontier never previously reached.
