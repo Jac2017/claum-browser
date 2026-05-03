@@ -5,6 +5,70 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-03 00:07 UTC** (session `zen-funny-pasteur`, heartbeat-only
+  cycle) — Build Claum (macOS) **#92** still **In progress** on
+  commit `c49f07f` (full SHA
+  `c49f07fdeff37f761eb802e887d9465a4e485732`), run id
+  `25264762189`, job id `74077420298`. Latest streaming-log
+  tick is **`[33833/55965]` (~60.45%)** at `2026-05-03T00:03:04Z`
+  on `xr_layer.o` (third_party/blink/renderer/modules/xr).
+  "Run Claum build" step started at `2026-05-02T23:41:51Z`,
+  so ninja has been ticking for **~21 m 13 s**. The job
+  sidebar still shows the step with no end-icon (only the
+  gear+chevron), and post-ninja steps (`Show sccache stats`,
+  `Save sccache disk cache`, `Package .app as .dmg`,
+  `Upload build log`, `Upload build artifact`,
+  `Post Cache Chromium source`, `Post Install sccache`,
+  `Post Check out Claum repo`) are all queued
+  (`octicon-circle`). Ran a JS regex over the whole 4.23 MB
+  step-log blob: **0 `FAILED:` markers, 0 `fatal error`, 0
+  `file not found`, 0 `ninja: error`** — the only "failed"
+  hit was the benign
+  `ERROR:root:Failed to get version info: Git command
+  'git log -1 --format=%H %ct --grep=^Change-Id: HEAD' …
+  rc=0, stdout='' stderr=''` which fires inside Chromium
+  subdirs that aren't git repos and is non-fatal.
+- Per task STEP 2 (*"If progress is advancing → record
+  progress, exit run."*) — **no code fix this cycle.** The
+  build is healthy and well past every prior failure
+  checkpoint observed so far this evening: SOLINK at
+  `[12845]`, the previous watcher's `[16593]`, plus all
+  earlier waves. Next failure cliff (per #91/#90) is the
+  `chrome/browser/safe_browsing/` consumer wave at
+  `~[47018]/55965`; ninja currently has **~13.2 k ticks to
+  go** (~24-30 minutes at the observed throughput of
+  ~25 ticks/sec across the streaming log) before reaching
+  it. The autopilot's `fix-safe-browsing-components-gn.py`
+  has fired correctly for every prior wave (#86 → #87 →
+  #89 → #90 → #91 → in-flight #92), so if `#92` does
+  hit a new failure at the cliff, the next autopilot
+  `Claum autopilot` scheduled run will commit a drop-set
+  for it; pushing a competing fix from this watcher would
+  race the autopilot.
+- `build-failure`-labeled issues filter still returns
+  `Invalid value build-failure for label` — the label has
+  never been created on this repo, so the GitHub Actions
+  failure handler can't tag any issue with it. Open Issues
+  count unchanged at **46**. Issues remains a no-signal
+  channel until that label is created. (This is consistent
+  with what the previous watcher noted at 23:59 UTC.)
+- Repo state at start of this cycle: in-place mount HEAD
+  was `0de311d` (1 commit behind origin/main `1d2529e`,
+  i.e. behind by the previous watcher's heartbeat). Used
+  the standard fresh-clone workaround
+  (`/tmp/claum-watcher-zfp-<epoch>/`) to dodge the
+  `.git/objects/*/tmp_obj_*` permission-denied issue
+  reported by every recent cycle.
+- Next checkpoint: when ninja approaches `[47000]` (in
+  ~25 m), re-poll. If `#92` clears past `[47030]` it
+  would be the **first run since #80-ish to advance
+  past the 47k cliff without a fresh fix**, which would
+  mean autopilot's drop-set in `c49f07f` actually
+  covered the next consumer layer too — promising signal.
+  If it stalls at `[47018]` again, autopilot will
+  dispatch its next drop-set; this watcher should NOT
+  pre-empt it.
+
 - **2026-05-02 22:12 UTC** (session `funny-intelligent-heisenberg`, RUN
   #90 IN PROGRESS, heartbeat-only cycle) — Latest workflow run on
   origin/main is **Build Claum (macOS) #90** (run id `25263034701`,
