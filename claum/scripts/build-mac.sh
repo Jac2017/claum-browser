@@ -1013,6 +1013,7 @@ GN_ARGS="
   use_libcxx_modules=false           # workaround for Xcode 16 SDK modulemap mismatch
   use_clang_modules=false            # turn OFF clang module compilation entirely
   treat_warnings_as_errors=false     # tolerate warnings so build does not abort
+  clang_use_chrome_plugins=false     # disable chromium clang plugin: it raises chromium-rawptr errors against /opt/homebrew/.../jpeglib.h (a system header we did not write); see BUILD_NOTES cycle 20 for the cliff fingerprint
   extra_cflags=\"$JPEG_INC_FLAG\"
   extra_cxxflags=\"$JPEG_INC_FLAG\"
   extra_ldflags=\"$JPEG_LIB_FLAG\"
