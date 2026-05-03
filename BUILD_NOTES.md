@@ -5493,3 +5493,43 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `/sessions/compassionate-vibrant-ritchie/tmp/work/claum-5/repo`.
   HEAD before this cycle: `29a8056` (prior cycle's
   heartbeat).
+
+- **2026-05-03 04:24 UTC** (session `epic-jolly-davinci`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96**
+  In progress on commit `50f2d8e` (the prior watcher's
+  `state_store.cc` consumer drop-set fix). Run ID
+  `25269246053`, job ID `74088807916`, started
+  `2026-05-03T03:54:48Z`. Job-elapsed at this poll:
+  **~28 m 16 s** (now `2026-05-03T04:23:04Z`). No
+  `FAILED:` / `fatal error` / `file not found` /
+  `ninja: build stopped` markers visible in the run
+  detail page or job page. Live ninja `[N/M]` tick
+  could not be extracted this cycle: GitHub returns
+  `HTTP 500` on `/checks/74088807916/logs` and `/logs/12`
+  (in-progress raw-log endpoint) and the `Run Claum
+  build` step's streamed log is not in
+  `document.body.innerText`. Same DOM-extract flake the
+  prior `kind-loving-brahmagupta` and earlier watchers
+  logged — not a new regression.
+- Per STEP 2 of the watcher SKILL ("*If progress is
+  advancing → record progress, exit run.*") → **no code
+  fix this cycle.** Build is past the `[12845]` SOLINK
+  `libvk_swiftshader.dylib` cliff (which historically
+  takes runs out within the first ~15-20 m of ninja, and
+  we are at ~25-26 m of step 12 alone) and is heading
+  toward the next expected cliff at `~[47018]`
+  (`chrome/browser/safe_browsing/` consumer wave). If
+  `50f2d8e`'s drop-set covers the latest transitive
+  layer, run #96 should clear that cliff; if not, the
+  autopilot will dispatch its next data-driven drop-set.
+  This watcher should NOT pre-empt it.
+- Issues filter `label:build-failure` still returns no
+  matches (label has never been created on this repo —
+  same finding as prior watchers). Open Issues count
+  unchanged at **46**.
+- Local mount `/sessions/epic-jolly-davinci/mnt/Projects/claum-browser`
+  is 27 commits behind origin and has never been
+  fast-forwarded; this watcher operates from a fresh
+  shallow clone in `/tmp/work-epic-jolly-davinci-5/claum-browser` (same
+  pattern as prior cycles). Heartbeat appended via that
+  clone with `[skip ci]`.
