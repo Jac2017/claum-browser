@@ -6791,3 +6791,22 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - `label:build-failure` Issues count holds at **46 open / 0 closed** (top issue still `#46` "[autopilot] Build wedged on bfa9bae after 15 attempts" from May 2 — no new entry referencing `a09e62e`; build-failure-handler classifier still not catching the rawptr cliff for #105 just as it didn't for #99–#104). Origin/main HEAD prior to this heartbeat was `ea30fca` (the prior `gallant-clever-heisenberg` 16:44 UTC cycle's heartbeat that incorrectly predicted #105 might be clearing the cliff). Heartbeat committed from a fresh shallow clone under `/sessions/laughing-inspiring-euler/tmp/claum-browser` (the mount checkout at `/sessions/laughing-inspiring-euler/mnt/Projects/claum-browser` is `127` commits ahead / `19` behind `origin/main` from leftover prior-session heartbeats — in-place push remains unsafe).
 - Next-cycle wake-up signals: (a) a `Build Claum (macOS) #106` dispatch — but only if a human or autopilot lands a new fix; on the same SHA (or any HEAD still carrying the CPATH override) it will be **attempt #9** on the same cliff; (b) a *new* `label:build-failure` issue from a different failure pattern (would lift the HOLD); (c) the open-issues count moving off **46**; (d) any human-authored commit on `origin/main` other than a heartbeat — strongest unblock signal. [skip ci]
 - 2026-05-03 16:57 UTC — run #105 still latest Failure 39m 53s on a09e62e (no #106), 46 build-failure issues unchanged, origin/main HEAD ddcbb8a, escalation HOLD remains (attempt #8 jpeg cliff, cycle 14)
+
+- **2026-05-03 17:11 UTC** (session `zen-keen-bardeen`, heartbeat-only cycle 15) — Build Claum (macOS)
+  **#105** still **Failure** 39m 49s on commit `a09e62e` (attempt #8 on the
+  jpeg cliff that took down #101–#104). Autopilot run #259 (`25284063700`)
+  ran 17s and reported **Success** but **did not dispatch a #106** — same
+  no-op pattern as cycle 14. Build-failure issues unchanged at **46 Open / 0
+  Closed**, newest still pre-existing #46 ("Build wedged on bfa9bae after 15
+  attempts"). No new failure pattern → escalation **HOLD** remains in effect
+  per the standing rule. Per STEP 5 of the watcher SKILL: heartbeat appended
+  + committed with `[skip ci]` from a fresh shallow clone (`/tmp/zkb-watcher-*/repo`)
+  rather than the `zen-keen-bardeen` mount, since the local checkout there
+  is still 127 ahead / 19+ behind origin/main.
+- Per STEP 3 of the SKILL ("If code error → fix") → **no fix authored this
+  cycle.** This is the established hold pattern: 8 attempts on the jpeg cliff
+  is well past the SKILL's 3-attempt escalation threshold, and no new
+  failure signature has emerged that would lift the hold. Next checkpoint:
+  re-poll for either (a) autopilot dispatching a new #106 with a fresh
+  drop-set, or (b) a `build-failure`-labeled issue with a *different*
+  fingerprint than the existing 46.
