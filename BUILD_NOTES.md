@@ -5657,3 +5657,85 @@ entirely. Last-resort option is `use_system_xcode=true`.
   closer look — but still inside the historical 30-60 min
   cadence. The *next-next* tick is the right place to
   consider divergence intervention, not this one.
+
+- **2026-05-03 05:04 UTC** (session `inspiring-exciting-mayer`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96**
+  remains the latest run, **Failure** on commit `50f2d8e`.
+  Run ID `25269246053`, started `2026-05-03T03:54:45Z`,
+  total duration 37 m 29 s, failed at `~2026-05-03T04:32:14Z`
+  — i.e. `~32 min` before this poll. Latest 3 build-mac runs
+  on the actions list: `#96` Build (Failure, `50f2d8e`),
+  `#95` Build (Failure, `bdaeb90`), `#94` Build (Failure,
+  manual-dispatch by github-actions Bot). Latest 3 autopilot
+  runs: `#250` (Scheduled, Success, 9 s), `#249` (Manual by
+  Jac2017, Success, 9 s), `#248` (Scheduled, Success, 10 s).
+  **Still no `#97` Build dispatched, still no `#251`
+  autopilot** — same as the prior `serene-wizardly-noether`
+  04:45 UTC heartbeat (19 min ago) and the
+  `quirky-youthful-faraday` 04:38 UTC heartbeat (26 min ago).
+- Tried again to extract `FAILED:` markers from the failed-step
+  log: `/Jac2017/claum-browser/commit/50f2d8e/checks/74088807916/logs/12`
+  returns HTTP 500, `/checks/74088807916/logs` returns HTTP
+  500, `/api/v3/.../actions/runs/25269246053/logs` returns
+  HTTP 404 (anonymous browser session, not GH-API
+  authenticated). Programmatically clicking the `Run Claum
+  build` step `<summary>` to expand it left
+  `document.body.innerText` at only 1362 chars (page chrome
+  only) — the React virtualizer keeps the failed-step body
+  out of `innerText`. **Same DOM-extract flake every recent
+  watcher has logged.** No new ninja `[N/M]` count and no
+  `FAILED:` filename extracted this cycle.
+- Per the previous `serene-wizardly-noether` cycle's
+  "next-next tick" guidance: with autopilot now `~32 min`
+  stale (and #96 failure `~32 min` old), we are right at
+  the lower edge of the historical 30-60 min autopilot
+  cadence — but **not yet definitively diverged**. Pushing
+  a competing fix from this watcher without a confirmed
+  failed file would be premature: the autopilot's
+  `fix-safe-browsing-components-gn.py` is data-driven (it
+  reads the actual `FAILED:` line from the run log to pick
+  which `chrome/browser/safe_browsing/*.cc` to drop next).
+  Without that filename, any speculative drop would risk
+  removing the wrong source and possibly mask the real
+  failure. → **No code fix this cycle.** Heartbeat-only,
+  consistent with all 5+ prior heartbeat-only cycles since
+  #96 turned up Failure.
+- Next-cycle recommendation: if the **next** watcher tick
+  (≈5-10 min from now, putting elapsed-since-#96-failure at
+  `~40 min`) still shows `no #97 / no #251`, that is the
+  upper-mid of the historical autopilot cadence and worth
+  a serious divergence look. Two divergence options to
+  weigh at that point:
+  1. Manually dispatch the Claum autopilot workflow via
+     `actions/workflows/claum-autopilot.yml` `Run workflow`
+     button (this is what `Jac2017` did for #249 — it
+     succeeded in 9 s but did not push a new fix; that
+     suggests the autopilot already considered the SHA
+     and decided no fix was needed, OR the autopilot only
+     fires when its scheduled cron triggers it, not on
+     manual dispatch). Reviewing the actual
+     `claum-autopilot.yml` and `fix-safe-browsing-components-gn.py`
+     scripts in `claum/scripts/` would clarify which.
+  2. Pull the failed-step log via the GH Actions UI's
+     `…` menu → `View raw logs` (only available
+     post-completion), grep for `FAILED:`, then push the
+     drop-set fix manually. This bypasses the autopilot
+     but produces a confirmed data-driven fix.
+- Issues check: filter `label:build-failure` returns the
+  same 46 escalation issues as the prior cycle's reading
+  (correcting the earlier watcher cycles' "label does not
+  exist" false negative — the label DOES exist, it just
+  matched 0 issues for SHA `50f2d8e` because the handler
+  only opens an escalation at 15 same-SHA failures, and
+  `50f2d8e` is still on attempt 1). No fresh signal for
+  run #96.
+- Local mount `/sessions/inspiring-exciting-mayer/mnt/Projects/claum-browser`
+  is **31 commits behind origin** and the same inherited
+  `.git/index.lock` from session `2026-05-03T00:26:20Z` is
+  still present (`Operation not permitted` to remove,
+  even as file owner — same FS quirk every prior watcher
+  hit). This watcher operates from a fresh shallow clone
+  in `/tmp/cb-watcher-iem-*` (HEAD before this cycle:
+  `de6f6d0` = prior watcher `serene-wizardly-noether`'s
+  heartbeat). Heartbeat appended via that clone with
+  `[skip ci]`.
