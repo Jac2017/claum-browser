@@ -597,6 +597,46 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "services_delegate_desktop.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #98 dangling file — ONE more consumer of the same stripped
+    # safe_browsing_prefs.h header. This is the FIRST one we've seen that
+    # lives OUTSIDE chrome/browser/safe_browsing/ — it's in
+    # chrome/browser/permissions/ instead. The fix recipe is identical
+    # (Path-A: drop from sources list), but the BUILD.gn is in a new dir.
+    #
+    # Build #98 (commit cea09e4 — the workflow fix that finally got the
+    # log-artifact upload working, so this is the FIRST run we have a
+    # full FAILED: marker for since the cliff started moving past
+    # [47018]) reached ninja [48717/55954] (~87 %, deepest yet) and then
+    # halted with this single FAILED: marker:
+    #
+    #   * chrome/browser/permissions/permission_revocation_request.cc:29
+    #     -> obj/chrome/browser/permissions/permissions/
+    #        permission_revocation_request.o
+    #     -> fatal error: 'components/safe_browsing/core/common/
+    #        safe_browsing_prefs.h' file not found.
+    #
+    # WHY this BUILD.gn (not auto-discover): ninja's failed-output path is
+    # `obj/chrome/browser/permissions/permissions/permission_revocation_request.o`,
+    # and Chromium's path convention is
+    # `obj/<dir-of-BUILD.gn>/<target>/<source>.o`, so the owning BUILD.gn
+    # is unambiguously `chrome/browser/permissions/BUILD.gn` (target name
+    # `permissions`). AUTO_DISCOVER_ROOT only walks `components/safe_browsing/`
+    # which does not cover `chrome/browser/permissions/` — and we don't want
+    # to widen it because there could be other `permission_revocation_request.cc`
+    # files elsewhere in the chrome/ tree (unlikely with this name, but the
+    # explicit-path rule is the safer policy).
+    #
+    # SAFETY: permission_revocation_request.cc is the consumer of the
+    # stripped safe_browsing prefs surface. Once safe browsing is off
+    # (which it always is in Claum, courtesy of the ungoogled-chromium
+    # patch), the revocation logic that this file participates in is
+    # dead code. Dropping it from sources is the same Path-A treatment
+    # we've applied for runs #67/#82/.../#96.
+    (
+        "chrome/browser/permissions/BUILD.gn",
+        "permission_revocation_request.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
