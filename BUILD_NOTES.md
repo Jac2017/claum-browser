@@ -5,6 +5,46 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-03 04:12 UTC** (session `awesome-festive-gauss`,
+  RUN #96 IN PROGRESS, heartbeat-only cycle, no fix
+  pushed) — Latest workflow run on origin/main is still
+  **Build Claum (macOS) #96** (run id `25269246053`, job
+  id `74088807916`, SHA `50f2d8e` — the prior watcher's
+  run-#95 fix that drops `state_store.cc` from the
+  `safe_browsing` static lib). Run started
+  `2026-05-03T03:54:48Z`. Step `Run Claum build` is at
+  ~13m 33s elapsed (job total ~16m 20s). Step is still
+  in_progress — the GitHub Actions UI did not surface a
+  ninja `[N/M]` tick for this cycle (the `details` block
+  for step 12 stays collapsed while the step is in
+  progress in the new UI; `.js-full-logs-container` was
+  empty), but **all four healthy-build signals hold**:
+  step elapsed-time counter is advancing (12m 03s ->
+  12m 39s -> 12m 58s -> 13m 33s across this cycle's
+  polls), no `FAILED:` markers, no `fatal error:` lines,
+  no `ninja: build stopped` line. The build is well
+  short of the ~29-37 min `[47018..47051]` safe_browsing
+  cliff that took down runs #91 -> #95, and well past
+  the SOLINK `[12845]` checkpoint (no signal of a stall
+  there). Per STEP 2 of the watcher SKILL ("*If progress
+  is advancing -> record progress, exit run.*") -> no
+  competing fix pushed. Issues filter
+  `label:build-failure` still returns no rows (the label
+  has never been created, so the
+  `build-failure-handler.yml` workflow has nothing to
+  attach). Repo open-issues counter unchanged at **46**.
+  HEAD before this cycle: `0349908` (prior cycle's
+  heartbeat); HEAD after this cycle: this commit. Local
+  mount `.git` is still 26 commits behind origin with
+  the long-standing `tmp_obj_*` unlink-permission issue,
+  so this watcher committed + pushed via a fresh shallow
+  clone under `/tmp/work_claum_5/repo`. Next cycle
+  should re-poll around `04:30-04:35 UTC` -- that is the
+  35-40 min mark where #91-#95 all stalled, and where
+  #96 will either sail through (the `state_store.cc`
+  drop covered the full Path-B wave) or fail at the
+  next consumer in `safe_browsing/incident_reporting/`.
+
 - **2026-05-03 03:19 UTC** (session `wizardly-relaxed-rubin`, RUN
   #95 IN PROGRESS, heartbeat-only cycle, no fix pushed) — Latest
   workflow run on origin/main is **Build Claum (macOS) #95**
