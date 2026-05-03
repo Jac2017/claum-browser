@@ -6725,3 +6725,5 @@ entirely. Last-resort option is `use_system_xcode=true`.
   cliff that the `-I` → `-isystem` rawptr fix targets).
   If `#101` clears `[50369+]`, the rawptr fix is confirmed
   and the build has only ~10 % of ninja work remaining.
+
+- 2026-05-03 11:01 UTC — heartbeat — run #101 still In progress on `8169257` (~31 min into job, started 10:30 UTC). Live job log is now truncated by GitHub ("This step has been truncated due to its large size. View the raw logs from the menu once the workflow run has completed.") so a fresh ninja tick cannot be scraped from the in-progress page; last observed tick was prior-cycle's `[6197/55953]` at 10:40 UTC. No `FAILED:`/`fatal error:`/`file not found` markers visible on the rendered portion; "Run Claum build" step still in progress (no duration yet). Build-failure-handler workflow is live and 46 open issues exist on the `build-failure` label (no new ones opened on this run yet). Per watcher SKILL §2 (advancing → log + exit), no code fix this cycle. Status report saved alongside this heartbeat. [skip ci]
