@@ -6647,3 +6647,20 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - **STEP-3 escalation guard:** does NOT fire. Each recent run has
   advanced the ninja step count, and #100's `[50369]` is a fresh
   frontier never previously reached.
+
+- **2026-05-03 10:25 UTC** (session `dazzling-nifty-lamport`,
+  heartbeat-only cycle) — Build Claum (macOS) **#100** still the
+  latest run on the workflow page (Failure, fired
+  `2026-05-03T09:24:22Z` on commit `dd86b12`). **No #101 dispatched
+  yet.** The fix `478dcc6` (jpeg-turbo `-I` → `-isystem` for the
+  chromium-rawptr plugin) is on `origin/main` HEAD `0e3628b`. Latest
+  Claum autopilot run on the page is **#253** (`2026-05-03T09:24:17Z`),
+  which fired *before* the rawptr fix landed and so dispatched #100
+  on the older `dd86b12` SHA. Per autopilot cadence (last 3 ticks
+  ~90 min apart), the next autopilot run should fall in the
+  **10:30–10:55 UTC window** and is expected to dispatch
+  **Build Claum (macOS) #101** on `0e3628b` — which exercises the
+  rawptr fix. `label:build-failure` issues count unchanged at 46
+  (all the old `bfa9bae` autopilot-spam wedge — no new failure
+  signal). Per task STEP 2 (no failure to fix, build advancing /
+  awaiting dispatch), this watcher cycle pushes only a heartbeat.
