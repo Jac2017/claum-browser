@@ -5371,3 +5371,53 @@ entirely. Last-resort option is `use_system_xcode=true`.
   cycle's commit + push went via a fresh shallow clone under
   `/tmp/claum-fix-*/repo`.
 - HEAD (origin/main) when this cycle ended: `50f2d8e` (this cycle's fix).
+
+- **2026-05-03 04:04 UTC** (session `compassionate-vibrant-ritchie`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96**
+  In progress on commit `50f2d8e` (the prior watcher's
+  fix that drops `state_store.cc` to clear the
+  `[47051]` Path-B `prefs::kSafeBrowsingIncidentsSent`
+  failure from run #95). Run ID `25269246053`,
+  job ID `74088807916`, started
+  `2026-05-03T03:54:48Z` (≈ 9 min into the run when this
+  cycle observed it). Latest ninja tick visible via the
+  GH Actions UI's virtualized log was at least
+  `[4443/55956]` (~7.9 %); the live tail is likely a
+  bit higher because the DOM only renders a window of
+  the streamed log lines and `View raw logs` isn't
+  exposed until the run completes. No `FAILED:`
+  markers, no `fatal error:` lines, no
+  `ninja: build stopped` line in the loaded log slice.
+  Pace looks healthy (the build is well below the
+  `[12845]` SOLINK `libvk_swiftshader.dylib`
+  checkpoint that took down #32/#34 long ago, and
+  the run is far below the recent `[47018..47051]`
+  safe_browsing wave that took down #91→#95).
+- Per STEP 2 of the watcher SKILL ("*If progress is
+  advancing → record progress, exit run.*") →
+  **no code fix this cycle.** The next watcher cycle
+  (≈ 30–35 min into ninja, around 04:25–04:30 UTC)
+  should re-poll: if `#96` clears the `[47018..47051]`
+  cliff and ticks past `[47060+]`, the prior cycle's
+  `state_store.cc` drop worked and we'll see whichever
+  Path-A/Path-B consumer in
+  `chrome/browser/safe_browsing/incident_reporting/` is
+  next in line; if it still stalls inside that wave,
+  expect the autopilot's `fix-safe-browsing-components-gn.py`
+  to extend the drop-set further.
+- `build-failure`-labeled issues check: filter
+  `label:build-failure` on the Issues tab still returns
+  no matching issues (the label has never been created
+  on this repo). Repository's overall Open issues
+  counter unchanged at **46**. So the
+  `build-failure-handler.yml` workflow has not opened a
+  new tracking issue for any recent run; Issues remains
+  a no-signal channel until that label is created.
+- Local checkout at
+  `/sessions/compassionate-vibrant-ritchie/mnt/Projects/claum-browser`
+  still has the long-standing `.git/objects/*/tmp_obj_*`
+  unlink-permission issue, so this watcher committed +
+  pushed the heartbeat via a fresh shallow clone under
+  `/sessions/compassionate-vibrant-ritchie/tmp/work/claum-5/repo`.
+  HEAD before this cycle: `29a8056` (prior cycle's
+  heartbeat).
