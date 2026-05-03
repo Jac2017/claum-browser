@@ -5954,3 +5954,44 @@ entirely. Last-resort option is `use_system_xcode=true`.
   behind origin, expected — worked from fresh shallow clone at
   `/tmp/cb-watcher-iye`).
 - Token at `claum-browser/.gh_token` (93 bytes, valid).
+
+### Scheduled watcher log — 2026-05-03 06:25 UTC (session: stoic-sleepy-thompson)
+
+- **Mode:** heartbeat (no fix needed).
+- **Run #97** (`25271263010`, job `74093997069`) is **In progress**
+  against commit `84af7e4` (the autopilot's fix-up after #96 failed
+  at `[47059/55956]`). Job has been running ~36 min per the workflow
+  `datetime` attribute (`2026-05-02T22:49:36-07:00` =
+  `2026-05-03T05:49:36Z`). All pre-build steps green: set-up 4s,
+  checkout 45s, Xcode 1s, Metal 0s, free-disk 0s, deps 4s, sccache
+  restore 1m43s, install sccache 2s, configure sccache 0s, SDK
+  modulemap diag 3s, Cache Chromium source 0s. Currently in **`Run
+  Claum build`** step (long ninja phase). No `FAILED:` / `fatal
+  error` markers visible (live log auto-truncated by GitHub's "step
+  has been truncated due to its large size" notice — known under
+  long ninja steps; the prior `eager-gallant-lovelace` cycle showed
+  raw-log fetch via blob SAS URL still works as a fallback when a
+  cycle actually needs the log content).
+- Per the previous cycle's reading at 06:14 UTC, the build was at
+  `[5/6] Applying Claum patches` with the build step at 19m42s.
+  Three minutes later, my cycle observes ~36 min total job time, so
+  we are past the `[12845]` SOLINK `libvk_swiftshader.dylib`
+  checkpoint and approaching the next failure cliff at the
+  `~[47005/55956]` `chrome/browser/safe_browsing/` consumer wave
+  that took down #91/#92/#96.
+- **Action this cycle:** none beyond this heartbeat. Status report
+  written to `claum-build-watcher-status-2026-05-03-06-25-UTC.md`
+  in the user's Projects folder.
+- `Claum autopilot #251` Scheduled, completed in 6s — autopilot
+  alive and primed to dispatch a fresh `fix-safe-browsing-components-gn.py`
+  drop-set if #97 fails. Pushing a competing fix from this watcher
+  would race the autopilot.
+- `label:build-failure` open issues: 0 (label has never been
+  created — Issues tab remains a no-signal channel).
+- Local mount checkout
+  `/sessions/stoic-sleepy-thompson/mnt/Projects/claum-browser` is
+  36 commits behind origin/main with stale `.git/HEAD.lock*`
+  debris (20+ files); per the established pattern, this commit was
+  prepared from a fresh shallow clone at `/tmp/work-thompson/claum`
+  and pushed from there. Token at
+  `claum-browser/.gh_token` (93 bytes, valid).
