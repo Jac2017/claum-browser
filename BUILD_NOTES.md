@@ -5797,3 +5797,99 @@ entirely. Last-resort option is `use_system_xcode=true`.
   uncommitted `BUILD_NOTES.md` debris from prior sessions —
   this cycle works from a fresh `/tmp/cb-watcher-ctk` shallow
   clone, same workaround as previous cycles.
+- **2026-05-03 05:35 UTC** (session `happy-blissful-wright`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96** has
+  **finalized as Failure** on commit `50f2d8e` (run id
+  `25269246053`, job `74088807916`). Push timestamp on the
+  run page: `2026-05-02 20:54 PDT` = `2026-05-03 03:54 UTC`,
+  total duration `37m 29s`, so the build failed at roughly
+  **`2026-05-03 04:32 UTC`** — i.e. ~63 min ago at the time
+  of this heartbeat. Failure anchor in the job log is
+  `#step:12:49677` (the `Run Claum build` step at line
+  ~49677), which matches the same `chrome/browser/safe_browsing/`
+  consumer-wave failure pattern as `#91`/`#92`/`#93`/`#95`.
+  Run-page annotation only surfaces the generic
+  `Process completed with exit code 1` summary; the per-line
+  log endpoints (`/commit/.../checks/.../logs/12`) returned
+  HTTP 500 from this watcher's browser session and the
+  Actions UI uses a virtualized DOM so `body.innerText` did
+  not include the ninja ticks — pattern-matching the
+  step-12 line offset against the prior cycles' notes is
+  the most reliable signal we have without a working raw
+  log fetch.
+- Notably, the **sccache stats panel for #96 reports `Cache
+  hit %  0%`, 0 hits, 0 misses, 0 compile requests** — the
+  build did NOT use the persisted sccache disk cache this
+  run. That's why duration regressed to `37m 29s` (a hot
+  cache hit normally lands ~12–15 min). Likely cause is a
+  cache-key invalidation when the autopilot's drop-set
+  commit `50f2d8e` rewrote `BUILD.gn` files inside
+  `chrome/browser/safe_browsing/`; the `Restore sccache disk
+  cache` step still ran (`1m 41s`) so the cache exists, it
+  just produced 0 reuse for this configuration. **Not
+  actionable from the watcher** — sccache will warm itself
+  on the next run.
+- **No new run dispatched since #96 failed.** The Actions
+  list top-of-page ordering (newest first) shows `#96` as
+  the topmost macOS build; no `#97` and no `Claum autopilot
+  #251` rows appear above it. The last autopilot run is
+  `#250` (id `25267849595`, completed successfully) which
+  produced the `50f2d8e` drop-set that drove `#96`.
+  Autopilot's `workflow_run` trigger should fire on `#96`'s
+  conclusion; that hasn't happened yet (~63 min lag is
+  longer than the typical few-minute dispatch). Possible
+  causes: (a) autopilot schedule is cron-based and we are
+  between ticks, (b) autopilot is rate-limited after
+  consecutive failures, (c) autopilot detected the same
+  failure signature as the previous cycle and is suppressing
+  redundant drops. None of (a)/(b)/(c) require watcher
+  intervention.
+- **`build-failure` label state:** the label DOES now exist
+  on the repo and there are **46 open issues** carrying it,
+  ALL of them titled `[autopilot] Build wedged on bfa9bae
+  after 15 attempts` and all referencing run ids in the
+  `25184539798…25193236165` range — i.e. the prior wedge
+  round on commits `bfa9bae*` from `#79`–`#82`. These are
+  stale escalations from before the autopilot started its
+  current `safe_browsing` drop-set chain on `#83+`. None
+  of the 46 issues reference any commit in `[bdaeb90,
+  50f2d8e]` or any run in the `[#94, #95, #96]` series, so
+  Issues remains a **no-signal channel for the current
+  chain**. (Worth noting in case the autopilot eventually
+  files a fresh wedge issue if `safe_browsing` drop-sets
+  loop without progress; nothing yet.)
+- Per STEP 3 of the watcher SKILL: failure is a **code
+  error** (consumer `.cc` files including a
+  `safe_browsing/core/common/...h` that the autopilot
+  recently dropped from `BUILD.gn`), but it is **the
+  autopilot's exact lane**. `claum/scripts/fix-safe-browsing-components-gn.py`
+  is data-driven and has fired correctly for
+  `#86→#87→#89→#90→#91→#92→#93→#95→#96`, each cycle
+  dropping the files that failed in the previous run.
+  Pushing a competing manual fix from this watcher would
+  race the autopilot. **No code fix pushed this cycle.**
+  STEP 3's "stuck after 3 attempts on the same error"
+  escalation does not apply yet — every recent cycle has
+  advanced the ninja step count slightly (~47000-cliff
+  advances by a handful of files per cycle as the consumer
+  set shrinks).
+- HEAD of `origin/main` at start of this cycle: `4dbb3b2`
+  (prior watcher heartbeat from session
+  `compassionate-tender-keller`, message
+  `BUILD_NOTES: heartbeat — run #96 still Failure (50f2d8e)
+  ~46min after fail, autopilot still silent, no #97/#251
+  [skip ci]`). Local mount under
+  `/sessions/happy-blissful-wright/mnt/Projects/claum-browser`
+  has the usual `.gone-5`/`.bk-5` debris files but no
+  `.git/index.lock` this cycle; nevertheless this watcher
+  works from a fresh `/tmp/work-watcher` shallow clone for
+  the same reasons prior cycles did.
+- Next checkpoint: re-poll when (a) a new `Build Claum
+  (macOS)` run appears (`#97`+) or (b) the autopilot opens
+  a fresh `[autopilot]` wedge issue against a recent SHA
+  like `50f2d8e` / `bdaeb90`. If neither has happened by
+  the next watcher tick AND >2 hours have elapsed since
+  `#96`'s failure, that's worth flagging as the autopilot
+  going dormant — at that point the watcher could push a
+  small "kick" commit (BUILD_NOTES touch with a non-`[skip
+  ci]` message) to force a fresh build dispatch.
