@@ -425,6 +425,57 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "safe_browsing_service.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #92 dangling files — FOUR more consumers of the same stripped
+    # safe_browsing_prefs.h header. Same Path-A pattern as runs #67/.../#90.
+    #
+    # Build #92 (commit c49f07f) reproduced #91's failure exactly: ninja
+    # halted at [47012..47021/55965] with these four FAILED markers, all
+    # pointing at:
+    #   fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h'
+    #                file not found
+    #
+    #   * chrome/browser/safe_browsing/
+    #         client_side_detection_intelligent_scan_delegate_desktop.cc:17
+    #     -> obj/chrome/browser/safe_browsing/safe_browsing/
+    #        client_side_detection_intelligent_scan_delegate_desktop.o
+    #
+    #   * chrome/browser/safe_browsing/download_protection/
+    #         download_protection_delegate_desktop.cc:15
+    #     -> obj/.../download_protection_delegate_desktop.o
+    #
+    #   * chrome/browser/safe_browsing/download_protection/
+    #         deep_scanning_request.cc:48
+    #     -> obj/.../deep_scanning_request.o
+    #
+    #   * chrome/browser/safe_browsing/download_protection/
+    #         cloud_binary_upload_service.cc
+    #     -> obj/.../cloud_binary_upload_service.o
+    #
+    # All four are listed (with optional subdir prefix) in
+    # chrome/browser/safe_browsing/BUILD.gn — confirmed by the
+    # obj/<dir-of-BUILD.gn>/<target>/<name>.o output paths. The
+    # patch_one regex tolerates `"download_protection/<file>.cc"`-style
+    # entries because it matches `"[^"\n]*<cc_name>"`.
+    #
+    # Same Path-A treatment: comment them out so ninja stops compiling
+    # them. Runtime safe_browsing is off in Claum, so they're dead code.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "client_side_detection_intelligent_scan_delegate_desktop.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "download_protection_delegate_desktop.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "deep_scanning_request.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "cloud_binary_upload_service.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
