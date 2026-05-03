@@ -76,6 +76,22 @@ jobs:
     # forever. 12h is well above a normal 4-6h cold build and 1-2h
     # for an incremental rebuild.
     timeout-minutes: 720
+    # ----------------------------------------------------------------
+    # Job-level env. CLAUM_BUILD_ROOT is referenced by the
+    # `path:` field of the upload-artifact steps below, which
+    # use the ${{ env.CLAUM_BUILD_ROOT }} expression syntax. That
+    # expression is evaluated by GitHub Actions BEFORE the step
+    # runs, so it can ONLY see env vars declared at the workflow
+    # or job level — NOT step-level env (the step-level env on
+    # `Run Claum build` only affects that one step's shell).
+    # Run #97 hit exactly this footgun: ninja failed, the
+    # `Upload build log on failure` step ran, and emitted
+    # "No files were found with the provided path: /build.log"
+    # because env.CLAUM_BUILD_ROOT expanded to "". Promoting
+    # it to job level fixes that — the next failure will
+    # actually upload build.log so we can diagnose it.
+    env:
+      CLAUM_BUILD_ROOT: ${{ github.workspace }}/claum-build
     steps:
       - name: Check out Claum repo
         uses: actions/checkout@v4

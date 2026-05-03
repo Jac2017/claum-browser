@@ -6027,3 +6027,48 @@ entirely. Last-resort option is `use_system_xcode=true`.
   build is still in_progress on `84af7e4`). `build-failure`
   Issues query still returns no results (label likely never
   created on this repo, or no handler-opened issues).
+- **2026-05-03 06:42 UTC** (session `friendly-affectionate-bell`,
+  cont'd) — Run #97 has now FAILED with **Total duration `46m 18s`**.
+  Step breakdown: `Run Claum build` `37m 31s` (this is the step
+  that exited 1), `Show sccache stats` `4s` ✓ (`if: always()`),
+  `Save sccache disk cache` `5m 50s` ✓ (`if: always()`),
+  `Package .app as .dmg` `0s` (skipped — default `if: success()`
+  with `Run Claum build` failed), `Upload build log on failure`
+  `0s` (ran via `if: failure()` but emitted notice
+  `"No files were found with the provided path: /build.log.
+  No artifacts will be uploaded."`), `Upload build artifact`
+  `0s` (skipped — `if: success()`).
+- **Diagnosis was blocked twice.** First, the per-step log
+  endpoints (`/commit/SHA/checks/JID/logs/N`) are returning
+  HTTP 500 for this run — GitHub's log service appears to
+  be degraded right now (the page itself shows
+  "*Uh oh! There was an error while loading. Please reload
+  this page.*"). Second, the `Upload build log on failure`
+  step couldn't find `build.log` because the
+  `${{ env.CLAUM_BUILD_ROOT }}` expression resolves at
+  expression-eval time and **only sees workflow/job-level
+  env vars, NOT step-level env vars**. `CLAUM_BUILD_ROOT`
+  was declared step-level on `Run Claum build` only, so for
+  every other step it expanded to empty string → upload
+  path became `/build.log` → file missing → no artifact.
+- **Fix pushed this cycle** (workflow-only, no claum/scripts
+  edit): promoted `CLAUM_BUILD_ROOT` to a **job-level** env
+  block in `.github/workflows/build-mac.yml` (added 18-line
+  block right before `steps:`). This makes the value
+  visible to every step's `path:` expression. The next
+  failure will upload `build.log` as artifact
+  `claum-build-log-98` (or whatever run number) so we can
+  grep for the actual `FAILED:` line. Commit will trigger
+  Run #98 because it's a non-`[skip ci]` push.
+- **Important note for the next watcher cycle:** Run #97
+  ACTUALLY CLEARED the historical `[47018]`
+  `chrome/browser/safe_browsing/` failure cliff for the
+  first time in this chain. Ninja ran 37m 31s (vs. #91's
+  29m 17s failure point), and the failure happened LATER
+  in the build — possibly at link time, at one of the
+  later targets (`chrome_app`, `chrome_framework`,
+  `Claum.app` packaging within ninja), or some other new
+  cliff. Once #98 produces the build.log artifact, grep
+  for `FAILED:` and `ninja: error` to identify it. The
+  autopilot's data-driven `fix-safe-browsing-components-gn.py`
+  will NOT help with this new cliff (different file set).
