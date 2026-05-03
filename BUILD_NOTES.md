@@ -6208,3 +6208,25 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `safe_browsing/`, this watcher should consider a one-off
   `source_set` drop in `chrome/browser/permissions/BUILD.gn`
   for `permission_revocation_request.{h,cc}` (escalate path).
+
+- **2026-05-03 07:31 UTC** (session `kind-dazzling-archimedes`,
+  fix-push cycle) — Build Claum (macOS) **#98** finalized
+  **Failure** at `[48717/55954]` (~87 %, **deepest yet**) on
+  `cea09e4`. **MILESTONE:** the `cea09e4` workflow fix worked —
+  `claum-build-log-98` artifact uploaded successfully (591826 B
+  zip → 4.5 MB build.log), so we have the FIRST full FAILED:
+  marker since the cliff started moving past `[47018]`.
+- **Single FAILED:** at log line 49384 —
+  `obj/chrome/browser/permissions/permissions/permission_revocation_request.o`
+  → `chrome/browser/permissions/permission_revocation_request.cc:29`
+  → `fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`.
+  This is the FIRST consumer outside `chrome/browser/safe_browsing/`
+  we have had to drop. Same Path-A pattern as runs #67/.../#96.
+- **Pushed fix as `ef40e99`** to
+  `claum/scripts/fix-safe-browsing-components-gn.py` adding
+  one new explicit TARGETS entry:
+  `("chrome/browser/permissions/BUILD.gn", "permission_revocation_request.cc")`.
+  Will trigger run #99 automatically. Expected next failure cliff
+  if any: ninja `[48720+/55954]` — likely another single
+  `chrome/browser/permissions/` or other-dir consumer of the same
+  stripped `safe_browsing_prefs.h` header.
