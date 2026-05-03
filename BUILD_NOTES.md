@@ -6120,3 +6120,43 @@ entirely. Last-resort option is `use_system_xcode=true`.
   workflow change). If it fails again at `[47018]`, that
   would mean the autopilot's drop-set in `84af7e4` was
   not transitively complete and a new fix wave is needed.
+
+- **2026-05-03 07:16 UTC** (session `practical-optimistic-thompson`,
+  heartbeat-only cycle) — Build Claum (macOS) **#98**
+  still In progress on commit `cea09e4`. Run ID `25272302974`,
+  job ID `74096599055`. Build step at ~22 min (job started
+  ~24 min ago); previous watcher (`friendly-nifty-ptolemy` at
+  07:02 UTC) recorded ninja at `[16577/55954]` ~9.5 min into
+  step at ~22 ticks/sec, so the projected current position is
+  ~`[33000-34000/55954]` — i.e. **~14 min and ~17 k ticks past
+  the prior poll**, still well below the historical `[47005]`
+  safe-browsing failure cliff and well past the `[12845]` SOLINK
+  checkpoint. The Search Logs filter on the GitHub job page is
+  matching `[N/...` literally as a regex character class (so
+  bracket-only searches mismatch), making per-tick verification
+  unreliable from this sandbox; the projection above relies on
+  ninja's prior steady pace rather than a fresh literal tick.
+- Per **STEP 2** ("*If progress is advancing → record progress,
+  exit run.*") → **no code fix this cycle.** Build is healthy
+  and the autopilot's `84af7e4` 2-file drop-set already cleared
+  the `[47018]` wave for #97. Next cliff to watch is the
+  dmg-package phase (where the workflow's `CLAUM_BUILD_ROOT`
+  → job-env fix in `cea09e4` should now correctly upload
+  `claum-build-log-98` on any failure).
+- `build-failure`-labeled Issues query returned an empty
+  result page (no rows, no "Invalid value" banner this cycle
+  — label may now exist with zero matching issues). Total
+  open Issues badge unchanged at **46**, so still no
+  handler-opened issue for run #98.
+- Local mount HEAD `0de311d` remains way behind `origin/main`
+  (now `b14d2af`); the mount's `.git/index.lock` and
+  `.git/objects/*tmp_obj*` files cannot be unlinked from
+  inside the sandbox, so this watcher (like the recent ones)
+  appended the heartbeat via a fresh shallow clone under
+  `/tmp/watcher-5/`.
+- Next checkpoint: when ninja approaches `[47000]`, re-poll.
+  If #98 reaches the `dmg-package` phase or finalizes
+  Success, retrieve the `.dmg` artifact and present to the
+  user (STEP 4). If it fails before that, the new
+  `claum-build-log-98` artifact (job-env-scoped path) will
+  hold the actual `FAILED:` line.
