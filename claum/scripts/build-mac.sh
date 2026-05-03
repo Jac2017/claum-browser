@@ -1307,3 +1307,5 @@ cat <<DONE
     open "$APP_PATH"
 ╚══════════════════════════════════════════════════╝
 DONE
+
+# Build kick (run #101): re-trigger build-mac after [skip ci] swallowed the prior push.
