@@ -5023,3 +5023,23 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `tailored_security/` follow-on (e.g. headers
   transitively pulling `safe_browsing_prefs.h` even
   if their direct `.cc` doesn't include it).
+- **2026-05-03 00:38 UTC** (session `vigilant-clever-pasteur`,
+  heartbeat-only cycle) — Build Claum (macOS) **#93**
+  In progress on commit `d72e905` (the prior watcher's
+  4-file safe-browsing drop-set fix for run #92's
+  `[47012]` failure). Run ID `25265610035`,
+  job ID `74079512652`, started
+  `2026-05-03T00:27:46Z`. Latest ninja tick is
+  `[14328/55961]` (~25.6 %), so the build is **past
+  the `[12845]` SOLINK `libvk_swiftshader.dylib`
+  checkpoint** (the classic #32/#34 failure point).
+  Pace ~22 ticks/sec — matches #92's healthy cadence.
+- Per STEP 2 of the watcher SKILL ("*If progress is
+  advancing → record progress, exit run.*") → **no code
+  fix this cycle.** Build is ~11 min into ninja; the next
+  expected failure cliff is the `~[47018]` wave of
+  `chrome/browser/safe_browsing/` consumers that took down
+  #91 and #92. If the new 4-file drop-set in `d72e905`
+  covers the same transitive consumers it would mean #93
+  sails past `[47030+]`. The next watcher cycle should
+  re-poll when the build is ~25–35 min into ninja.
