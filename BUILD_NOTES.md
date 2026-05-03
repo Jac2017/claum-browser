@@ -5739,3 +5739,61 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `de6f6d0` = prior watcher `serene-wizardly-noether`'s
   heartbeat). Heartbeat appended via that clone with
   `[skip ci]`.
+
+- **2026-05-03 05:18 UTC** (session `compassionate-tender-keller`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96** is still
+  the latest run, still `Failure` on commit `50f2d8e`, run ID
+  `25269246053`, job `74088807916`. Total duration was
+  37 m 29 s. Failure timestamp `~2026-05-03T03:54:45Z`. **No
+  `#97` build dispatched and no `#251` autopilot has fired.** The
+  prior watcher cycle (`inspiring-exciting-mayer`,
+  `2026-05-03T05:04Z`) saw the same state ~32 min after the
+  failure; this cycle is now ~46 min after, putting the autopilot
+  squarely past the lower edge of its historical 30–60 min cadence
+  but still within the upper edge.
+- The build-failure handler has filed **0 issues** for SHA
+  `50f2d8e` (only `bfa9bae`-themed escalations exist, all 46 of
+  them; handler escalates at 15 same-SHA failures and `50f2d8e`
+  is on attempt 1). The handler IS confirmed alive (the
+  `build-failure` label exists and was used) — it just hasn't
+  hit threshold for this commit.
+- Per the same "*don't pre-empt the autopilot — it produces the
+  data-driven drop set*" guidance from every recent cycle, no
+  speculative drop pushed. Reasoning: the streamed log on the
+  job page is only 1.4 KB into innerText (React virtualizer
+  hides the body), `/commit/.../checks/74088807916/logs/{12..16}`
+  all return HTTP 500 (server-side, not a cookie issue), and
+  `api.github.com` is proxy-blocked from the sandbox. Without
+  the `FAILED:` filename, any drop addition would be a guess.
+- Autopilot workflow (`claum/scripts/claum-autopilot.yml` at
+  HEAD) confirms what the prior cycle suspected: the autopilot
+  *only dispatches* `build-mac` retries; the lines explicitly
+  state *"Code fixes come from a human / Claude session, not
+  from the autopilot."* So a missing `#97` means the autopilot
+  saw the run, decided no retry is needed (15-attempt cap not
+  hit + run is in `Failure` not `Stuck`), and stayed silent.
+  The drop-set fixes that closed `#93` and `#95` were therefore
+  pushed by an external Claude session (commits authored by
+  `Jac2017`), NOT by the autopilot itself.
+- **Recommendation for the next watcher cycle:** if `#96`'s
+  `Failure` is still the latest run >75 min after `~03:54Z`
+  (i.e. past `~05:09Z`), and no fresh fix commit lands on
+  `main`, treat the autopilot as silent for this commit and
+  consider:
+  (a) Manually clicking the gear menu → `View raw logs` in the
+      authenticated browser tab — that endpoint serves the full
+      stream as a single text/plain response and bypasses both
+      the React virtualizer and the `/logs/{step}` 500. Save
+      it to disk and grep `FAILED:`.
+  (b) If the new failed file is in the same `chrome/browser/safe_browsing/`
+      tree as before, append it to the drop list in
+      `claum/scripts/fix-safe-browsing-components-gn.py`
+      (currently 35 entries) and push.
+  (c) If outside that tree, escalate to BUILD_NOTES escalation
+      section — likely a new failure class.
+- HEAD of `origin/main` at start of this cycle: `c124495`
+  (prior watcher heartbeat). Local mount `/sessions/compassionate-tender-keller/mnt/Projects/claum-browser`
+  was 29 commits behind, with the usual `.git/index.lock` and
+  uncommitted `BUILD_NOTES.md` debris from prior sessions —
+  this cycle works from a fresh `/tmp/cb-watcher-ctk` shallow
+  clone, same workaround as previous cycles.
