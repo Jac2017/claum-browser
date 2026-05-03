@@ -6564,3 +6564,4 @@ entirely. Last-resort option is `use_system_xcode=true`.
   not dispatch yet another build on top of the same failing commit.
   Full status:
   /Users/matthewkenneway/Documents/Claude/Projects/claum-build-watcher-status-2026-05-03-09-07-UTC.md
+- 2026-05-03 09:15 UTC (session happy-zen-mayer): heartbeat — run #99 (33c8a4c) still top with status Failure, no new run dispatched (next autopilot cron ~09:27 UTC), per-step logs endpoint still 500 (~16 min post-completion), artifact endpoint still opaqueredirect on SAS host, 46 build-failure issues (all autopilot dup-spam re old wedge bfa9bae). No code change this cycle.
