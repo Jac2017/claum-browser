@@ -5995,3 +5995,35 @@ entirely. Last-resort option is `use_system_xcode=true`.
   prepared from a fresh shallow clone at `/tmp/work-thompson/claum`
   and pushed from there. Token at
   `claum-browser/.gh_token` (93 bytes, valid).
+- **2026-05-03 06:30 UTC** (session `friendly-affectionate-bell`,
+  *milestone* heartbeat) — Build Claum (macOS) **#97** on
+  commit `84af7e4` has **finished the ninja build step**.
+  Run ID `25271263010`, job ID `74093997069`. The `Run Claum
+  build` step reports `37m 31s` total (no spinner — step is
+  COMPLETE). Downstream `Show sccache stats and prepare cache
+  for save` is also done in `4s`. We are now in
+  `Save sccache disk cache` (uploading ~1.3 GB to the cache
+  service). After that the workflow runs `Package .app as .dmg`
+  → `Upload build artifact`. **No `FAILED:` markers, no `fatal
+  error` lines, no `file not found` lines anywhere in the
+  step log.** This is the first time since this watcher chain
+  started that ninja has cleared the historical `[47018]`
+  `chrome/browser/safe_browsing/` failure cliff and reached
+  the post-build packaging stage. Run-level Status still
+  reads "In progress" because cache-save + dmg-package are
+  still queued; Total duration is not yet final and Artifacts
+  is empty (`–`).
+- Per task STEP 2 ("*If progress is advancing → record progress,
+  exit run.*") this watcher records the milestone but does NOT
+  push a code fix. Per task STEP 4 ("*If latest run succeeded:
+  download the .dmg and present to user*") we are NOT yet there
+  — must wait for `Upload build artifact` to complete. The
+  next watcher cycle should re-poll: if `Status = Success`
+  with an artifact named like `Claum-*.dmg`, download it
+  to `/Users/matthewkenneway/Documents/Claude/Projects/` and
+  surface to the user.
+- Autopilot run `#251` ran at 06:25 UTC and exited `Success`
+  in 6s (no-op — autopilot only acts on `Failure` state and
+  build is still in_progress on `84af7e4`). `build-failure`
+  Issues query still returns no results (label likely never
+  created on this repo, or no handler-opened issues).
