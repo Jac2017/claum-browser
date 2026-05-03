@@ -6817,3 +6817,10 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - build-failure issues: **46 Open / 0 Closed** — newest still pre-existing #46 ("Build wedged on bfa9bae after 15 attempts"); no new fingerprint
 - Escalation HOLD still in effect (jpeg-cliff, attempt #8 past SKILL's 3-attempt threshold) — no fix authored this cycle
 - Pushed heartbeat from fresh shallow clone (local mount remains divergent)
+
+#### 2026-05-03 17:30 UTC — cycle 17 heartbeat (session: tender-eager-carson)
+- Build #106 (Build Claum (macOS)) — **In progress** on commit `020000a` (cycle-15 heartbeat-only commit; same code as failed #105).
+- Build-failure issues: **46 Open / 0 Closed** — newest still **#46** ("Build wedged on bfa9bae after 15 attempts"). No new fingerprint emerged.
+- Escalation **HOLD remains** — the jpeg-cliff fingerprint (8 attempts) is unchanged and #106 is on the same code, so any failure will be the 9th attempt on the same fingerprint.
+- No fix authored this cycle. Heartbeat-only push from fresh shallow clone (`/tmp/tec-watcher-5/repo`); divergent local mount not used.
+
