@@ -5893,3 +5893,46 @@ entirely. Last-resort option is `use_system_xcode=true`.
   going dormant — at that point the watcher could push a
   small "kick" commit (BUILD_NOTES touch with a non-`[skip
   ci]` message) to force a fresh build dispatch.
+
+### Scheduled watcher log — 2026-05-03 05:49 UTC (session: eager-gallant-lovelace)
+
+- Latest run: `Build Claum (macOS)` **#96** (run `25269246053`,
+  commit `50f2d8e`) — `Failure` at 04:27 UTC, ninja
+  [47059..47060/55956]. About 1h45m after failure.
+- **Breakthrough:** raw-log fetch via Chrome MCP `fetch()` of the
+  `/commit/<sha>/checks/<jid>/logs` URL works when called from a
+  github.com tab and follows the redirect to the
+  `productionresultssa\*.blob.core.windows.net` SAS-signed URL with
+  `credentials:'omit', mode:'cors'`. The full 6.1 MB raw log
+  (50,857 lines) parsed cleanly. The previous "React virtualizer
+  blocks innerText" workaround is no longer needed: just
+  `window.__joblog = await fetch(blobUrl).then(r=>r.text())` and
+  grep for `FAILED:`/`fatal error` in JS.
+- **Failure root cause:** two more consumers of the stripped
+  `components/safe_browsing/core/common/safe_browsing_prefs.h`
+  header in the chrome/browser/safe_browsing tree. Both compile to
+  `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o` so
+  both belong to the `static_library("safe_browsing")` target in
+  `chrome/browser/safe_browsing/BUILD.gn`:
+  - `tailored_security/notification_handler_desktop.cc:25`
+  - `services_delegate_desktop.cc` (header pulled in via line 12
+    of `services_delegate_desktop.h`)
+- **Action this cycle:** appended these two filenames to the
+  `TARGETS` list in
+  `claum/scripts/fix-safe-browsing-components-gn.py` (drop list now
+  37 entries, up from 35) with a Run #96 comment block matching the
+  Run #92/#94/#95 style. Pushed to `origin/main`. Push triggers a
+  fresh build automatically.
+- **Other noise dismissed:** one `'jpeglib.h' file not found` line
+  appears at log line ~227 (timestamp 03:55 UTC, before the actual
+  build started at 04:01) and is NOT inside any `FAILED:` block —
+  it is a stale staging-phase warning, not a failure cause. Five
+  `error: corrupt patch at line N` warnings at 04:01:40 are also
+  cosmetic: they come from `git apply --check` failing on Claum
+  customization patches (`01-claum-branding`, `02-claum-glass-ui`,
+  `03-claum-vertical-tabs`); the staging script then retries with
+  `patch -p1 --fuzz=3` and proceeds, so the build kept going.
+- Heartbeat HEAD before this cycle: `5a0c0f1`
+  (heartbeat from session `happy-blissful-wright`).
+- Token at `/sessions/eager-gallant-lovelace/mnt/Projects/claum-browser/.gh_token`
+  (93 bytes, valid).

@@ -556,6 +556,47 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "state_store.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #96 dangling files — TWO more consumers of the same stripped
+    # safe_browsing_prefs.h header. Same Path-A pattern as runs
+    # #67/.../#95: drop them from the static_library("safe_browsing")
+    # target in chrome/browser/safe_browsing/BUILD.gn so ninja stops
+    # compiling them. Runtime safe_browsing is off in Claum, so they
+    # are dead code in this configuration.
+    #
+    # Build #96 (commit 50f2d8e) reached ninja [47059..47060/55956]
+    # and then failed with these two FAILED markers:
+    #
+    #   * chrome/browser/safe_browsing/tailored_security/
+    #         notification_handler_desktop.cc:25
+    #     -> obj/chrome/browser/safe_browsing/safe_browsing/
+    #        notification_handler_desktop.o
+    #     -> fatal error: 'components/safe_browsing/core/common/
+    #        safe_browsing_prefs.h' file not found.
+    #
+    #   * chrome/browser/safe_browsing/services_delegate_desktop.cc
+    #     (the .h is in the include chain at line 12, but the .cc is
+    #      what the [47060/55956] CXX rule was compiling)
+    #     -> obj/chrome/browser/safe_browsing/safe_browsing/
+    #        services_delegate_desktop.o
+    #     -> fatal error: same missing safe_browsing_prefs.h.
+    #
+    # Why this BUILD.gn (not auto-discover): both ninja outputs land
+    # under obj/chrome/browser/safe_browsing/safe_browsing/, and
+    # Chromium's naming convention is
+    # `obj/<dir-of-BUILD.gn>/<target>/<source>.o`, so the owning
+    # BUILD.gn is unambiguously chrome/browser/safe_browsing/BUILD.gn.
+    # patch_one's regex tolerates the optional `tailored_security/`
+    # subdir prefix in the BUILD.gn entry because it matches
+    # `"[^"\n]*<cc_name>"`.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "notification_handler_desktop.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "services_delegate_desktop.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
