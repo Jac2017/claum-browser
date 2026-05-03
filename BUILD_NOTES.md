@@ -6810,3 +6810,10 @@ entirely. Last-resort option is `use_system_xcode=true`.
   re-poll for either (a) autopilot dispatching a new #106 with a fresh
   drop-set, or (b) a `build-failure`-labeled issue with a *different*
   fingerprint than the existing 46.
+
+#### 2026-05-03 17:14 UTC — heartbeat (cycle 16, session nifty-zealous-faraday)
+- Build Claum (macOS) latest run: **#105** still **Failure** (39m 53s, commit a09e62e) — no #106 dispatched
+- Claum autopilot ran **#260** (10s, Scheduled, Success-but-noop) — same pattern as #259/#258
+- build-failure issues: **46 Open / 0 Closed** — newest still pre-existing #46 ("Build wedged on bfa9bae after 15 attempts"); no new fingerprint
+- Escalation HOLD still in effect (jpeg-cliff, attempt #8 past SKILL's 3-attempt threshold) — no fix authored this cycle
+- Pushed heartbeat from fresh shallow clone (local mount remains divergent)
