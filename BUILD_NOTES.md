@@ -5209,3 +5209,32 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - **2026-05-03 03:00 UTC** (session `quirky-gracious-cerf`, heartbeat-only cycle) — Build Claum (macOS) **#94** still **In progress** on commit `90fa9e1`. Run ID `25267716484`, job ID `74084834587`. "Run Claum build" step at ~**27m 44s** elapsed (up from ~24m at the prior `38b536e` heartbeat ~4 min earlier) — i.e. progress is advancing in wall-time. No `FAILED:` markers and no `fatal error` lines visible on the run page; the job-page DOM still does not stream live ninja ticks to the Chrome extract path (same flake noted in the two prior heartbeats `38b536e` and `b936434`). Last **known** ninja tick remains `[4088/55961]` (~7.3 %, captured by `nifty-optimistic-albattani` at 02:35 UTC); 28+ min of additional ninja since then at the previously-observed ~20 ticks/sec pace would put the actual position somewhere in the `[~30000–35000]` band — i.e. **past the `[12845]` SOLINK `libvk_swiftshader.dylib` checkpoint** (historical #32/#34 failure point) and approaching the `[~47018]` `chrome/browser/safe_browsing/` cliff that took down #91/#92/#93. No artifacts yet (run still in progress). Issues tab unchanged: **46 open** `build-failure`-labeled issues, all stale-SHA `[autopilot] Build wedged on bfa9bae after 15 attempts` — **no new issue filed for `90fa9e1`** by the build-failure-handler, consistent with #94 still being in progress.
 - Per task STEP 2 ("*If progress is advancing → record progress, exit run.*") → **no code fix this cycle.** #94 is on the *same* code as #93 (commit `90fa9e1` is a heartbeat-only `[skip ci]` on top of `d72e905`'s 4-file safe-browsing drop-set), so if it stalls at `[~47018]` again, the autopilot's `fix-safe-browsing-components-gn.py` will own the next drop-set; this watcher should not pre-empt it. Next watcher cycle should re-poll when #94 is ~50–60 min into ninja (approaching the `[~47018]` cliff) or has completed.
 - HEAD (origin/main): `38b536e` (the prior watcher's heartbeat `[skip ci]`). This watcher committed its heartbeat from a fresh shallow clone at `/tmp/work-*/repo` because the mounted checkout's `.git/index.lock` cannot be unlinked from this sandbox (same workaround as prior sessions).
+- **2026-05-03 03:07 UTC** (session `elegant-adoring-euler`, fix-push cycle) —
+  Build Claum (macOS) **#94** (workflow_dispatch on `90fa9e1`,
+  run id `25267716484`) finished as **Failure** at
+  `2026-05-03T03:04:30Z` (38m 0s total). Failure log fetched via
+  authenticated GitHub API for job `74084834587` (6.14 MB,
+  50,854 lines). Failure root cause is **identical Path-A pattern**
+  as runs #85/#86/#88/#89/#90/#91/#92/#93: three .cc files in
+  `chrome/browser/safe_browsing/extension_telemetry/` include the
+  ungoogled-chromium-stripped `safe_browsing_prefs.h` header.
+  Compile failed at ninja `[47031..47033/55961]` (~84 %).
+  Failing files (all 3 with same `fatal error: ... file not found`):
+  `extension_telemetry_config_manager.cc:11`,
+  `search_hijacking_detector.cc:14`,
+  `extension_telemetry_service.cc:60`.
+- **Action taken** (per STEP 3 of the watcher SKILL): added 3 entries
+  to the TARGETS list in `claum/scripts/fix-safe-browsing-components-gn.py`,
+  pointing at `chrome/browser/safe_browsing/BUILD.gn` (target dir
+  confirmed by obj path `obj/chrome/browser/safe_browsing/safe_browsing/<name>.o`).
+  Same Path-A peel as prior runs.
+- **Pushed**: `bdaeb90` —
+  `fix-safe-browsing-components-gn.py: drop 3 more chrome/browser/safe_browsing/extension_telemetry files (run #94 fix)`.
+  Push triggered **build #95** at `2026-05-03T03:07:16Z`,
+  status `in_progress` on commit `bdaeb90`. Expected next failure
+  cliff: if the 3-file fix works, ninja should sail past `[47040+]`;
+  the next likely failure is the next layer of `safe_browsing/` consumers
+  that include the same stripped header.
+- HEAD before fix: `cb31365` (heartbeat-only commits from prior watcher
+  cycles that observed #94 in_progress but didn't see its failure).
+  HEAD after fix: `bdaeb90`.
