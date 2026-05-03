@@ -5320,3 +5320,25 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - HEAD before fix: `cb31365` (heartbeat-only commits from prior watcher
   cycles that observed #94 in_progress but didn't see its failure).
   HEAD after fix: `bdaeb90`.
+
+## Watcher cycle 2026-05-03 03:26 UTC
+
+- **Run #95 still In progress** on commit `bdaeb90` (autopilot/watcher's
+  3-file extension_telemetry drop-set fix for run #94). Run ID
+  `25268412875`, job ID `74086620588`. Build step started
+  `2026-05-03T03:09:59-07:00 PDT` and is ~12-13 min into
+  the "Run Claum build" phase at this cycle.
+- Per STEP 2 of the watcher SKILL ("*If progress advancing → record progress,
+  exit run.*") → **no code fix this cycle**. The job log text-tail says
+  "*This step has been truncated due to its large size*" so we couldn't
+  fetch a fresh ninja `[X/Y]` tick from the DOM, but the step status
+  is "In progress" with no failure indicator.
+- Reference cliff: run #94 failed at `~[47031..47033/55961]` after ~37m total.
+  We're well below that elapsed time, so no decision to make yet.
+- Issues filter `label:build-failure` → no labeled issues, consistent
+  with prior cycles (label not yet created).
+- HEAD (origin/main) when this cycle started: `73127d4` (the prior watcher
+  cycle's run #95 ~9m heartbeat). This cycle's heartbeat is committed via a
+  fresh shallow clone under `/tmp/work-*/repo/` because the local mount
+  `.git` directory has lock-file permission issues (cannot unlink
+  `.git/objects/*/tmp_obj_*` on fetch).
