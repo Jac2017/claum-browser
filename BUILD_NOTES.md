@@ -5043,3 +5043,44 @@ entirely. Last-resort option is `use_system_xcode=true`.
   covers the same transitive consumers it would mean #93
   sails past `[47030+]`. The next watcher cycle should
   re-poll when the build is ~25–35 min into ninja.
+
+- **2026-05-03 00:49 UTC** (session `friendly-adoring-volta`,
+  heartbeat-only cycle) — Build Claum (macOS) **#93**
+  still **in_progress** on commit `d72e905` (the autopilot's
+  4-file safe-browsing drop-set fix for run #92's
+  `[47012]` failure). Run ID `25265610035`,
+  job ID `74079512652`, started
+  `2026-05-03T00:27:46Z` (~22 min ago). Latest ninja
+  tick from the live log endpoint is `[16567/55961]`
+  (~29.6 %), captured at `2026-05-03T00:40:39Z`. The
+  `Run Claum build` step started at `00:30:40Z` and
+  is at ~19 min into ninja. Pace from prior heartbeat
+  (`[14328]` → `[16567]` over ~2.5 min) is ~14
+  ticks/sec — about half the earlier ~22 t/s pace, but
+  still steadily advancing. Build remains **past the
+  `[12845]` SOLINK `libvk_swiftshader.dylib`
+  checkpoint** and well below the next expected
+  failure cliff at `~[47018]` (the
+  `chrome/browser/safe_browsing/` consumers wave that
+  killed #91 and #92).
+- Per STEP 2 of the watcher SKILL ("*If progress is
+  advancing → record progress, exit run.*") → **no
+  code fix this cycle.** The autopilot's `d72e905`
+  drop-set is the right thing to be testing right now;
+  pushing a competing fix from this watcher would race
+  the autopilot. Next watcher cycle should re-poll
+  when the build is ~30–40 min into ninja so we can
+  see whether `#93` clears the `[47000]` cliff or
+  stalls there for a fresh autopilot drop-set.
+- Only non-tick log warning seen is one
+  `ERROR:root: Failed to get version info` line at
+  `00:34:53Z` from the version-detection helper — this
+  is **non-fatal** (just the script that tries to read
+  a `Change-Id:` commit trailer; the build does not
+  depend on it).
+- HEAD (origin/main): `8942b67` (the prior watcher
+  heartbeat `[skip ci]`). This watcher commits its
+  heartbeat from a fresh shallow clone at
+  `/tmp/work-*/repo` because the mounted checkout's
+  `.git/index.lock` is not removable from this
+  sandbox.
