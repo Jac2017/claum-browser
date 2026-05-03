@@ -6358,3 +6358,30 @@ entirely. Last-resort option is `use_system_xcode=true`.
   `/sessions/adoring-fervent-newton/mnt/Projects/claum-browser`
   is **45 commits behind** origin; pushed from fresh shallow
   clone at `/tmp/work-99` via the in-repo `.gh_token`.
+
+- **2026-05-03 08:21 UTC** — Session
+  `wizardly-amazing-dirac`. Build **#99** still **In progress**
+  on commit `33c8a4c`. Build step started `2026-05-03 08:00:42
+  UTC` per the `relative-time` element on the job page; current
+  step duration ≈ **21 min**, comfortably inside the typical
+  30–35 min ninja phase. Status badge: `In progress`. Total
+  duration: `–`. **Zero `FAILED:` / `fatal error:` / `ninja:
+  build stopped` markers** in any DOM-loaded slice. **Zero
+  ninja `[N/M]` ticks materialised in the page DOM** — same
+  GH live-log virtualisation throttling the prior two cycles
+  documented (the `/commit/<sha>/checks/<jobId>/logs/<step>`
+  endpoint returns `HTTP 500` while a job is in_progress).
+  Issues filtered by `label:build-failure` returns **0 rows**
+  — same as every prior cycle (label still unmade). Per
+  watcher `STEP 2` — the build step has advanced from `1m 38s`
+  (prior 08:03 cycle) to ≈ `21m`, i.e. **healthy linear
+  progress** → **heartbeat-only cycle, no code fix.** The
+  `state_store.cc` drop in `50f2d8e` and the
+  `permission_revocation_request.cc` drop in `ef40e99` (both
+  in `33c8a4c`'s ancestry) get tested when ninja crosses
+  `[47000+]` and `[48700+]` respectively. Mount checkout
+  under `/sessions/wizardly-amazing-dirac/mnt/Projects/claum-browser`
+  is far behind origin (`HEAD = 0de311d`, run #92 era) due to
+  the long-standing `.git` lock issue; pushed from fresh
+  shallow clone at `/tmp/work-watcher-99/repo` via the
+  in-repo `.gh_token`.
