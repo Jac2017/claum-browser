@@ -519,6 +519,43 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "extension_telemetry_service.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #95 dangling file — ONE more consumer in
+    # `chrome/browser/safe_browsing/incident_reporting/`. This is a
+    # Path-B failure (NOT a missing-header / Path-A like runs #87..#94).
+    #
+    # Build #95 (commit bdaeb90) reached ninja [47051/55958] and then died
+    # with this clang error inside state_store.cc:
+    #
+    #   ../../chrome/browser/safe_browsing/incident_reporting/state_store.cc:88:46:
+    #       error: no member named 'kSafeBrowsingIncidentsSent' in namespace 'prefs'
+    #   ../../chrome/browser/safe_browsing/incident_reporting/state_store.cc:113:45:
+    #       error: no member named 'kSafeBrowsingIncidentsSent' in namespace 'prefs'
+    #
+    # Translation for novice readers: state_store.cc is trying to read a
+    # value out of `prefs::kSafeBrowsingIncidentsSent`, but that constant
+    # was deleted by ungoogled-chromium's safe_browsing patch (the same
+    # patch that strips `safe_browsing_prefs.h`, which is where this
+    # constant used to be defined). Since the symbol no longer exists,
+    # the file fails to compile.
+    #
+    # Same fix recipe as previous runs: comment the .cc out of the
+    # `static_library("safe_browsing")` target in
+    # `chrome/browser/safe_browsing/BUILD.gn`. Runtime safe_browsing is
+    # off in Claum, so dropping incident-reporting plumbing changes
+    # nothing user-visible — it's dead code in this configuration.
+    #
+    # Why this BUILD.gn (not auto-discover): ninja's failed-output path
+    # was `obj/chrome/browser/safe_browsing/safe_browsing/state_store.o`,
+    # and Chromium's path convention is
+    # `obj/<dir-of-BUILD.gn>/<target>/<source>.o`, so the owning BUILD.gn
+    # is unambiguously `chrome/browser/safe_browsing/BUILD.gn`. The
+    # `patch_one` regex already tolerates the `incident_reporting/` subdir
+    # prefix because it matches `"[^"\n]*<cc_name>"`.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "state_store.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
