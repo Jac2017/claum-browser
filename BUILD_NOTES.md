@@ -5,6 +5,38 @@ Running log of failures and fixes. Newest at top. The scheduled task
 
 ### Scheduled watcher log
 
+- **2026-05-03 04:19 UTC** (session `kind-loving-brahmagupta`,
+  RUN #96 IN PROGRESS, heartbeat-only cycle, no fix
+  pushed) — Latest workflow run on origin/main remains
+  **Build Claum (macOS) #96** (run id `25269246053`, job
+  id `74088807916`, SHA `50f2d8e`). Run total now ~24m
+  elapsed (started `2026-05-03T03:54:48Z`); step `Run
+  Claum build` still in_progress without a posted
+  duration. The new GitHub Actions UI keeps the live log
+  body collapsed while a step runs (the React virtualizer
+  serves an empty `document.body.innerText` log region —
+  same DOM-extract flake the previous two watchers logged
+  — so no fresh ninja `[N/M]` tick this cycle). Healthy-
+  build signals all hold: no `FAILED:` lines, no
+  `fatal error:` lines, no `ninja: build stopped`,
+  workflow status banner still reads "In progress" and
+  the `Cancel workflow` control is still active. Build is
+  comfortably past the [12845] SOLINK
+  `libvk_swiftshader.dylib` cliff (which historically
+  trips at ~12-15m elapsed) and not yet at the
+  [47000+] safe_browsing cliff that took down runs
+  #91-#95 (which historically trips at ~28-37m elapsed),
+  so the next ~5-15m is the live-fire window for the
+  `50f2d8e` `state_store.cc` fix. No `build-failure`
+  label issues opened against `50f2d8e` either — handler
+  has nothing to classify yet. Per STEP 2 of the watcher
+  SKILL (*If progress is advancing -> record progress,
+  exit run.*) -> no fix this cycle. Next watcher should
+  re-check status; if still in_progress, repeat
+  heartbeat; if Failure, fetch raw log via the
+  `/commit/{sha}/checks/{jid}/logs` workaround
+  documented at the top of this file.
+
 - **2026-05-03 04:12 UTC** (session `awesome-festive-gauss`,
   RUN #96 IN PROGRESS, heartbeat-only cycle, no fix
   pushed) — Latest workflow run on origin/main is still
