@@ -476,6 +476,49 @@ TARGETS = [
         "chrome/browser/safe_browsing/BUILD.gn",
         "cloud_binary_upload_service.cc",
     ),
+    # ------------------------------------------------------------------------
+    # Run #94 dangling files — THREE more consumers of the same stripped
+    # safe_browsing_prefs.h header, this time in the
+    # `chrome/browser/safe_browsing/extension_telemetry/` subdirectory.
+    # Same Path-A pattern as runs #67/.../#92 — drop them from sources so
+    # ninja stops compiling them. Runtime safe_browsing is off in Claum,
+    # so they're dead code in this configuration.
+    #
+    # Build #94 (commit 90fa9e1) failed at ninja [47031..47033/55961] with
+    # these three FAILED markers, all pointing at the same missing header:
+    #   fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h'
+    #                file not found
+    #
+    #   * chrome/browser/safe_browsing/extension_telemetry/
+    #         extension_telemetry_config_manager.cc:11
+    #     -> obj/chrome/browser/safe_browsing/safe_browsing/
+    #        extension_telemetry_config_manager.o
+    #
+    #   * chrome/browser/safe_browsing/extension_telemetry/
+    #         search_hijacking_detector.cc:14
+    #     -> obj/.../search_hijacking_detector.o
+    #
+    #   * chrome/browser/safe_browsing/extension_telemetry/
+    #         extension_telemetry_service.cc:60
+    #     -> obj/.../extension_telemetry_service.o
+    #
+    # All three are listed (with `extension_telemetry/` subdir prefix) in
+    # chrome/browser/safe_browsing/BUILD.gn — confirmed by the
+    # obj/<dir-of-BUILD.gn>/<target>/<name>.o output path. The patch_one
+    # regex tolerates the subdir prefix because it matches
+    # `"[^"\n]*<cc_name>"`.
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "extension_telemetry_config_manager.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "search_hijacking_detector.cc",
+    ),
+    (
+        "chrome/browser/safe_browsing/BUILD.gn",
+        "extension_telemetry_service.cc",
+    ),
 ]
 
 # Subtree to walk when auto-discovering which BUILD.gn lists a given .cc
