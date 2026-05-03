@@ -5588,3 +5588,72 @@ entirely. Last-resort option is `use_system_xcode=true`.
   files); this watcher operates from a fresh shallow
   clone in `/tmp/work2/claum-browser`. Heartbeat appended
   via that clone with `[skip ci]`.
+
+- **2026-05-03 04:45 UTC** (session `serene-wizardly-noether`,
+  heartbeat-only cycle) — Build Claum (macOS) **#96**
+  remains the latest run, **Failure** on commit
+  `50f2d8e`. Run ID `25269246053`, started
+  `2026-05-03T03:54:45Z`, total duration **37 m 29 s**,
+  failed `~2026-05-03T04:32:14Z` — i.e. ~13 min before
+  this poll. Process completed with exit code 1; build
+  step `Run Claum build` accounts for **37 m 25 s** of
+  the run. No new build run dispatched since.
+- Latest 8 runs on the actions list:
+  `#96` Build (Failure, `50f2d8e`), `#95` Build
+  (Failure, `bdaeb90`), `#250` autopilot (Success, 9 s),
+  `#94` Build (Failure, manual-dispatch by github-actions
+  Bot), `#249` autopilot (Manual by Jac2017), `#93`
+  Build (Failure, `d72e905`), `#92` Build (Failure,
+  bot-dispatch), `#248` autopilot (Scheduled). Confirmed
+  with prior cycle (`quirky-youthful-faraday`): **still
+  no `#97` Build dispatched, still no `#251` autopilot**.
+  We are 6 min after the previous heartbeat tick which
+  also reported `no #97 / no #251`.
+- Per the established pattern (`elegant-adoring-euler`
+  pushed `bdaeb90`, `compassionate-vibrant-ritchie`
+  pushed `50f2d8e`, both via the `fix-safe-browsing-
+  components-gn.py` autopilot drop), the next failing
+  file is identified by reading the raw log around the
+  `FAILED:` marker, then dropping its `chrome/browser/
+  safe_browsing/` consumer. **I did not extract the
+  failed file this cycle**: GitHub's failed-step log
+  body is not in `document.body.innerText` until the
+  step is manually expanded — same DOM-extract flake
+  every recent watcher has logged. Per the strong
+  "*don't pre-empt autopilot — it produces the data-
+  driven drop set*" guidance from every recent cycle,
+  → **no code fix this cycle.** Autopilot's typical
+  cadence between fixes (#249 → #94 → #250 → #95 → #96)
+  is ≥30 min; #96 failure is only 13 min old, so
+  autopilot is not yet overdue.
+- Issues check: filter `label:build-failure` returns
+  **46 open issues** (e.g. issue `#46`:
+  *"[autopilot] Build wedged on bfa9bae after 15
+  attempts"*). Those are stale escalations from older
+  SHAs (`bfa9bae` ≪ `50f2d8e`); the build-failure-
+  handler only opens a new escalation issue once a
+  single SHA hits 15 same-SHA failures, and `50f2d8e`
+  is still on attempt 1, so this is **not** a fresh
+  signal for run #96. (Prior watcher cycles incorrectly
+  reported "no build-failure issues / label has never
+  been created" — that was a false negative; the label
+  exists and 46 prior escalations are present, but none
+  apply to the current SHA.)
+- Local mount
+  `/sessions/serene-wizardly-noether/mnt/Projects/claum-browser`
+  is **29 commits behind origin** and has the same
+  inherited `.git/index.lock` from session
+  `2026-05-03T00:26:20Z` that I cannot remove
+  (`Operation not permitted` even as the file owner —
+  same FS quirk every prior watcher hit). This watcher
+  operates from a fresh shallow clone in
+  `/tmp/cb-work` (HEAD before this cycle: `27e24fe` =
+  prior watcher `quirky-youthful-faraday`'s heartbeat).
+  Heartbeat appended via that clone with `[skip ci]`.
+- Next-cycle recommendation: if the **next** watcher
+  tick (≈5-10 min from now, putting elapsed-since-#96-
+  failure at ~25 min) still shows `no #97 / no #251`,
+  autopilot would then be ~25 min stale and worth a
+  closer look — but still inside the historical 30-60 min
+  cadence. The *next-next* tick is the right place to
+  consider divergence intervention, not this one.
