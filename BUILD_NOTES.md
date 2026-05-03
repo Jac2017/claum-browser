@@ -6478,3 +6478,61 @@ entirely. Last-resort option is `use_system_xcode=true`.
   same run. Build-step at ~44 min suggests we're already at or
   past those cliffs given the ~22 ticks/sec pace observed in #92.
   [skip ci]
+
+- **2026-05-03 08:59 UTC** (session `determined-beautiful-feynman`,
+  heartbeat-only cycle, run #99 finalized **Failure**) —
+  Build Claum (macOS) **#99** ended **Failure** at total
+  duration **53m 36s** (run id `25273689954`, job id
+  `74100055423`, commit `33c8a4c`). Build step `Run Claum build`
+  ran **44m 58s** before exit code 1, post-failure steps ran
+  cleanly: `Show sccache stats 4s`, `Save sccache disk cache
+  5m 39s`, `Upload build log on failure 2s` (so the
+  `claum-build-log-99` artifact is uploaded — id `6769449421`).
+  Job page annotation surface returned only `Process completed
+  with exit code 1.` (no FAILED file inline).
+- **Log fetch blocked this cycle.** The `claum-build-log-99`
+  artifact endpoint redirects (HTTP 307) to
+  `productionresultssa*.blob.core.windows.net` /
+  `pipelines.actions.githubusercontent.com` — both
+  sandbox-proxy-blocked. The per-step log endpoint
+  `/commit/33c8a4c/checks/74100055423/logs[/N]` returns HTTP
+  500 for every step number 0-12 (same throttling the prior
+  watchers saw mid-run; here it persisted post-completion).
+  In-browser fetch of the artifact yields `TypeError: Failed
+  to fetch` (opaque CORS redirect to the SAS URL); the
+  `SAS-redirected blob` workaround the 08:41 UTC cycle used
+  for the *streaming* mid-run log does not apply to the
+  *uploaded* artifact endpoint. Without the FAILED line we
+  cannot identify which `safe_browsing_prefs.h` consumer (if
+  any) tripped this run.
+- **No code fix this cycle.** Per watcher SKILL §3 the right
+  move when we cannot identify the failing file is to NOT
+  push a speculative `fix-safe-browsing-components-gn.py`
+  TARGETS entry — a wrong drop costs a fresh ~45-min ninja
+  cycle. Heartbeat appended; next cycle should re-poll the
+  log endpoint (sometimes settles 10-30 min post-completion)
+  and download the artifact (next watcher session may have a
+  different proxy allowlist or land in a Chrome session that
+  exposes the SAS URL via a different code path).
+- Prior cycle's prediction (`If #99 fails on yet another
+  safe_browsing_prefs.h consumer in chrome/browser/permissions/
+  or another previously-untouched directory: same Path-A
+  pattern`) is the leading hypothesis given run length —
+  44m 58s of build is past both the `[47000+]` cliff and the
+  `[48717]` cliff that took down #98 on
+  `permission_revocation_request.cc`. The autopilot's regular
+  30-min cron (next ~09:27 UTC) will dispatch a retry on
+  `33c8a4c` — same commit, expected to fail at the same line,
+  so unproductive without a code change.
+- Issues filter `label:build-failure` returns 0 issue rows
+  (DOM probe) — the `build-failure` label still does not
+  exist on the repo and the handler workflow most recent
+  numerical run id is `2496…` range, ages older than #99's
+  `2527…` id, so the handler has not fired against #99.
+- Local mount at
+  `/sessions/determined-beautiful-feynman/mnt/Projects/claum-browser`
+  is 49 commits behind origin/main with the chronic
+  `.git/index.lock` mount permission issue. Heartbeat prepared
+  in shallow clone under `/tmp/watcher-99-fail-*/repo`. Token
+  read from the in-repo `.gh_token` (gitignored, untracked).
+  [skip ci]
