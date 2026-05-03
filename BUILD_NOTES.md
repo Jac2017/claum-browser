@@ -6536,3 +6536,31 @@ entirely. Last-resort option is `use_system_xcode=true`.
   in shallow clone under `/tmp/watcher-99-fail-*/repo`. Token
   read from the in-repo `.gh_token` (gitignored, untracked).
   [skip ci]
+
+- 2026-05-03 09:07 UTC — run #99 still the top Build Claum run on
+  the Actions page; status confirmed **Failure** on commit `33c8a4c`
+  (run id `25273689954`, total 53m 36s). 4 min after the prior
+  heartbeat (`1758559`) and 20 min before the autopilot's next cron
+  (~09:27 UTC), so no new run has been dispatched and no new signal
+  is available. Re-probed the per-step logs endpoint
+  `/commit/33c8a4c/checks/74100055423/logs` and steps `/6` `/7` `/8`
+  — all still HTTP **500** ~13 min post-completion (prior cycle was
+  ~10 min post-completion at HTTP 500). The artifact endpoint
+  `/runs/.../artifacts/6769449421` still resolves to an
+  `opaqueredirect` (CORS-blocked SAS URL on the proxy denylist), so
+  in-browser fetch remains a dead end. **New observation this
+  cycle:** the Issues tab `?q=label:build-failure` filter now
+  returns **46 open issues** (was `0` per every prior cycle's
+  probe). All 46 are duplicate `[autopilot] Build wedged on bfa9bae
+  after 15 attempts` reports auto-opened by `github-actions[bot]`
+  every cron tick — they reference an *old* commit (`bfa9bae`, that
+  was the wedge state around runs #68–#82) and **none** of them
+  reference run #99 or commit `33c8a4c`. This is autopilot
+  duplicate-report spam, not a new signal about the current
+  failure. Per the watcher SKILL §3 the right move when the failing
+  file cannot be identified is *not* to push a speculative
+  `fix-safe-browsing-components-gn.py` TARGETS entry — heartbeat
+  only this cycle, `[skip ci]` so the autopilot push trigger does
+  not dispatch yet another build on top of the same failing commit.
+  Full status:
+  /Users/matthewkenneway/Documents/Claude/Projects/claum-build-watcher-status-2026-05-03-09-07-UTC.md
