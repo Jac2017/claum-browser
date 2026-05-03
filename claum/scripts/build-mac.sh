@@ -762,7 +762,39 @@ fi
 # include dir fixes that resolution without abandoning system libjpeg.
 JPEG_TURBO_PREFIX="$(brew --prefix jpeg-turbo 2>/dev/null || true)"
 if [ -n "$JPEG_TURBO_PREFIX" ] && [ -d "$JPEG_TURBO_PREFIX/include" ]; then
-  JPEG_INC_FLAG="-I$JPEG_TURBO_PREFIX/include"
+  # ---------------------------------------------------------------------
+  # Run #100 fix (chromium-rawptr plugin firing on jpeg-turbo headers):
+  #
+  # Run #100 failed at ninja [50369/55953] (~90% done) compiling
+  # third_party/pdfium/core/fxcodec/jpeg/jpeg_common.c.  The error was
+  # NOT a missing-header or link error this time -- it was the Chromium
+  # `find-bad-constructs` clang plugin (with the `check-raw-ptr`
+  # sub-check) emitting:
+  #     /opt/homebrew/opt/jpeg-turbo/include/jpeglib.h:226:15: error:
+  #       [chromium-rawptr] Use raw_ptr<T> instead of a raw pointer.
+  # ...20+ times for fields like `JQUANT_TBL *quant_table;` inside the
+  # external libjpeg-turbo header.
+  #
+  # Why the plugin was firing on a third-party system header:
+  #   The plugin skips files whose `SourceManager::isInSystemHeader()`
+  #   returns true. A header counts as "system" only when the compiler
+  #   found it via a SYSTEM include search path (`-isystem`,
+  #   `-cxx-isystem`, `--system-header-prefix=`, the SDK sysroot, etc.).
+  #   We were adding the Homebrew jpeg-turbo include dir with `-I`,
+  #   which is a NORMAL include path -- so the plugin treated jpeglib.h
+  #   as first-party Chromium code and enforced raw_ptr<T> on it.
+  #
+  # Fix: switch from `-I<dir>` to `-isystem<dir>`. Clang accepts the
+  # joined form `-isystem<path>` (option spec is `JoinedOrSeparate`),
+  # so this is still ONE token and survives whatever tokenization GN
+  # does with extra_cflags. Once jpeglib.h is found via a system search
+  # path, isInSystemHeader() returns true and the rawptr plugin (and
+  # any other Chromium clang plugin warnings) skip the header entirely.
+  # Resolution still works the same -- system dirs are searched after
+  # `-I` dirs, and these jpeg headers don't exist anywhere else, so the
+  # search-order change has no effect on what gets included.
+  # ---------------------------------------------------------------------
+  JPEG_INC_FLAG="-isystem$JPEG_TURBO_PREFIX/include"
   JPEG_LIB_FLAG="-L$JPEG_TURBO_PREFIX/lib"
   echo "  jpeg-turbo prefix: $JPEG_TURBO_PREFIX"
 
