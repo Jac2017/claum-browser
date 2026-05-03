@@ -5093,3 +5093,41 @@ entirely. Last-resort option is `use_system_xcode=true`.
 - **2026-05-03 01:58 UTC** (session `beautiful-gracious-newton`, heartbeat-only): Build Claum (macOS) **#93** still latest — Failure on `d72e905` (final 39m 20s). No new Build Claum run since last cycle (~12 min ago). Last `Claum autopilot` still **#248** at 23:39 UTC (now ~2h 19m old — `#249` overdue ~79 min past its ~60-min cadence; autopilot stall persists across multiple watcher cycles). Issues tab: 46 open with `build-failure` label, all `[autopilot] Build wedged on bfa9bae after 15 attempts` (stale SHA — not the current `d72e905`); 0 new signal. **No code change this cycle** — per established multi-cycle pattern, `fix-safe-browsing-components-gn.py` autopilot owns this failure class; pushing a competing fix would race the autopilot's drop-set logic. Autopilot stall (>2h) is a 2nd-order problem to investigate (escalation candidate per BUILD_NOTES escalation section), not a fresh code error this watcher should patch. Heartbeat-only. [skip ci]
 - **2026-05-03 02:11 UTC** (session `festive-eloquent-cannon`, heartbeat-only): Build Claum (macOS) **#93** still latest — Failure on `d72e905` (final 39m 20s, exit code 1). No new Build Claum run since previous cycle (~13 min ago at 01:58 UTC). Last `Claum autopilot` still **#248** at 23:39 UTC (now **~2h 32m old** — `#249` overdue ~92 min past the empirical ~60-min cadence; **note** that the workflow file `claum-autopilot.yml` declares `cron: '*/30 * * * *'`, so against the *declared* schedule the next run is overdue ~122 min — this is well outside GitHub's normal scheduled-workflow slop and reinforces last cycle's autopilot-stall escalation flag). Issues tab: **46 open with `build-failure` label** (unchanged from last 5+ cycles), all stale-SHA `[autopilot] Build wedged on bfa9bae after 15 attempts`. Run #93's failure has not produced a fresh build-failure issue (build-failure-handler workflow likely gated by a condition not met by this run, or also stalled). **No code change this cycle** — per the established multi-cycle pattern, `fix-safe-browsing-components-gn.py` autopilot owns this failure class; pushing a competing fix would race the autopilot's drop-set logic if/when it wakes. The autopilot stall (>2h 30m) remains a 2nd-order problem and a strong escalation candidate, but per STEP 3 of the watcher SKILL it is not a fresh code error this watcher should patch. Heartbeat-only. [skip ci]
 - **2026-05-03 02:30 UTC** (session `compassionate-adoring-edison`, **manual-dispatch action**): Build Claum (macOS) **#93** still latest **failed** run on `d72e905` (final 39m 20s, exit 1, age ~2h). After **7 consecutive heartbeat-only watcher cycles** observing autopilot stall on `#248` (now ~2h 51m old, `#249` overdue ~111 min vs ~60-min empirical cadence and ~141 min vs declared 30-min cron), and after re-reading `claum-autopilot.yml` (autopilot's gating logic SHOULD have dispatched given #93's `completed/failure` state on a unique SHA with attempts=1), the watcher concluded the autopilot was schedule-paused (no `Enable workflow` banner visible, but a 2h+ silence on a `*/30 * * * *` cron is well past GitHub's typical scheduling slop). Per the SKILL's "iterate autonomously / never ask user approval" directive, the watcher **manually dispatched `Claum autopilot` via the `Run workflow` UI button on `claum-autopilot.yml`** (logged in as `Jac2017`). Result: autopilot **#249** ran (id `25267714568`, 9s, completed `Success`), summary header **"Autopilot: intervention dispatched"**, decision text: *"Dispatching build-mac: latest run #93 ... attempts-on-sha=1/15"*. This in turn triggered **Build Claum (macOS) #94** (id `25267716484`, manually-triggered by `github-actions[bot]` on commit `90fa9e1` of `main`, status **In progress**, 1m+ in). NOTE: #94 runs the *same code* as #93 (no new fix was pushed) so it is statistically likely to fail at the same `[~47018]` `chrome/browser/safe_browsing/` cliff; that is acceptable — the autopilot's 15-retry safety cap will eventually escalate via an issue if no human pushes a fresh fix. Heartbeat-only `[skip ci]` commit follows. Next watcher cycle: re-poll #94 ninja count + check whether autopilot has resumed its scheduled cadence (next tick should be ~03:00 UTC). [skip ci]
+- **2026-05-03 02:35 UTC** (session `nifty-optimistic-albattani`,
+  heartbeat-only cycle) — Build Claum (macOS) **#94**
+  In progress on commit `90fa9e1`. Run ID `25267716484`,
+  job ID `74084834587`, manually dispatched by
+  `github-actions[bot]` (= autopilot run #249, which the
+  prior `compassionate-adoring-edison` cycle kicked off
+  via the GitHub UI to break a 7-cycle dispatch stall).
+  Latest visible ninja tick is **`[4088/55961]`** (~7.3 %),
+  up from `[363/55961]` ~3 minutes earlier — pace is
+  healthy at ~20 ticks/sec, similar to #92's healthy
+  cadence. No `FAILED:` markers, no `fatal error` lines.
+  The build has not yet reached the SOLINK
+  `[12845]` checkpoint (`libvk_swiftshader.dylib`) nor
+  the `[~47018]` `chrome/browser/safe_browsing/` cliff.
+- Per task STEP 2 ("*If progress is advancing → record
+  progress, exit run.*") → **no code fix this cycle.**
+  The autopilot system (#249) re-dispatched build #94
+  on the same `90fa9e1` source state as #93 (which was
+  itself the same source as `d72e905`'s 4-file
+  safe-browsing drop-set fix). If #94 stalls at
+  `[~47018]` again, the autopilot's
+  `fix-safe-browsing-components-gn.py` will pick up
+  the failure and push the next drop-set; this watcher
+  should not pre-empt it.
+- Issues tab still shows **46 open** `build-failure`-labeled
+  issues, all titled `[autopilot] Build wedged on bfa9bae
+  after 15 attempts` — these are stale (refer to old SHA
+  `bfa9bae`, current main is `90fa9e1`). No new issue for
+  run #94 (it's still in progress). Issues remain a
+  no-signal channel until the autopilot opens fresh ones
+  for the current SHA.
+- Local mounted checkout was 15 commits behind origin and
+  carried stale `.gone-5`/`.local`/`.bk-5` debris and a
+  modified `BUILD_NOTES.md`; this watcher pushed the
+  heartbeat from a fresh shallow clone under
+  `/tmp/wcb-test/` (the mount's `.git/index.lock` is
+  un-removable from this sandbox, same workaround as
+  prior watcher sessions). Push parent: `273ff28`.
