@@ -5342,3 +5342,32 @@ entirely. Last-resort option is `use_system_xcode=true`.
   fresh shallow clone under `/tmp/work-*/repo/` because the local mount
   `.git` directory has lock-file permission issues (cannot unlink
   `.git/objects/*/tmp_obj_*` on fetch).
+
+## Watcher cycle 2026-05-03 03:56 UTC
+
+- **Run #95 FAILED** in 37m 19s on commit `bdaeb90`. Run ID `25268412875`,
+  job ID `74086620588`.
+- **FAILED tick:** `[47051/55958]` —
+  `obj/chrome/browser/safe_browsing/safe_browsing/state_store.o`.
+  This is well past the previous cliff (`[47031..47033]` for runs
+  #93/#94), so the run #94 fix did its job and exposed the next domino.
+- **Failure type:** Path-B (undeclared identifier from a stripped pref
+  symbol), NOT Path-A (missing header). `state_store.cc` references
+  `prefs::kSafeBrowsingIncidentsSent` at lines 88 and 113, but that
+  constant was deleted by ungoogled-chromium's safe_browsing patch.
+- **Fix pushed:** [`50f2d8e`](https://github.com/Jac2017/claum-browser/commit/50f2d8e)
+  — adds a TARGETS entry to `fix-safe-browsing-components-gn.py` that
+  comments `state_store.cc` out of `chrome/browser/safe_browsing/BUILD.gn`'s
+  `static_library("safe_browsing")` sources list.
+- Push triggered **build #96** at the same instant (run ID `25269246053`,
+  status `in_progress` on commit `50f2d8e`). Expected next failure cliff:
+  if there's another domino it likely sits in
+  `chrome/browser/safe_browsing/incident_reporting/` (the same subdir
+  as state_store.cc) — that subdir has several other sources that may
+  reference the same stripped pref. Otherwise ninja should keep marching.
+- Issues filter `label:build-failure` → no labeled issues, same as
+  every prior cycle (label still not created on the repo).
+- Local-mount `.git` still has the unlink-permission issue, so this
+  cycle's commit + push went via a fresh shallow clone under
+  `/tmp/claum-fix-*/repo`.
+- HEAD (origin/main) when this cycle ended: `50f2d8e` (this cycle's fix).
