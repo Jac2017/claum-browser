@@ -6160,3 +6160,51 @@ entirely. Last-resort option is `use_system_xcode=true`.
   user (STEP 4). If it fails before that, the new
   `claum-build-log-98` artifact (job-env-scoped path) will
   hold the actual `FAILED:` line.
+
+- 2026-05-03 07:28 UTC (session `awesome-sharp-wright`) — Build Claum (macOS) **#98**
+  has now **Failed** at `[48708/55954]` (run ID `25272302974`,
+  job ID `74096599055`, build step ran 30m 13s, then sccache save
+  step is still finalizing — overall run still labeled
+  *In progress* in the UI). Read the live in-progress step log via
+  the `data-log-url` endpoint (`/commit/cea09e4d.../checks/74096599055/logs/12`,
+  6.2 MB plain text, 51,345 lines, 3 `FAILED:` markers, `ninja: build
+  stopped: subcommand failed` at line 51,150).
+- **Failure root**: `chrome/browser/permissions/permission_revocation_request.cc:29:10:
+  fatal error: 'components/safe_browsing/core/common/safe_browsing_prefs.h' file not found`.
+  This is the FIRST consumer-of-safe_browsing failure outside
+  `chrome/browser/safe_browsing/` that this watcher has seen — i.e.
+  the autopilot's drop-set strategy successfully cleared every direct
+  source under `safe_browsing/` (the `[47018]` cliff that took down
+  #91/#92 is gone), and the build now hits transitive consumers in
+  sibling subdirs that `#include` safe_browsing headers.
+- **Significant progress vs prior runs:** failed at `[48708/55954]`
+  vs #91/#92's `[47018/55965]` cliff — that's **~1,690 ninja ticks
+  past the safe_browsing cliff** and well past the `[12845]` SOLINK
+  `libvk_swiftshader.dylib` checkpoint. So the in-flight workflow
+  fix in `cea09e4` (job-level `CLAUM_BUILD_ROOT` env) didn't help
+  on its own, but the autopilot's `84af7e4` drop-set _did_.
+- **No code fix pushed this cycle** per BUILD_NOTES warning
+  ("pushing a competing fix from this watcher would race the
+  autopilot"). The pattern of failure (one new consumer file
+  needs its safe_browsing include / GN target dropped) is exactly
+  what `fix-safe-browsing-components-gn.py` is built for.
+  Autopilot `#251` (commit `84af7e4`, 25271356251) finished
+  Success 6s and was scheduled before `cea09e4` landed; the next
+  scheduled autopilot run will pick up `cea09e4` as the latest
+  failure and emit the next drop-set. Build-failure label still
+  not created on the repo (Issues count unchanged at **46 open**;
+  most-recent issue is #46 `[autopilot] Build wedged on bfa9bae`,
+  unrelated to current SHA).
+- HEAD on origin/main: `34bc112` (the prior watcher's heartbeat
+  for #98 In progress with no fresh tick). This watcher's local
+  mount at `/sessions/awesome-sharp-wright/mnt/Projects/claum-browser`
+  is behind 41 commits with uncommitted BUILD_NOTES debris from
+  prior cycles, so the heartbeat was appended via a fresh
+  shallow clone under `/tmp/heartbeat/repo`.
+- Next checkpoint: when next autopilot scheduled run dispatches
+  (every ~15 min on cron), look for a new commit referencing
+  `permission_revocation_request` or a `drop` of a permissions
+  consumer; if autopilot's data script can't pattern-match outside
+  `safe_browsing/`, this watcher should consider a one-off
+  `source_set` drop in `chrome/browser/permissions/BUILD.gn`
+  for `permission_revocation_request.{h,cc}` (escalate path).
