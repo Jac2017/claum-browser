@@ -1263,27 +1263,17 @@ inline std::vector<std::string> GetURLAllowlistByPolicy(
   return {};
 }
 
-// `safe_browsing::DownloadFileType` is a proto-generated message class
-// declared in components/safe_browsing/content/common/proto/download_file_types.proto
-// (proto2 syntax). chrome/browser/download/chrome_download_manager_delegate.cc
-// references DownloadFileType::NOT_DANGEROUS at lines 931 + 1745 via a
-// `using safe_browsing::DownloadFileType;` declaration. proto2's C++
-// generator hoists nested-enum values into the enclosing message class
-// scope (so DownloadFileType::NOT_DANGEROUS resolves), and unscoped enums
-// in C++ similarly make the values visible at the surrounding class scope.
-// We mirror that with a minimal stub: just the DangerLevel enum, which is
-// the only sub-symbol the consumer cc file actually uses. Numeric values
-// match the upstream .proto definition.
-class DownloadFileType {
- public:
-  enum DangerLevel {
-    NOT_DANGEROUS = 0,
-    ALLOW_ON_USER_GESTURE = 1,
-    DANGEROUS = 2,
-    DANGEROUS_HOST = 3,
-    POTENTIALLY_UNWANTED = 4,
-  };
-};
+// (cycle-38 fix) The cycle-36 stub `class DownloadFileType` block that
+// used to live here was REMOVED because it caused a redefinition error
+// (run #121, downloads_list_tracker.cc):
+//   error: redefinition of 'DownloadFileType'
+//   note:  previous definition is here →
+//          gen/components/safe_browsing/content/common/proto/
+//          download_file_types.pb.h:461
+// In other words: the proto-generated DownloadFileType IS present in the
+// build tree and is reachable transitively, so we don't need (and must
+// not provide) our own stub. chrome_download_manager_delegate.cc keeps
+// using `safe_browsing::DownloadFileType` from the proto header.
 
 }  // namespace safe_browsing
 
