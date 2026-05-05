@@ -1127,6 +1127,148 @@ python3 "$CLAUM_REPO_DIR/claum/scripts/fix-safe-browsing-components-gn.py" \
         "$CLAUM_BUILD_ROOT/build/src"
 
 # ---------------------------------------------------------------------------
+# Fix #3 — stage a stub `components/safe_browsing/core/common/safe_browsing_prefs.h`
+# (run #119 fix — cycle 28 BUILD_NOTES; the cliff fingerprint that cycles 26+27
+# verified via the raw-logs endpoint at ninja [51391/55953] CXX
+# obj/chrome/browser/ui/ui/downloads_list_tracker.o).
+# ---------------------------------------------------------------------------
+# Background: ungoogled-chromium's safe_browsing patch *deletes* the upstream
+# header `components/safe_browsing/core/common/safe_browsing_prefs.h` rather
+# than just emptying it. Most consumers of that header live inside
+# `components/safe_browsing/` and `chrome/browser/safe_browsing/` and were
+# already neutralized by `fix-safe-browsing-components-gn.py` (Path A — drop
+# the dangling `.cc` from BUILD.gn).
+#
+# `chrome/browser/ui/webui/downloads/downloads_list_tracker.cc` is the one
+# *real-use* consumer that survives in the ungoogled tree: it backs the
+# `chrome://downloads/` page, so dropping it from BUILD.gn would break the
+# Downloads UI for end users. Path A doesn't apply.
+#
+# Looking at the upstream source (chromium/main @ time of writing), the file
+# only references safe_browsing_prefs.h symbols inside a
+# `#if BUILDFLAG(SAFE_BROWSING_DOWNLOAD_PROTECTION)` gate, and the only
+# symbols it actually uses are:
+#   * `safe_browsing::SafeBrowsingState` (enum with NO_SAFE_BROWSING,
+#     STANDARD_PROTECTION, ENHANCED_PROTECTION)
+#   * `safe_browsing::GetSafeBrowsingState(const PrefService&)` returning that enum
+#
+# So Path B (header stub) is both correct *and* minimal: write a tiny header
+# at the upstream path that declares just those symbols, returning
+# NO_SAFE_BROWSING from the inline helper. That is the right semantic for
+# ungoogled-chromium where safe-browsing is disabled — the Downloads UI will
+# render rows with "no safe-browsing verdict" instead of crashing the build.
+#
+# We also include a couple of common pref-name constants (kSafeBrowsingEnabled
+# etc.) declared as `inline constexpr` so any *other* TU that survived the
+# ungoogled patch and references them through this header still links. Using
+# `inline constexpr` rather than `extern const char[]` means we do not need a
+# matching .cc to define them — the value lives in the header.
+#
+# This step is idempotent (we overwrite the file every run), and only writes
+# if the parent dir exists (which it should, since the upstream tree always
+# has `components/safe_browsing/core/common/`). On a fresh extraction the
+# patch will have removed any prior stub, so we always re-stage.
+# ---------------------------------------------------------------------------
+log_step "Staging stub safe_browsing_prefs.h (run #119 fix — Path B for downloads_list_tracker.cc)"
+SB_PREFS_DIR="$CLAUM_BUILD_ROOT/build/src/components/safe_browsing/core/common"
+SB_PREFS_FILE="$SB_PREFS_DIR/safe_browsing_prefs.h"
+if [ -d "$SB_PREFS_DIR" ]; then
+  # `cat <<'EOF' > "$file"` writes everything between the EOF markers verbatim
+  # (the single quotes around 'EOF' disable shell interpolation, so $foo and
+  # backticks inside the heredoc are written as literals — important here
+  # because the C++ stub itself contains no shell variables).
+  cat <<'EOF' > "$SB_PREFS_FILE"
+// Copyright 2024 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+//
+// CLAUM STUB (re-staged by claum/scripts/build-mac.sh on every build).
+//
+// ungoogled-chromium's safe_browsing patch deletes the upstream
+// safe_browsing_prefs.h. Most TUs that depended on it are dropped from
+// BUILD.gn by claum/scripts/fix-safe-browsing-components-gn.py (Path A).
+// chrome/browser/ui/webui/downloads/downloads_list_tracker.cc is the one
+// real-use consumer that has to keep compiling, because it backs
+// chrome://downloads/. This stub provides the minimum surface that file
+// needs: the SafeBrowsingState enum and a GetSafeBrowsingState() that
+// always returns NO_SAFE_BROWSING (which is the correct semantic when
+// safe browsing is disabled).
+//
+// Common pref-name constants are also exposed as inline constexpr so that
+// any sibling TU still pulling them in through this header continues to
+// link without us having to ship a matching .cc.
+
+#ifndef COMPONENTS_SAFE_BROWSING_CORE_COMMON_SAFE_BROWSING_PREFS_H_
+#define COMPONENTS_SAFE_BROWSING_CORE_COMMON_SAFE_BROWSING_PREFS_H_
+
+// Forward-declare PrefService so callers that pass `*profile->GetPrefs()`
+// continue to type-check without us pulling in the full prefs header.
+class PrefService;
+
+namespace safe_browsing {
+
+// The three protection levels Chromium normally exposes. We keep the
+// numeric values stable so any third-party header that references them
+// by integer keeps working.
+enum SafeBrowsingState {
+  NO_SAFE_BROWSING = 0,
+  STANDARD_PROTECTION = 1,
+  ENHANCED_PROTECTION = 2,
+};
+
+// Always report "off" — that is the correct answer for an ungoogled build.
+// `inline` lets multiple TUs include this header without ODR violations.
+inline SafeBrowsingState GetSafeBrowsingState(const PrefService& /*prefs*/) {
+  return NO_SAFE_BROWSING;
+}
+
+// Helper predicates that mirror upstream's API surface. Each is a no-op
+// for ungoogled (safe browsing is disabled), so they all return false.
+inline bool IsSafeBrowsingEnabled(const PrefService& /*prefs*/) {
+  return false;
+}
+inline bool IsEnhancedProtectionEnabled(const PrefService& /*prefs*/) {
+  return false;
+}
+inline bool IsExtendedReportingEnabled(const PrefService& /*prefs*/) {
+  return false;
+}
+inline bool IsExtendedReportingPolicyManaged(const PrefService& /*prefs*/) {
+  return false;
+}
+
+}  // namespace safe_browsing
+
+namespace prefs {
+
+// Common pref-name constants exposed by upstream's safe_browsing_prefs.h.
+// `inline constexpr char[]` (C++17) gives them external linkage without
+// needing a matching translation unit to define storage.
+inline constexpr char kSafeBrowsingEnabled[] = "safebrowsing.enabled";
+inline constexpr char kSafeBrowsingEnhanced[] = "safebrowsing.enhanced";
+inline constexpr char kSafeBrowsingScoutReportingEnabled[] =
+    "safebrowsing.scout_reporting_enabled";
+inline constexpr char kSafeBrowsingExtendedReportingOptInAllowed[] =
+    "safebrowsing.extended_reporting_opt_in_allowed";
+inline constexpr char kSafeBrowsingProceedAnywayDisabled[] =
+    "safebrowsing.proceed_anyway_disabled";
+inline constexpr char kSafeBrowsingIncidentsSent[] =
+    "safebrowsing.incidents_sent";
+inline constexpr char kSafeBrowsingTriggerEventTimestamps[] =
+    "safebrowsing.trigger_event_timestamps";
+inline constexpr char kSafeBrowsingUnhandledGaiaPasswordReuses[] =
+    "safebrowsing.unhandled_gaia_password_reuses";
+
+}  // namespace prefs
+
+#endif  // COMPONENTS_SAFE_BROWSING_CORE_COMMON_SAFE_BROWSING_PREFS_H_
+EOF
+  echo "  staged stub at $SB_PREFS_FILE ($(wc -l < "$SB_PREFS_FILE") lines)"
+else
+  log_warn "  parent dir $SB_PREFS_DIR not present — skipping stub stage"
+fi
+
+# ---------------------------------------------------------------------------
 # DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
 # see exactly what state it's in. We dump:
 #   * lines 1-30   — the file header + `source_set("safe_browsing") {` opening
