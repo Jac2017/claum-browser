@@ -1201,9 +1201,17 @@ if [ -d "$SB_PREFS_DIR" ]; then
 #ifndef COMPONENTS_SAFE_BROWSING_CORE_COMMON_SAFE_BROWSING_PREFS_H_
 #define COMPONENTS_SAFE_BROWSING_CORE_COMMON_SAFE_BROWSING_PREFS_H_
 
+// Cycle-36 additions: <string> + <vector> are needed for the
+// GetURLAllowlistByPolicy() return type (std::vector<std::string>).
+#include <string>
+#include <vector>
+
 // Forward-declare PrefService so callers that pass `*profile->GetPrefs()`
 // continue to type-check without us pulling in the full prefs header.
 class PrefService;
+// GURL is used as a parameter type by IsURLAllowlistedByPolicy(); a forward
+// declaration is enough because we never deref a GURL inside this stub.
+class GURL;
 
 namespace safe_browsing {
 
@@ -1237,6 +1245,46 @@ inline bool IsExtendedReportingPolicyManaged(const PrefService& /*prefs*/) {
   return false;
 }
 
+// --- Cycle-36 additions ---------------------------------------------------
+// Two more pref-helpers referenced by chrome_content_browser_client*.cc.
+// Upstream signatures (chromium tag 146.0.7680.164,
+// components/safe_browsing/core/common/safe_browsing_prefs.h):
+//   bool IsURLAllowlistedByPolicy(const GURL& url, const PrefService& pref);
+//   std::vector<std::string> GetURLAllowlistByPolicy(PrefService* pref_service);
+// In an ungoogled build, no URLs are policy-allowlisted, so we return false
+// and an empty list respectively — same "safe defaults" semantic as the
+// other helpers above.
+inline bool IsURLAllowlistedByPolicy(const GURL& /*url*/,
+                                     const PrefService& /*pref*/) {
+  return false;
+}
+inline std::vector<std::string> GetURLAllowlistByPolicy(
+    PrefService* /*pref_service*/) {
+  return {};
+}
+
+// `safe_browsing::DownloadFileType` is a proto-generated message class
+// declared in components/safe_browsing/content/common/proto/download_file_types.proto
+// (proto2 syntax). chrome/browser/download/chrome_download_manager_delegate.cc
+// references DownloadFileType::NOT_DANGEROUS at lines 931 + 1745 via a
+// `using safe_browsing::DownloadFileType;` declaration. proto2's C++
+// generator hoists nested-enum values into the enclosing message class
+// scope (so DownloadFileType::NOT_DANGEROUS resolves), and unscoped enums
+// in C++ similarly make the values visible at the surrounding class scope.
+// We mirror that with a minimal stub: just the DangerLevel enum, which is
+// the only sub-symbol the consumer cc file actually uses. Numeric values
+// match the upstream .proto definition.
+class DownloadFileType {
+ public:
+  enum DangerLevel {
+    NOT_DANGEROUS = 0,
+    ALLOW_ON_USER_GESTURE = 1,
+    DANGEROUS = 2,
+    DANGEROUS_HOST = 3,
+    POTENTIALLY_UNWANTED = 4,
+  };
+};
+
 }  // namespace safe_browsing
 
 namespace prefs {
@@ -1267,6 +1315,52 @@ EOF
 else
   log_warn "  parent dir $SB_PREFS_DIR not present — skipping stub stage"
 fi
+
+# ---------------------------------------------------------------------------
+# Cycle-36 fix #4 — inject #include of our stub safe_browsing_prefs.h into
+# the three cc files identified by cycle-32 diagnostic that use safe_browsing
+# symbols (IsURLAllowlistedByPolicy / GetURLAllowlistByPolicy /
+# IsSafeBrowsingEnabled / DownloadFileType) but no longer #include the
+# header after ungoogled-chromium's safe_browsing patch. The cycle-28 stub
+# satisfies downloads_list_tracker.cc (which kept its #include); these
+# 3 cc files lost the include and need it injected here.
+#
+# Idempotent — guarded by `grep -q` so re-runs do nothing on already-patched
+# files. Insertion is right after the LAST existing #include line so we
+# never break a file's preprocessor block ordering.
+# ---------------------------------------------------------------------------
+log_step "Injecting #include safe_browsing_prefs.h into 3 cc files (cycle-36 fix)"
+SB_INC='#include "components/safe_browsing/core/common/safe_browsing_prefs.h"'
+SRC_ROOT="$CLAUM_BUILD_ROOT/build/src"
+for rel in \
+  chrome/browser/chrome_content_browser_client_receiver_bindings.cc \
+  chrome/browser/download/chrome_download_manager_delegate.cc \
+  chrome/browser/chrome_content_browser_client.cc; do
+  fp="$SRC_ROOT/$rel"
+  if [ ! -f "$fp" ]; then
+    log_warn "  $rel not found — skipping (file may be patched out by ungoogled)"
+    continue
+  fi
+  if grep -qF "$SB_INC" "$fp"; then
+    echo "  $rel: include already present, skipping"
+    continue
+  fi
+  # awk inserts $inc right after the LAST line that begins with `#include`.
+  # The 2-pass approach (first pass finds the line; second pass writes) is
+  # required because we don't know where the last #include is until we've
+  # scanned the whole file.
+  awk -v inc="$SB_INC" '
+    NR == FNR { if (/^#include/) last = NR; next }
+    { print; if (FNR == last) print inc }
+  ' "$fp" "$fp" > "$fp.cycle36.tmp"
+  if [ -s "$fp.cycle36.tmp" ]; then
+    mv "$fp.cycle36.tmp" "$fp"
+    echo "  $rel: injected include after the last existing #include"
+  else
+    rm -f "$fp.cycle36.tmp"
+    log_warn "  $rel: awk produced empty output, skipping (no edit applied)"
+  fi
+done
 
 # ---------------------------------------------------------------------------
 # DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
