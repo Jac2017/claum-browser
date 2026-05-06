@@ -1668,3 +1668,6 @@ cat <<DONE
 DONE
 
 # Build kick (run #101): re-trigger build-mac after [skip ci] swallowed the prior push.
+
+# cycle-93 push nudge: HEAD commit had [skip ci]; this comment makes the
+# next push contain a real non-md file change so the build trigger fires.
