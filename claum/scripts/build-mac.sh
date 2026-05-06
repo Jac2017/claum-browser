@@ -1245,6 +1245,13 @@ inline bool IsExtendedReportingPolicyManaged(const PrefService& /*prefs*/) {
   return false;
 }
 
+// (cycle-92 add) Referenced by download_ui_safe_browsing_util.cc:67:26.
+// Upstream signature: bool IsSafeBrowsingPolicyManaged(const PrefService&).
+// Always-false in ungoogled (safe browsing is fully disabled).
+inline bool IsSafeBrowsingPolicyManaged(const PrefService& /*prefs*/) {
+  return false;
+}
+
 // --- Cycle-36 additions ---------------------------------------------------
 // Two more pref-helpers referenced by chrome_content_browser_client*.cc.
 // Upstream signatures (chromium tag 146.0.7680.164,
@@ -1325,7 +1332,8 @@ SRC_ROOT="$CLAUM_BUILD_ROOT/build/src"
 for rel in \
   chrome/browser/chrome_content_browser_client_receiver_bindings.cc \
   chrome/browser/download/chrome_download_manager_delegate.cc \
-  chrome/browser/chrome_content_browser_client.cc; do
+  chrome/browser/chrome_content_browser_client.cc \
+  chrome/browser/download/download_ui_safe_browsing_util.cc; do
   fp="$SRC_ROOT/$rel"
   if [ ! -f "$fp" ]; then
     log_warn "  $rel not found — skipping (file may be patched out by ungoogled)"
@@ -1351,6 +1359,39 @@ for rel in \
     log_warn "  $rel: awk produced empty output, skipping (no edit applied)"
   fi
 done
+
+# ---------------------------------------------------------------------------
+# Cycle-92 fix #5 — inject #include of the proto-generated
+# `download_file_types.pb.h` into `chrome_download_manager_delegate.cc`
+# only. This file references `safe_browsing::DownloadFileType` (a proto
+# class) at lines 932 and 1746 but does NOT pick up the proto header
+# transitively, unlike `downloads_list_tracker.cc` which does. Cycle-38
+# removed our own DownloadFileType stub because it caused a redefinition
+# in `downloads_list_tracker.cc`; this targeted include avoids touching
+# the stub at all and gives only this one TU access to the real proto.
+#
+# Idempotent — `grep -q` guards against re-injecting on re-runs.
+# ---------------------------------------------------------------------------
+log_step "Injecting #include download_file_types.pb.h into chrome_download_manager_delegate.cc (cycle-92 fix)"
+PROTO_INC='#include "components/safe_browsing/content/common/proto/download_file_types.pb.h"'
+fp="$SRC_ROOT/chrome/browser/download/chrome_download_manager_delegate.cc"
+if [ ! -f "$fp" ]; then
+  log_warn "  chrome_download_manager_delegate.cc not found — skipping (file may be patched out)"
+elif grep -qF "$PROTO_INC" "$fp"; then
+  echo "  chrome_download_manager_delegate.cc: proto include already present, skipping"
+else
+  awk -v inc="$PROTO_INC" '
+    NR == FNR { if (/^#include/) last = NR; next }
+    { print; if (FNR == last) print inc }
+  ' "$fp" "$fp" > "$fp.cycle92.tmp"
+  if [ -s "$fp.cycle92.tmp" ]; then
+    mv "$fp.cycle92.tmp" "$fp"
+    echo "  chrome_download_manager_delegate.cc: injected proto include after the last existing #include"
+  else
+    rm -f "$fp.cycle92.tmp"
+    log_warn "  chrome_download_manager_delegate.cc: awk produced empty output, skipping (no edit applied)"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
