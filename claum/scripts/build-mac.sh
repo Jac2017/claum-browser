@@ -1394,6 +1394,97 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Cycle-93 fix #6 — inject `using safe_browsing::DownloadFileType;` into
+# `chrome_download_manager_delegate.cc`. The cycle-92 proto-include alone
+# was not enough: build #129 still failed with two compile errors:
+#   chrome/browser/download/chrome_download_manager_delegate.cc:933:13:
+#     error: use of undeclared identifier 'DownloadFileType';
+#            did you mean 'safe_browsing::DownloadFileType'?
+#   chrome/browser/download/chrome_download_manager_delegate.cc:1747:13:
+#     error: use of undeclared identifier 'DownloadFileType';
+#            did you mean 'safe_browsing::DownloadFileType'?
+#
+# Why: upstream chromium (146.0.7680.164) has a `using safe_browsing::
+# DownloadFileType;` at line 189 of this .cc which makes lines 933 and
+# 1747's unqualified `DownloadFileType::NOT_DANGEROUS` / `::DANGEROUS`
+# resolve. Some ungoogled-chromium patch in our patch stack appears to
+# strip that `using` line (likely as part of dropping safe_browsing
+# deps), leaving the unqualified usages dangling.
+#
+# Fix: re-insert the `using` declaration in the post-include block. We
+# place it immediately after the last #include so the proto's
+# `DownloadFileType` class is in scope for the `using` directive. This
+# is idempotent — `grep -q` skips on re-runs and on builds where ungoogled
+# left the original `using` in place.
+#
+# Note: we don't touch downloads_list_tracker.cc because that file already
+# qualifies its DownloadFileType uses fully (cycle-38 confirmed it).
+# ---------------------------------------------------------------------------
+log_step "Injecting using safe_browsing::DownloadFileType into chrome_download_manager_delegate.cc (cycle-93 fix)"
+USING_DFT='using safe_browsing::DownloadFileType;  // cycle-93 re-inject'
+fp="$SRC_ROOT/chrome/browser/download/chrome_download_manager_delegate.cc"
+if [ ! -f "$fp" ]; then
+  log_warn "  chrome_download_manager_delegate.cc not found — skipping (file may be patched out)"
+elif grep -qF "using safe_browsing::DownloadFileType" "$fp"; then
+  echo "  chrome_download_manager_delegate.cc: 'using safe_browsing::DownloadFileType' already present, skipping"
+else
+  # Insert AFTER the last #include line. By this point cycle-36 has injected
+  # safe_browsing_prefs.h and cycle-92 has injected the proto include, so
+  # both are guaranteed to be present in the include block.
+  awk -v decl="$USING_DFT" '
+    NR == FNR { if (/^#include/) last = NR; next }
+    { print; if (FNR == last) print decl }
+  ' "$fp" "$fp" > "$fp.cycle93.tmp"
+  if [ -s "$fp.cycle93.tmp" ]; then
+    mv "$fp.cycle93.tmp" "$fp"
+    echo "  chrome_download_manager_delegate.cc: injected 'using safe_browsing::DownloadFileType;' after the last existing #include"
+  else
+    rm -f "$fp.cycle93.tmp"
+    log_warn "  chrome_download_manager_delegate.cc: awk produced empty output, skipping (no edit applied)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Cycle-93 diagnostic — dump the staged safe_browsing_prefs.h stub at the
+# compile-resolved path AND grep for the two symbols build #129 reported
+# as missing in chrome_content_browser_client_receiver_bindings.cc. This
+# tells the next watcher whether our 129-line stub is still in place at
+# build time, or whether something between staging and ninja (the actual
+# compile) overwrites it.
+#
+# Build #129 errors at receiver_bindings.cc:159 and :162 said
+# `IsSafeBrowsingEnabled` and `GetURLAllowlistByPolicy` are not in the
+# `safe_browsing` namespace — but our stub DEFINES both. Two suspects:
+#   (a) the staged stub gets overwritten by a sync/checkout step that
+#       runs after our staging; or
+#   (b) the include resolves to a DIFFERENT safe_browsing_prefs.h
+#       elsewhere in the include path that lacks those symbols.
+# Either way, this diagnostic prints definitive evidence the next watcher
+# can use to plan cycle-94. `|| true` ensures it never fails the build.
+# ---------------------------------------------------------------------------
+SB_PREFS_RESOLVED="$CLAUM_BUILD_ROOT/build/src/components/safe_browsing/core/common/safe_browsing_prefs.h"
+if [ -f "$SB_PREFS_RESOLVED" ]; then
+  log_step "Diagnostic: post-stage safe_browsing_prefs.h state ($(wc -l < "$SB_PREFS_RESOLVED") lines)"
+  echo "----- safe_browsing_prefs.h grep for the symbols build #129 reported missing -----"
+  grep -nE 'IsSafeBrowsingEnabled|GetURLAllowlistByPolicy|IsSafeBrowsingPolicyManaged|namespace safe_browsing' "$SB_PREFS_RESOLVED" || echo "  (no matches - stub appears to have been overwritten or stripped)"
+  echo "----- end grep -----"
+else
+  log_warn "Diagnostic: $SB_PREFS_RESOLVED missing (stub stage either failed earlier or got deleted)"
+fi
+
+# Same diagnostic for the .cc file: grep for our injected include + the
+# call sites at lines 159/162 that errored in #129. If the include is
+# present but symbols still missing, we know the issue is namespace/path
+# resolution rather than missing-include.
+RB_FILE="$SRC_ROOT/chrome/browser/chrome_content_browser_client_receiver_bindings.cc"
+if [ -f "$RB_FILE" ]; then
+  log_step "Diagnostic: chrome_content_browser_client_receiver_bindings.cc state"
+  echo "----- include lines + first three safe_browsing:: call sites -----"
+  grep -nE '#include "components/safe_browsing/core/common/safe_browsing_prefs.h"|safe_browsing::IsSafeBrowsingEnabled|safe_browsing::GetURLAllowlistByPolicy' "$RB_FILE" | head -10 || echo "  (no matches - file may have been patched out)"
+  echo "----- end grep -----"
+fi
+
+# ---------------------------------------------------------------------------
 # DIAGNOSTIC: dump several windows of the post-patched BUILD.gn so we can
 # see exactly what state it's in. We dump:
 #   * lines 1-30   — the file header + `source_set("safe_browsing") {` opening
